@@ -1,15 +1,18 @@
 from datetime import datetime, timedelta
 from typing import Any
 
+import httpx
+
 from news_pipeline.archive.schema import enriched_to_row
 from news_pipeline.archive.writer import ArchiveWriter
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
-from news_pipeline.common.exceptions import AntiCrawlError, ScraperError
+from news_pipeline.common.exceptions import AntiCrawlError
 from news_pipeline.common.timeutil import to_market_local, utc_now
 from news_pipeline.dedup.dedup import Dedup
 from news_pipeline.llm.pipeline import LLMPipeline
+from news_pipeline.observability.alert import AlertLevel, BarkAlerter
 from news_pipeline.observability.log import get_logger
 from news_pipeline.pushers.common.burst import BurstSuppressor
 from news_pipeline.pushers.common.message_builder import MessageBuilder
@@ -24,6 +27,20 @@ from news_pipeline.storage.dao.raw_news import RawNewsDAO
 from news_pipeline.storage.dao.source_state import SourceStateDAO
 
 log = get_logger(__name__)
+
+# Exception types that indicate transient infrastructure problems:
+# retry next interval is fine, no alert needed.
+_TRANSIENT_EXC = (
+    httpx.TimeoutException,
+    httpx.ConnectError,
+)
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """Return True if the exception is a known transient network error."""
+    return isinstance(exc, _TRANSIENT_EXC) or (
+        isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code >= 500
+    )
 
 
 def _choose_digest_key(market: Market, now_utc: datetime) -> str:
@@ -46,6 +63,7 @@ async def scrape_one_source(
     state_dao: SourceStateDAO,
     metrics: MetricsDAO,
     lookback_minutes: int = 60,
+    bark: BarkAlerter | None = None,
 ) -> int:
     if await state_dao.is_paused(scraper.source_id):
         log.info("scrape_skip_paused", source=scraper.source_id)
@@ -65,10 +83,39 @@ async def scrape_one_source(
             until=utc_now().replace(tzinfo=None) + timedelta(minutes=30),
             error="anti_crawl",
         )
+        # C-1: alert on anti-crawl detection (throttled by BarkAlerter)
+        if bark is not None:
+            await bark.send(
+                f"anti_crawl_{scraper.source_id}",
+                f"{scraper.source_id} 被反爬, 暂停 30 min",
+                level=AlertLevel.WARN,
+            )
         return 0
-    except (ScraperError, Exception) as e:
-        log.error("scrape_failed", source=scraper.source_id, error=str(e))
-        await state_dao.record_error(scraper.source_id, str(e))
+    except Exception as e:
+        if _is_transient(e):
+            # Transient: HTTP 5xx, timeout, connect error — retry next interval, no alert
+            log.warning(
+                "scrape_transient_error",
+                source=scraper.source_id,
+                error=str(e),
+                category="transient",
+            )
+            await state_dao.record_error(scraper.source_id, str(e))
+        else:
+            # Structural: KeyError, ValueError, AttributeError, parse bug — needs investigation
+            log.error(
+                "scrape_structural_error",
+                source=scraper.source_id,
+                error=str(e),
+                category="structural",
+            )
+            await state_dao.record_error(scraper.source_id, str(e))
+            if bark is not None:
+                await bark.send(
+                    f"scrape_structural_{scraper.source_id}",
+                    f"{scraper.source_id} 结构错误 (可能是 bug): {str(e)[:150]}",
+                    level=AlertLevel.URGENT,
+                )
         return 0
 
     new_count = 0
@@ -228,3 +275,27 @@ async def send_digest(
     await dispatcher.dispatch(msg, channels=channels)
     await digest_dao.mark_consumed(consumed_ids)
     return len(items)
+
+
+async def alert_on_push_failures(
+    *,
+    push_log: PushLogDAO,
+    bark: BarkAlerter | None,
+    threshold: int = 3,
+    window_minutes: int = 60,
+) -> None:
+    """C-4: Check for push channels with repeated failures in the recent window.
+
+    Run every 30 min. If any channel had >= threshold failures in the last
+    window_minutes, send a Bark warn.
+    """
+    if bark is None:
+        return
+    counts = await push_log.failure_counts_by_channel(window_minutes=window_minutes)
+    for channel, count in counts.items():
+        if count >= threshold:
+            await bark.send(
+                f"push_fail_{channel}",
+                f"{channel} 最近 {window_minutes} min 推送失败 {count} 次",
+                level=AlertLevel.WARN,
+            )

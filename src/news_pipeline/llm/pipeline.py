@@ -33,7 +33,8 @@ class LLMPipeline:
 
     async def process(self, art: RawArticle, *, raw_id: int) -> EnrichedNews | None:
         # Check cost ceiling first — raises CostCeilingExceeded if over limit
-        self._cost.check()
+        # check_async also fires Bark alerts at 80% warn and 100% urgent thresholds
+        await self._cost.check_async()
 
         verdict = await self._cls.classify(
             art,

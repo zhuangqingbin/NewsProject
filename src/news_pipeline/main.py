@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from news_pipeline.archive.writer import ArchiveWriter
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.classifier.llm_judge import LLMJudge
 from news_pipeline.classifier.rules import RuleEngine
+from news_pipeline.common.timeutil import utc_now
 from news_pipeline.config.loader import ConfigLoader
 from news_pipeline.config.schema import ClassifierRulesCfg
 from news_pipeline.dedup.dedup import Dedup
@@ -26,8 +28,9 @@ from news_pipeline.llm.extractors import (
 from news_pipeline.llm.pipeline import LLMPipeline
 from news_pipeline.llm.prompts.loader import PromptLoader
 from news_pipeline.llm.router import LLMRouter
-from news_pipeline.observability.alert import BarkAlerter
+from news_pipeline.observability.alert import AlertLevel, BarkAlerter
 from news_pipeline.observability.log import configure_logging, get_logger
+from news_pipeline.observability.weekly_report import build_dlq_summary
 from news_pipeline.pushers.common.burst import BurstSuppressor
 from news_pipeline.pushers.common.feishu_auth import FeishuTenantAuth
 from news_pipeline.pushers.common.message_builder import MessageBuilder
@@ -35,12 +38,14 @@ from news_pipeline.pushers.dispatcher import PusherDispatcher
 from news_pipeline.pushers.factory import build_pushers
 from news_pipeline.router.routes import DispatchRouter
 from news_pipeline.scheduler.jobs import (
+    alert_on_push_failures,
     process_pending,
     scrape_one_source,
     send_digest,
 )
 from news_pipeline.scheduler.runner import SchedulerRunner
 from news_pipeline.scrapers.factory import build_registry
+from news_pipeline.scrapers.registry import ScraperRegistry
 from news_pipeline.storage.dao.audit_log import AuditLogDAO
 from news_pipeline.storage.dao.dead_letter import DeadLetterDAO
 from news_pipeline.storage.dao.digest_buffer import DigestBufferDAO
@@ -99,6 +104,8 @@ async def _amain() -> None:
 
     prompts = PromptLoader(cfg_dir / "prompts")
     p_versions = snap.app.llm.prompt_versions
+    # CostTracker gets bark reference after bark is built (bark may be None if not configured)
+    # bark is built later; we pass it after building. Use a placeholder and update below.
     cost = CostTracker(daily_ceiling_cny=snap.app.runtime.daily_cost_ceiling_cny, pricing=PRICING)
 
     tier2_client, tier2_model = pick_client_and_model(
@@ -214,6 +221,9 @@ async def _amain() -> None:
     if snap.secrets.alert.get("bark_url"):
         bark = BarkAlerter(base_url=snap.secrets.alert["bark_url"])
 
+    # C-2/C-3: wire bark into cost tracker now that bark is available
+    cost._bark = bark
+
     dedup = Dedup(raw_dao, title_distance_max=snap.app.dedup.title_simhash_distance)
     sec_ciks: dict[str, str] = {"NVDA": "1045810", "TSLA": "1318605", "AAPL": "320193"}
     scrapers = build_registry(snap.sources, snap.watchlist, snap.secrets, sec_ciks=sec_ciks)
@@ -225,6 +235,7 @@ async def _amain() -> None:
                 dedup=dedup,
                 state_dao=state_dao,
                 metrics=metrics,
+                bark=bark,
             )
         await process_pending(
             raw_dao=raw_dao,
@@ -256,7 +267,7 @@ async def _amain() -> None:
             seconds=interval,
             jitter=10,
             coro_factory=lambda s=scraper: scrape_one_source(  # type: ignore[misc]
-                scraper=s, dedup=dedup, state_dao=state_dao, metrics=metrics
+                scraper=s, dedup=dedup, state_dao=state_dao, metrics=metrics, bark=bark
             ),
         )
 
@@ -297,6 +308,46 @@ async def _amain() -> None:
             ),
         )
 
+    # B-I11: startup connectivity probe — warns immediately if any source is broken
+    await _probe_scrapers(scrapers, bark)
+
+    # C-4: push failure threshold alert (every 30 min)
+    runner.add_interval(
+        name="push_failure_alert",
+        seconds=1800,
+        coro_factory=lambda: alert_on_push_failures(push_log=push_log, bark=bark),
+    )
+
+    # C-6: daily heartbeat — if you go 24h without seeing this, something is wrong
+    async def _heartbeat() -> None:
+        if bark is not None:
+            await bark.send("heartbeat", "news_pipeline alive", level=AlertLevel.INFO)
+
+    runner.add_interval(
+        name="bark_heartbeat",
+        seconds=86400,
+        coro_factory=_heartbeat,
+    )
+
+    # C-7: weekly DLQ summary (Mon 08:00 CST)
+    async def _weekly_dlq_alert() -> None:
+        if bark is None:
+            return
+        summary = await build_dlq_summary(dlq=_dlq)
+        if summary:
+            await bark.send(
+                "dlq_weekly_summary",
+                f"未处理死信:\n{summary}"[:200],
+                level=AlertLevel.INFO,
+            )
+
+    runner.add_cron(
+        name="dlq_weekly_alert",
+        hour=8,
+        minute=0,
+        coro_factory=_weekly_dlq_alert,
+    )
+
     runner.start()
 
     stop_event = asyncio.Event()
@@ -318,6 +369,29 @@ async def _amain() -> None:
         log.error("shutdown_timeout", waited_seconds=30)
     await db.close()
     log.info("shutdown_complete")
+
+
+async def _probe_scrapers(reg: ScraperRegistry, bark: BarkAlerter | None) -> None:
+    """Quick connectivity check for each enabled scraper at startup.
+
+    Logs warnings on failure; does NOT crash the pipeline.
+    Bark-warns if any scraper is unreachable so user knows within 1 min of restart
+    instead of silently producing 0 items for hours.
+    """
+    for sid in reg.list_ids():
+        scraper = reg.get(sid)
+        try:
+            since = utc_now().replace(tzinfo=None) - timedelta(minutes=5)
+            items = await asyncio.wait_for(scraper.fetch(since), timeout=15)
+            log.info("scraper_probe_ok", source=sid, items=len(items))
+        except Exception as e:
+            log.warning("scraper_probe_failed", source=sid, error=str(e))
+            if bark is not None:
+                await bark.send(
+                    f"scraper_probe_{sid}_failed",
+                    str(e)[:200],
+                    level=AlertLevel.WARN,
+                )
 
 
 async def _digest_job_runner(

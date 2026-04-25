@@ -9,14 +9,47 @@ from news_pipeline.pushers.base import SendResult
 from news_pipeline.pushers.common.retry import async_retry
 
 # https://core.telegram.org/bots/api#markdownv2-style
-_MD2_SPECIAL = r"_*[]()~`>#+-=|{}.!\\"
+#
+# Escaping rules differ by context:
+#   - Text / emphasis / bold: all special chars must be escaped
+#   - Inside `code` spans: only backtick and backslash
+#   - Inside (link_url): only ) and backslash (URL already encoded, _ safe)
+
+# All special chars for regular text context
+_MD2_TEXT_SPECIAL = r"_*[]()~`>#+-=|{}.!\\"
+
+# Inside `code` spans: only backtick and backslash need escaping
+_MD2_CODE_SPECIAL = r"`\\"
+
+# Inside (link_url): only ) and backslash need escaping
+_MD2_LINK_URL_SPECIAL = r")\\"
 
 # Telegram caption limit for sendPhoto
 _CAPTION_MAX = 1024
 
 
+def md2_escape_text(text: str) -> str:
+    """Escape all MarkdownV2 special characters for use in text/emphasis/bold context."""
+    return re.sub(rf"([{re.escape(_MD2_TEXT_SPECIAL)}])", r"\\\1", text)
+
+
+def md2_escape_code(text: str) -> str:
+    """Escape for use inside backtick code spans — only ` and \\ need escaping."""
+    return re.sub(rf"([{re.escape(_MD2_CODE_SPECIAL)}])", r"\\\1", text)
+
+
+def md2_escape_link_url(url: str) -> str:
+    """Escape for use inside link URL parentheses — only ) and \\ need escaping."""
+    return re.sub(rf"([{re.escape(_MD2_LINK_URL_SPECIAL)}])", r"\\\1", url)
+
+
 def md2_escape(text: str) -> str:
-    return re.sub(rf"([{re.escape(_MD2_SPECIAL)}])", r"\\\1", text)
+    """Escape all MarkdownV2 special chars (text context).
+
+    Deprecated: use md2_escape_text / md2_escape_code / md2_escape_link_url
+    for the appropriate context.
+    """
+    return md2_escape_text(text)
 
 
 class TelegramPusher:
@@ -112,16 +145,21 @@ class TelegramPusher:
         )
 
     def _render(self, msg: CommonMessage) -> str:
-        title = md2_escape(msg.title)
-        summary = md2_escape(msg.summary)
-        badges = " ".join(f"`{md2_escape(b.text)}`" for b in msg.badges)
-        links = r"  \| ".join(f"[{md2_escape(d.label)}]({d.url})" for d in msg.deeplinks)
+        title = md2_escape_text(msg.title)
+        summary = md2_escape_text(msg.summary)
+        # Badge text is inside backticks — only ` and \\ need escaping
+        badges = " ".join(f"`{md2_escape_code(b.text)}`" for b in msg.badges)
+        # Link label is in [...] (text context); URL is in (...) (url context)
+        links = r"  \| ".join(
+            f"[{md2_escape_text(d.label)}]({md2_escape_link_url(str(d.url))})"
+            for d in msg.deeplinks
+        )
         chart = ""
         if msg.chart_url:
-            chart = f"\n\n[📈 chart]({msg.chart_url})"
+            chart = f"\n\n[📈 chart]({md2_escape_link_url(str(msg.chart_url))})"
         return (
             f"*{title}*\n"
-            f"_{md2_escape(msg.source_label)}_\n\n"
+            f"_{md2_escape_text(msg.source_label)}_\n\n"
             f"{summary}\n\n"
             f"{badges}\n\n"
             f"{links}{chart}"
