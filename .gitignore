@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Project
+data/
+logs/
+secrets/
+config/secrets.yml
+
+# OMC state (already gitignored conceptually)
+.omc/
+
+# OS
+.DS_Store
