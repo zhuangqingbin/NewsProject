@@ -13,6 +13,7 @@ from news_pipeline.common.enums import (
 )
 from news_pipeline.common.exceptions import LLMError
 from news_pipeline.llm.clients.base import LLMClient, LLMRequest
+from news_pipeline.llm.cost_tracker import CostTracker
 from news_pipeline.llm.prompts.loader import PromptHandle
 
 # ---------------------------------------------------------------------------
@@ -29,9 +30,10 @@ class Tier0Verdict:
 
 
 class Tier0Classifier:
-    def __init__(self, *, client: LLMClient, prompt: PromptHandle) -> None:
+    def __init__(self, *, client: LLMClient, prompt: PromptHandle, cost: CostTracker) -> None:
         self._client = client
         self._prompt = prompt
+        self._cost = cost
 
     async def classify(
         self,
@@ -55,6 +57,7 @@ class Tier0Classifier:
             max_tokens=200,
         )
         resp = await self._client.call(req)
+        self._cost.record(model=resp.model, usage=resp.usage)
         payload = resp.json_payload
         if payload is None:
             raise LLMError("tier0 invalid json")
@@ -72,9 +75,10 @@ class Tier0Classifier:
 
 
 class Tier1Summarizer:
-    def __init__(self, *, client: LLMClient, prompt: PromptHandle) -> None:
+    def __init__(self, *, client: LLMClient, prompt: PromptHandle, cost: CostTracker) -> None:
         self._client = client
         self._prompt = prompt
+        self._cost = cost
 
     async def summarize(self, art: RawArticle, *, raw_id: int) -> EnrichedNews:
         rendered = self._prompt.render(
@@ -92,6 +96,7 @@ class Tier1Summarizer:
             max_tokens=600,
         )
         resp = await self._client.call(req)
+        self._cost.record(model=resp.model, usage=resp.usage)
         payload = resp.json_payload
         if payload is None:
             raise LLMError("tier1 invalid json")
@@ -118,9 +123,10 @@ class Tier1Summarizer:
 
 
 class Tier2DeepExtractor:
-    def __init__(self, *, client: LLMClient, prompt: PromptHandle) -> None:
+    def __init__(self, *, client: LLMClient, prompt: PromptHandle, cost: CostTracker) -> None:
         self._client = client
         self._prompt = prompt
+        self._cost = cost
 
     async def extract(
         self,
@@ -146,6 +152,7 @@ class Tier2DeepExtractor:
             max_tokens=1200,
         )
         resp = await self._client.call(req)
+        self._cost.record(model=resp.model, usage=resp.usage)
         payload = resp.json_payload
         if payload is None:
             raise LLMError("tier2 invalid json")

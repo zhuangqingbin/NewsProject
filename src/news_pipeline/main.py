@@ -88,16 +88,22 @@ async def _amain() -> None:
 
     prompts = PromptLoader(cfg_dir / "prompts")
     p_versions = snap.app.llm.prompt_versions
+    cost = CostTracker(daily_ceiling_cny=snap.app.runtime.daily_cost_ceiling_cny, pricing=PRICING)
     tier0 = Tier0Classifier(
-        client=ds, prompt=prompts.load("tier0_classify", p_versions["tier0_classify"])
+        client=ds,
+        prompt=prompts.load("tier0_classify", p_versions["tier0_classify"]),
+        cost=cost,
     )
     tier1 = Tier1Summarizer(
-        client=ds, prompt=prompts.load("tier1_summarize", p_versions["tier1_summarize"])
+        client=ds,
+        prompt=prompts.load("tier1_summarize", p_versions["tier1_summarize"]),
+        cost=cost,
     )
     tier2 = Tier2DeepExtractor(
-        client=cl, prompt=prompts.load("tier2_extract", p_versions["tier2_extract"])
+        client=cl,
+        prompt=prompts.load("tier2_extract", p_versions["tier2_extract"]),
+        cost=cost,
     )
-    cost = CostTracker(daily_ceiling_cny=snap.app.runtime.daily_cost_ceiling_cny, pricing=PRICING)
     llm_router = LLMRouter(first_party_sources={"sec_edgar", "juchao", "caixin_telegram"})
     llm = LLMPipeline(
         tier0,
