@@ -1,23 +1,21 @@
 """initial 13 tables
 
 Revision ID: 28adb82d0608
-Revises: 
+Revises:
 Create Date: 2026-04-25 17:27:38.805293
 
 """
 from collections.abc import Sequence
-from typing import Union
 
+import sqlalchemy as sa
 import sqlmodel
 from alembic import op
-import sqlalchemy as sa
-
 
 # revision identifiers, used by Alembic.
 revision: str = '0001'
-down_revision: Union[str, Sequence[str], None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -121,8 +119,13 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('raw_id', name='uq_proc_raw')
     )
-    op.create_index('idx_proc_critical_extracted', 'news_processed', ['is_critical', 'extracted_at'], unique=False)
-    op.create_index('idx_proc_push_status', 'news_processed', ['push_status', 'extracted_at'], unique=False)
+    op.create_index(
+        'idx_proc_critical_extracted', 'news_processed',
+        ['is_critical', 'extracted_at'], unique=False,
+    )
+    op.create_index(
+        'idx_proc_push_status', 'news_processed', ['push_status', 'extracted_at'], unique=False
+    )
     op.create_table('digest_buffer',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('news_id', sa.Integer(), nullable=False),
@@ -134,7 +137,9 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('news_id', name='uq_digest_news')
     )
-    op.create_index('idx_digest_pending', 'digest_buffer', ['scheduled_digest', 'consumed_at'], unique=False)
+    op.create_index(
+        'idx_digest_pending', 'digest_buffer', ['scheduled_digest', 'consumed_at'], unique=False
+    )
     op.create_table('news_entities',
     sa.Column('news_id', sa.Integer(), nullable=False),
     sa.Column('entity_id', sa.Integer(), nullable=False),

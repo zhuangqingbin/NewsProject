@@ -1,7 +1,5 @@
 from datetime import datetime
 
-from sqlalchemy import select
-
 from news_pipeline.common.timeutil import utc_now
 from news_pipeline.storage.db import Database
 from news_pipeline.storage.models import SourceState
