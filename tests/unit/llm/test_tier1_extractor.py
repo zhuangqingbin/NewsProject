@@ -1,7 +1,7 @@
 # tests/unit/llm/test_tier1_extractor.py
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -68,7 +68,8 @@ async def test_tier1_returns_enriched(prompt):
         title="t",
         body="b",
     )
-    s = Tier1Summarizer(client=fake, prompt=prompt)
+    mock_cost = MagicMock()
+    s = Tier1Summarizer(client=fake, prompt=prompt, cost=mock_cost)
     out = await s.summarize(art, raw_id=42)
     assert out.raw_id == 42
     assert out.related_tickers == ["NVDA"]

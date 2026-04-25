@@ -1,6 +1,6 @@
 # tests/unit/llm/test_tier0_extractor.py
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -49,7 +49,8 @@ async def test_classify_returns_parsed(prompt_handle):
         usage=TokenUsage(100, 30),
         model="deepseek-v3",
     )
-    cls = Tier0Classifier(client=fake, prompt=prompt_handle)
+    mock_cost = MagicMock()
+    cls = Tier0Classifier(client=fake, prompt=prompt_handle, cost=mock_cost)
     art = RawArticle(
         source="finnhub",
         market=Market.US,

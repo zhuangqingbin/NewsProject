@@ -1,7 +1,7 @@
 # tests/unit/llm/test_tier2_extractor.py
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -73,7 +73,8 @@ async def test_tier2_with_entities(prompt):
         title="t",
         body="b",
     )
-    ext = Tier2DeepExtractor(client=fake, prompt=prompt)
+    mock_cost = MagicMock()
+    ext = Tier2DeepExtractor(client=fake, prompt=prompt, cost=mock_cost)
     out = await ext.extract(art, raw_id=10, recent_context="")
     assert len(out.entities) == 2
     assert out.relations[0].predicate.value == "supplies"
