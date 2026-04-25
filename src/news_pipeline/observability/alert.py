@@ -1,6 +1,7 @@
 # src/news_pipeline/observability/alert.py
 import time
 from enum import StrEnum
+from urllib.parse import quote
 
 import httpx
 
@@ -35,7 +36,12 @@ class BarkAlerter:
             log.debug("alert_throttled", title=title, level=level)
             return False
         self._last_sent[key] = now
-        url = f"{self._base}/{title}/{body}"
+        # Bark URL path segments must be percent-encoded; titles/bodies often
+        # contain newlines, slashes, Unicode, or other special chars that
+        # break url parsers (httpx rejects \n in paths).
+        safe_title = quote(title.replace("\n", " ").strip()[:100], safe="")
+        safe_body = quote(body.replace("\n", " ").strip()[:500], safe="")
+        url = f"{self._base}/{safe_title}/{safe_body}"
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.get(url)

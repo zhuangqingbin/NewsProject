@@ -9,7 +9,7 @@ from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
 from news_pipeline.common.exceptions import AntiCrawlError
-from news_pipeline.common.timeutil import to_market_local, utc_now
+from news_pipeline.common.timeutil import ensure_utc, to_market_local, utc_now
 from news_pipeline.dedup.dedup import Dedup
 from news_pipeline.llm.pipeline import LLMPipeline
 from news_pipeline.observability.alert import AlertLevel, BarkAlerter
@@ -69,11 +69,15 @@ async def scrape_one_source(
         log.info("scrape_skip_paused", source=scraper.source_id)
         return 0
     state = await state_dao.get(scraper.source_id)
-    since = (
+    # `since` MUST be timezone-aware (UTC). Scrapers compare against datetimes
+    # produced by datetime.fromtimestamp(..., tz=UTC) which are aware; mixing
+    # naive + aware raises TypeError. SQLite stores naive UTC, so we add tz back.
+    raw_since = (
         state.last_fetched_at
         if state and state.last_fetched_at
-        else utc_now().replace(tzinfo=None) - timedelta(minutes=lookback_minutes)
+        else utc_now() - timedelta(minutes=lookback_minutes)
     )
+    since = ensure_utc(raw_since)
     try:
         items = await scraper.fetch(since)
     except AntiCrawlError as e:

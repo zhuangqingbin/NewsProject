@@ -3,12 +3,12 @@ from dataclasses import dataclass
 
 from news_pipeline.common.contracts import EnrichedNews, Entity, RawArticle, Relation
 from news_pipeline.common.enums import (
-    EntityType,
-    EventType,
-    Magnitude,
-    Market,
-    Predicate,
-    Sentiment,
+    safe_entity_type,
+    safe_event_type,
+    safe_magnitude,
+    safe_market,
+    safe_predicate,
+    safe_sentiment,
 )
 from news_pipeline.common.exceptions import LLMError
 from news_pipeline.common.timeutil import utc_now
@@ -123,10 +123,10 @@ class Tier1Summarizer:
             summary=payload["summary"],
             related_tickers=payload.get("related_tickers", []),
             sectors=payload.get("sectors", []),
-            event_type=EventType(payload["event_type"]),
-            sentiment=Sentiment(payload["sentiment"]),
-            magnitude=Magnitude(payload["magnitude"]),
-            confidence=float(payload["confidence"]),
+            event_type=safe_event_type(payload.get("event_type")),
+            sentiment=safe_sentiment(payload.get("sentiment")),
+            magnitude=safe_magnitude(payload.get("magnitude")),
+            confidence=float(payload.get("confidence", 0.5)),
             key_quotes=payload.get("key_quotes", []),
             entities=[],
             relations=[],
@@ -186,29 +186,26 @@ class Tier2DeepExtractor:
 
         ents_by_name: dict[str, Entity] = {
             e["name"]: Entity(
-                type=EntityType(e["type"]),
+                type=safe_entity_type(e.get("type")),
                 name=e["name"],
                 ticker=e.get("ticker"),
-                market=Market(e["market"]) if e.get("market") else None,
+                market=safe_market(e.get("market")),
                 aliases=e.get("aliases", []),
             )
             for e in payload.get("entities", [])
+            if e.get("name")
         }
 
         relations: list[Relation] = []
         for r in payload.get("relations", []):
-            sub = ents_by_name.get(r["subject_name"])
-            obj = ents_by_name.get(r["object_name"])
+            sub = ents_by_name.get(r.get("subject_name", ""))
+            obj = ents_by_name.get(r.get("object_name", ""))
             if sub is None or obj is None:
                 continue
-            try:
-                pred = Predicate(r["predicate"])
-            except ValueError:
-                pred = Predicate.MENTIONS
             relations.append(
                 Relation(
                     subject=sub,
-                    predicate=pred,
+                    predicate=safe_predicate(r.get("predicate")),
                     object=obj,
                     confidence=float(r.get("confidence", 0.5)),
                 )
@@ -216,13 +213,13 @@ class Tier2DeepExtractor:
 
         return EnrichedNews(
             raw_id=raw_id,
-            summary=payload["summary"],
+            summary=payload.get("summary", ""),
             related_tickers=payload.get("related_tickers", []),
             sectors=payload.get("sectors", []),
-            event_type=EventType(payload["event_type"]),
-            sentiment=Sentiment(payload["sentiment"]),
-            magnitude=Magnitude(payload["magnitude"]),
-            confidence=float(payload["confidence"]),
+            event_type=safe_event_type(payload.get("event_type")),
+            sentiment=safe_sentiment(payload.get("sentiment")),
+            magnitude=safe_magnitude(payload.get("magnitude")),
+            confidence=float(payload.get("confidence", 0.5)),
             key_quotes=payload.get("key_quotes", []),
             entities=list(ents_by_name.values()),
             relations=relations,

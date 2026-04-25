@@ -1,10 +1,17 @@
 sources:
   finnhub:        {enabled: true, interval_sec: 300}
   sec_edgar:      {enabled: true, interval_sec: 120}
-  yfinance_news:  {enabled: true, interval_sec: 600}
   caixin_telegram: {enabled: true, interval_sec: 60}
   akshare_news:   {enabled: true, interval_sec: 180}
   juchao:         {enabled: true, interval_sec: 120}
-  xueqiu:         {enabled: true, interval_sec: 300}
-  ths:            {enabled: true, interval_sec: 300}
-  tushare_news:   {enabled: true, interval_sec: 600}
+  # Sources below are temporarily disabled — endpoints/API have shifted since
+  # the v0.1.0-mvp implementation and need real-world re-investigation:
+  #   - yfinance_news: yfinance lib changed news object schema (no providerPublishTime)
+  #   - xueqiu: /v4/statuses/stock_timeline.json now returns 404
+  #   - ths: news.10jqka.com.cn/<ticker>/list.shtml URL pattern changed
+  #   - tushare_news: requires higher 积分 tier (paid) for news API
+  # To re-enable any: change `enabled: true` AND fix the corresponding scraper module.
+  yfinance_news:  {enabled: false, interval_sec: 600}
+  xueqiu:         {enabled: false, interval_sec: 300}
+  ths:            {enabled: false, interval_sec: 300}
+  tushare_news:   {enabled: false, interval_sec: 600}
