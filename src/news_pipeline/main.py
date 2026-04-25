@@ -8,6 +8,7 @@ from typing import Any
 
 from news_pipeline.archive.feishu_table import FeishuBitableClient
 from news_pipeline.archive.writer import ArchiveWriter
+from news_pipeline.pushers.common.feishu_auth import FeishuTenantAuth
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.classifier.llm_judge import LLMJudge
 from news_pipeline.classifier.rules import RuleEngine
@@ -190,18 +191,21 @@ async def _amain() -> None:
     )
 
     archive = None
+    feishu_auth: FeishuTenantAuth | None = None
     if snap.secrets.storage.get("feishu_app_id"):
-        us_cli = FeishuBitableClient(
+        feishu_auth = FeishuTenantAuth(
             app_id=snap.secrets.storage["feishu_app_id"],
             app_secret=snap.secrets.storage["feishu_app_secret"],
+        )
+        us_cli = FeishuBitableClient(
             app_token=snap.secrets.storage["feishu_app_token"],
             table_id=snap.secrets.storage["feishu_table_us"],
+            auth=feishu_auth,
         )
         cn_cli = FeishuBitableClient(
-            app_id=snap.secrets.storage["feishu_app_id"],
-            app_secret=snap.secrets.storage["feishu_app_secret"],
             app_token=snap.secrets.storage["feishu_app_token"],
             table_id=snap.secrets.storage["feishu_table_cn"],
+            auth=feishu_auth,
         )
         archive = ArchiveWriter(clients_by_market={"us": us_cli, "cn": cn_cli})
 

@@ -10,7 +10,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_index("uq_chart_req_hash", table_name="chart_cache")
+    # Drop the table directly; SQLite drops its implicit constraint indexes with it.
     op.drop_table("chart_cache")
 
 
@@ -25,5 +25,5 @@ def downgrade() -> None:
         sa.Column("generated_at", sa.DateTime(), nullable=False),
         sa.Column("expires_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("request_hash", name="uq_chart_req_hash"),
     )
-    op.create_index("uq_chart_req_hash", "chart_cache", ["request_hash"], unique=True)
