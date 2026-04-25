@@ -1,5 +1,6 @@
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from news_pipeline.commands.dispatcher import CommandDispatcher
 from news_pipeline.common.timeutil import utc_now
