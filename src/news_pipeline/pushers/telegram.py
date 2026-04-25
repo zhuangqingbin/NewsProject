@@ -1,5 +1,6 @@
 # src/news_pipeline/pushers/telegram.py
 import re
+from io import BytesIO
 
 import httpx
 
@@ -9,6 +10,9 @@ from news_pipeline.pushers.common.retry import async_retry
 
 # https://core.telegram.org/bots/api#markdownv2-style
 _MD2_SPECIAL = r"_*[]()~`>#+-=|{}.!\\"
+
+# Telegram caption limit for sendPhoto
+_CAPTION_MAX = 1024
 
 
 def md2_escape(text: str) -> str:
@@ -32,6 +36,11 @@ class TelegramPusher:
         self._max = max_retries
 
     async def send(self, msg: CommonMessage) -> SendResult:
+        if msg.chart_image is not None:
+            return await self._send_photo(msg)
+        return await self._send_message(msg)
+
+    async def _send_message(self, msg: CommonMessage) -> SendResult:
         text = self._render(msg)
         url = f"https://api.telegram.org/bot{self._bot}/sendMessage"
         body = {
@@ -49,6 +58,43 @@ class TelegramPusher:
         async def _post() -> tuple[int, str]:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 r = await client.post(url, json=body)
+                if r.status_code >= 500:
+                    raise httpx.HTTPStatusError(
+                        message=f"HTTP {r.status_code}",
+                        request=r.request,
+                        response=r,
+                    )
+                return r.status_code, r.text
+
+        try:
+            status, resp_text = await _post()
+        except httpx.HTTPError as e:
+            return SendResult(ok=False, http_status=None, response_body=str(e), retries=self._max)
+        return SendResult(
+            ok=(status == 200), http_status=status, response_body=resp_text, retries=0
+        )
+
+    async def _send_photo(self, msg: CommonMessage) -> SendResult:
+        """Send chart_image as a photo using multipart/form-data (sendPhoto API).
+
+        Caption is truncated to 1024 chars (Telegram limit).
+        """
+        assert msg.chart_image is not None
+        caption = self._render(msg)[:_CAPTION_MAX]
+        url = f"https://api.telegram.org/bot{self._bot}/sendPhoto"
+
+        @async_retry(
+            max_attempts=self._max,
+            backoff_seconds=1.0,
+            retry_on=(httpx.HTTPError,),
+        )
+        async def _post() -> tuple[int, str]:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                r = await client.post(
+                    url,
+                    data={"chat_id": self._chat, "caption": caption, "parse_mode": "MarkdownV2"},
+                    files={"photo": ("chart.png", BytesIO(msg.chart_image), "image/png")},  # type: ignore[arg-type]
+                )
                 if r.status_code >= 500:
                     raise httpx.HTTPStatusError(
                         message=f"HTTP {r.status_code}",

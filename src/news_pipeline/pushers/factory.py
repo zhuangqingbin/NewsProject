@@ -1,6 +1,7 @@
 # src/news_pipeline/pushers/factory.py
 from news_pipeline.config.schema import ChannelsFile, SecretsFile
 from news_pipeline.pushers.base import PusherProtocol
+from news_pipeline.pushers.common.feishu_auth import FeishuTenantAuth
 from news_pipeline.pushers.feishu import FeishuPusher
 from news_pipeline.pushers.telegram import TelegramPusher
 from news_pipeline.pushers.wecom import WecomPusher
@@ -9,6 +10,7 @@ from news_pipeline.pushers.wecom import WecomPusher
 def build_pushers(
     channels: ChannelsFile,
     secrets: SecretsFile,
+    image_auth: FeishuTenantAuth | None = None,
 ) -> dict[str, PusherProtocol]:
     out: dict[str, PusherProtocol] = {}
     for cid, c in channels.channels.items():
@@ -28,6 +30,7 @@ def build_pushers(
                 channel_id=cid,
                 webhook=s[opts["webhook_key"]],
                 sign_secret=s.get(sign_key) or None,
+                image_auth=image_auth,
             )
         elif c.type == "wecom":
             out[cid] = WecomPusher(

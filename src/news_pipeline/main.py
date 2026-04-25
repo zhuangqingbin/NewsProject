@@ -8,7 +8,6 @@ from typing import Any
 
 from news_pipeline.archive.feishu_table import FeishuBitableClient
 from news_pipeline.archive.writer import ArchiveWriter
-from news_pipeline.pushers.common.feishu_auth import FeishuTenantAuth
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.classifier.llm_judge import LLMJudge
 from news_pipeline.classifier.rules import RuleEngine
@@ -30,6 +29,7 @@ from news_pipeline.llm.router import LLMRouter
 from news_pipeline.observability.alert import BarkAlerter
 from news_pipeline.observability.log import configure_logging, get_logger
 from news_pipeline.pushers.common.burst import BurstSuppressor
+from news_pipeline.pushers.common.feishu_auth import FeishuTenantAuth
 from news_pipeline.pushers.common.message_builder import MessageBuilder
 from news_pipeline.pushers.dispatcher import PusherDispatcher
 from news_pipeline.pushers.factory import build_pushers
@@ -160,7 +160,27 @@ async def _amain() -> None:
         + [w.ticker for w in snap.watchlist.cn],
     )
 
-    pushers = build_pushers(snap.channels, snap.secrets)
+    # Build shared FeishuTenantAuth (used by both archive writer and image pusher)
+    archive = None
+    feishu_auth: FeishuTenantAuth | None = None
+    if snap.secrets.storage.get("feishu_app_id"):
+        feishu_auth = FeishuTenantAuth(
+            app_id=snap.secrets.storage["feishu_app_id"],
+            app_secret=snap.secrets.storage["feishu_app_secret"],
+        )
+        us_cli = FeishuBitableClient(
+            app_token=snap.secrets.storage["feishu_app_token"],
+            table_id=snap.secrets.storage["feishu_table_us"],
+            auth=feishu_auth,
+        )
+        cn_cli = FeishuBitableClient(
+            app_token=snap.secrets.storage["feishu_app_token"],
+            table_id=snap.secrets.storage["feishu_table_cn"],
+            auth=feishu_auth,
+        )
+        archive = ArchiveWriter(clients_by_market={"us": us_cli, "cn": cn_cli})
+
+    pushers = build_pushers(snap.channels, snap.secrets, image_auth=feishu_auth)
     dispatcher = PusherDispatcher(pushers)
     msg_builder = MessageBuilder(
         source_labels={
@@ -189,25 +209,6 @@ async def _amain() -> None:
             ],
         }
     )
-
-    archive = None
-    feishu_auth: FeishuTenantAuth | None = None
-    if snap.secrets.storage.get("feishu_app_id"):
-        feishu_auth = FeishuTenantAuth(
-            app_id=snap.secrets.storage["feishu_app_id"],
-            app_secret=snap.secrets.storage["feishu_app_secret"],
-        )
-        us_cli = FeishuBitableClient(
-            app_token=snap.secrets.storage["feishu_app_token"],
-            table_id=snap.secrets.storage["feishu_table_us"],
-            auth=feishu_auth,
-        )
-        cn_cli = FeishuBitableClient(
-            app_token=snap.secrets.storage["feishu_app_token"],
-            table_id=snap.secrets.storage["feishu_table_cn"],
-            auth=feishu_auth,
-        )
-        archive = ArchiveWriter(clients_by_market={"us": us_cli, "cn": cn_cli})
 
     bark = None
     if snap.secrets.alert.get("bark_url"):
