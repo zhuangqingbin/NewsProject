@@ -9,7 +9,6 @@ services:
     volumes:
       - ../data:/app/data
       - ../config:/app/config:ro
-      - ../secrets/secrets.yml:/app/config/secrets.yml:ro
       - ../logs:/app/logs
     environment:
       - TZ=Asia/Shanghai
