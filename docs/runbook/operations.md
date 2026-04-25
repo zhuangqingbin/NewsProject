@@ -3,7 +3,7 @@
 ## Bootstrapping a new server
 
 1. SSH into 阿里云轻量服务器 (Ubuntu 22.04, 2c2g+).
-2. `apt update && apt install -y docker.io docker-compose-v2 sqlite3 ossutil`
+2. `apt update && apt install -y docker.io docker-compose-v2 sqlite3`
 3. `git clone <repo> /opt/news_pipeline && cd /opt/news_pipeline`
 4. `cp config/secrets.yml.example config/secrets.yml && chmod 600 config/secrets.yml && vim config/secrets.yml` — fill in real tokens (gitignored)
 5. `mkdir -p data logs`
