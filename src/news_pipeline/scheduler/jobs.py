@@ -5,9 +5,11 @@ from news_pipeline.archive.schema import enriched_to_row
 from news_pipeline.archive.writer import ArchiveWriter
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.common.contracts import RawArticle
+from datetime import datetime
+
 from news_pipeline.common.enums import Market
 from news_pipeline.common.exceptions import AntiCrawlError, ScraperError
-from news_pipeline.common.timeutil import utc_now
+from news_pipeline.common.timeutil import to_market_local, utc_now
 from news_pipeline.dedup.dedup import Dedup
 from news_pipeline.llm.pipeline import LLMPipeline
 from news_pipeline.observability.log import get_logger
@@ -24,6 +26,19 @@ from news_pipeline.storage.dao.raw_news import RawNewsDAO
 from news_pipeline.storage.dao.source_state import SourceStateDAO
 
 log = get_logger(__name__)
+
+
+def _choose_digest_key(market: Market, now_utc: datetime) -> str:
+    """Return 'morning_{market}' or 'evening_{market}' based on local time.
+
+    Rule: if the market-local hour is before 12:00 (noon), it's a morning
+    digest; otherwise it's an evening digest.  This ensures articles processed
+    during AM hours land in the morning digest and PM/evening articles land in
+    the evening digest, so both digest cron jobs actually receive rows.
+    """
+    local = to_market_local(now_utc, market)
+    period = "morning" if local.hour < 12 else "evening"
+    return f"{period}_{market.value}"
 
 
 async def scrape_one_source(
@@ -168,7 +183,7 @@ async def process_pending(
                     await digest_dao.enqueue(
                         news_id=proc_id,
                         market=art.market.value,
-                        scheduled_digest=f"morning_{art.market.value}",
+                        scheduled_digest=_choose_digest_key(art.market, utc_now()),
                     )
                     break  # one entry per news enough; channel resolved at digest time
 
