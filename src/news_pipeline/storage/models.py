@@ -152,18 +152,6 @@ class DeadLetter(SQLModel, table=True):
     resolved_at: datetime | None = None
 
 
-class ChartCache(SQLModel, table=True):
-    __tablename__ = "chart_cache"
-    __table_args__ = (UniqueConstraint("request_hash", name="uq_chart_req_hash"),)
-    id: int | None = Field(default=None, primary_key=True)
-    request_hash: str
-    ticker: str
-    kind: str
-    oss_url: str
-    generated_at: datetime
-    expires_at: datetime
-
-
 class AuditLog(SQLModel, table=True):
     __tablename__ = "audit_log"
     id: int | None = Field(default=None, primary_key=True)

@@ -41,7 +41,6 @@ from news_pipeline.scheduler.jobs import (
 from news_pipeline.scheduler.runner import SchedulerRunner
 from news_pipeline.scrapers.factory import build_registry
 from news_pipeline.storage.dao.audit_log import AuditLogDAO
-from news_pipeline.storage.dao.chart_cache import ChartCacheDAO
 from news_pipeline.storage.dao.dead_letter import DeadLetterDAO
 from news_pipeline.storage.dao.digest_buffer import DigestBufferDAO
 from news_pipeline.storage.dao.metrics import MetricsDAO
@@ -81,7 +80,6 @@ async def _amain() -> None:
     _dlq = DeadLetterDAO(db)
     _audit = AuditLogDAO(db)
     metrics = MetricsDAO(db)
-    _chart_cache = ChartCacheDAO(db)
 
     # LLM clients
     ds = DashScopeClient(api_key=snap.secrets.llm.get("dashscope_api_key", ""))
