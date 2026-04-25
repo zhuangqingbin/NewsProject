@@ -1,0 +1,29 @@
+# config/prompts/tier3_deep_analysis.v1.yaml
+name: tier3_deep_analysis
+version: 1
+model_target: claude-sonnet-4-6
+description: "On-demand deep analysis (manual /deep command)"
+cache_segments: [system]
+system: |
+  你是高级财经分析师。给定一条新闻 + 该公司近 30 天相关历史, 产出一份 600-1000 字深度分析:
+  1. 事件本身的核心要点
+  2. 短期 (1 周) 可能的市场反应
+  3. 中期 (1 季度) 对基本面的影响
+  4. 上下游/关联公司的传导路径
+  5. 关键风险与对冲建议 (仅信息, 非投资建议)
+  Markdown 输出, 不要 JSON。结尾加一段免责声明。
+output_schema_inline: null
+user_template: |
+  ## 主新闻
+  来源: {source}
+  时间: {published_at}
+  标题: {title}
+  摘要 (LLM): {prior_summary}
+  原文: {body}
+
+  ## 历史关联新闻 (近 30 天)
+  {history}
+guardrails:
+  max_input_tokens: 16000
+  retry_on_invalid_json: 0
+  fallback_model: null
