@@ -1,0 +1,27 @@
+# docker/compose.yml
+services:
+  news_pipeline:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: news_pipeline
+    restart: unless-stopped
+    volumes:
+      - ../data:/app/data
+      - ../config:/app/config:ro
+      - ../secrets/secrets.yml:/app/config/secrets.yml:ro
+      - ../logs:/app/logs
+    environment:
+      - TZ=Asia/Shanghai
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "python", "-m", "news_pipeline.healthcheck"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+          cpus: '1.5'
