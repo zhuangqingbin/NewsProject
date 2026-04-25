@@ -1,4 +1,5 @@
 # src/news_pipeline/llm/cost_tracker.py
+import threading
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -18,6 +19,7 @@ class CostTracker:
         self._ceiling = daily_ceiling_cny
         self._pricing = pricing
         self._daily_total: dict[str, float] = defaultdict(float)
+        self._lock = threading.Lock()
 
     def record(self, *, model: str, usage: TokenUsage) -> None:
         p = self._pricing.get(model)
@@ -27,10 +29,12 @@ class CostTracker:
             usage.output_tokens / 1_000_000
         ) * p.output_per_m_cny
         key = utc_now().date().isoformat()
-        self._daily_total[key] += cost
+        with self._lock:
+            self._daily_total[key] += cost
 
     def today_cost_cny(self) -> float:
-        return self._daily_total[utc_now().date().isoformat()]
+        with self._lock:
+            return self._daily_total[utc_now().date().isoformat()]
 
     def check(self) -> None:
         if self.today_cost_cny() >= self._ceiling:
