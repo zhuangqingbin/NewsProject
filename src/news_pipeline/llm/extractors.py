@@ -30,10 +30,18 @@ class Tier0Verdict:
 
 
 class Tier0Classifier:
-    def __init__(self, *, client: LLMClient, prompt: PromptHandle, cost: CostTracker) -> None:
+    def __init__(
+        self,
+        *,
+        client: LLMClient,
+        prompt: PromptHandle,
+        cost: CostTracker,
+        model_override: str | None = None,
+    ) -> None:
         self._client = client
         self._prompt = prompt
         self._cost = cost
+        self._model_override = model_override
 
     async def classify(
         self,
@@ -49,7 +57,7 @@ class Tier0Classifier:
             watchlist=",".join(watchlist_us + watchlist_cn),
         )
         req = LLMRequest(
-            model=rendered.model_target,
+            model=self._model_override or rendered.model_target,
             system=rendered.system,
             user=rendered.user,
             json_mode=True,
@@ -75,10 +83,18 @@ class Tier0Classifier:
 
 
 class Tier1Summarizer:
-    def __init__(self, *, client: LLMClient, prompt: PromptHandle, cost: CostTracker) -> None:
+    def __init__(
+        self,
+        *,
+        client: LLMClient,
+        prompt: PromptHandle,
+        cost: CostTracker,
+        model_override: str | None = None,
+    ) -> None:
         self._client = client
         self._prompt = prompt
         self._cost = cost
+        self._model_override = model_override
 
     async def summarize(self, art: RawArticle, *, raw_id: int) -> EnrichedNews:
         rendered = self._prompt.render(
@@ -88,7 +104,7 @@ class Tier1Summarizer:
             body=art.body or "",
         )
         req = LLMRequest(
-            model=rendered.model_target,
+            model=self._model_override or rendered.model_target,
             system=rendered.system,
             user=rendered.user,
             json_mode=True,
@@ -123,10 +139,18 @@ class Tier1Summarizer:
 
 
 class Tier2DeepExtractor:
-    def __init__(self, *, client: LLMClient, prompt: PromptHandle, cost: CostTracker) -> None:
+    def __init__(
+        self,
+        *,
+        client: LLMClient,
+        prompt: PromptHandle,
+        cost: CostTracker,
+        model_override: str | None = None,
+    ) -> None:
         self._client = client
         self._prompt = prompt
         self._cost = cost
+        self._model_override = model_override
 
     async def extract(
         self,
@@ -143,9 +167,10 @@ class Tier2DeepExtractor:
             recent_context=recent_context,
         )
         req = LLMRequest(
-            model=rendered.model_target,
+            model=self._model_override or rendered.model_target,
             system=rendered.system,
             user=rendered.user,
+            json_mode=True,
             output_schema=rendered.output_schema,
             cache_segments=rendered.cache_segments,
             few_shot_examples=rendered.few_shot_examples,
