@@ -3,11 +3,17 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from news_pipeline.common.contracts import EnrichedNews, Entity, RawArticle, Relation
-from news_pipeline.common.enums import EntityType, EventType, Magnitude, Market, Predicate, Sentiment
+from news_pipeline.common.enums import (
+    EntityType,
+    EventType,
+    Magnitude,
+    Market,
+    Predicate,
+    Sentiment,
+)
 from news_pipeline.common.exceptions import LLMError
 from news_pipeline.llm.clients.base import LLMClient, LLMRequest
 from news_pipeline.llm.prompts.loader import PromptHandle
-
 
 # ---------------------------------------------------------------------------
 # Tier-0: Title classifier
