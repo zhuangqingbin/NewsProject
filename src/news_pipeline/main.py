@@ -309,7 +309,10 @@ async def _amain() -> None:
         await bark.send("news_pipeline", "started")
 
     await stop_event.wait()
-    await runner.shutdown()
+    try:
+        await asyncio.wait_for(runner.shutdown(), timeout=30)
+    except TimeoutError:
+        log.error("shutdown_timeout", waited_seconds=30)
     await db.close()
     log.info("shutdown_complete")
 
