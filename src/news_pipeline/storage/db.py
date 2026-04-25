@@ -1,5 +1,5 @@
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -12,9 +12,7 @@ from sqlalchemy.ext.asyncio import (
 
 class Database:
     def __init__(self, dsn: str) -> None:
-        self._engine: AsyncEngine = create_async_engine(
-            dsn, echo=False, pool_pre_ping=True
-        )
+        self._engine: AsyncEngine = create_async_engine(dsn, echo=False, pool_pre_ping=True)
         self._sessionmaker = async_sessionmaker(self._engine, expire_on_commit=False)
 
     async def initialize(self) -> None:

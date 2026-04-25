@@ -66,9 +66,7 @@ class Entity(SQLModel, table=True):
     ticker: str | None = None
     market: str | None = None
     aliases: list[str] | None = Field(default=None, sa_column=Column(JSON))
-    metadata_: dict[str, Any] | None = Field(
-        default=None, sa_column=Column("metadata", JSON)
-    )
+    metadata_: dict[str, Any] | None = Field(default=None, sa_column=Column("metadata", JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -150,9 +148,7 @@ class DeadLetter(SQLModel, table=True):
 
 class ChartCache(SQLModel, table=True):
     __tablename__ = "chart_cache"
-    __table_args__ = (
-        UniqueConstraint("request_hash", name="uq_chart_req_hash"),
-    )
+    __table_args__ = (UniqueConstraint("request_hash", name="uq_chart_req_hash"),)
     id: int | None = Field(default=None, primary_key=True)
     request_hash: str
     ticker: str
