@@ -47,6 +47,14 @@
 
 ### 1.2 Anthropic Claude（Tier-2 深度抽取）
 
+**可选**：如果你不打算用 Anthropic（嫌麻烦/没海外卡），**可以完全跳过这一步**。
+
+v0.1.2 起，系统检测到 `anthropic_api_key` 为空或 `REPLACE_ME` 时会自动把 Tier-2 / Tier-3 路由到 DashScope（用 `tier1_model`，默认 DeepSeek-V3）跑。
+
+代价：实体/关系抽取质量稍差，但能跑、月成本压到 ¥10-30。
+
+启动时会有一行 WARN 日志 `anthropic_not_configured_fallback_to_tier1`，提示你"我自动降级了"。
+
 **用途**：Tier-2 实体/关系深度抽取（Haiku 4.5），偶尔 Tier-3 深度分析（Sonnet）
 
 1. 访问 [console.anthropic.com](https://console.anthropic.com/)
@@ -274,17 +282,14 @@ sources:
 ```bash
 cd /Users/qingbin.zhuang/Personal/NewsProject
 
-# 创建 secrets 目录（gitignored）
-mkdir -p secrets
-
-# 复制模板
-cp config/secrets.yml.example secrets/secrets.yml
+# 复制模板（config/secrets.yml 已在 .gitignore，不会被提交）
+cp config/secrets.yml.example config/secrets.yml
 
 # 设置只有自己可读的权限
-chmod 600 secrets/secrets.yml
+chmod 600 config/secrets.yml
 
 # 编辑（填上面所有的真值）
-vim secrets/secrets.yml
+vim config/secrets.yml
 ```
 
 **最终结构示例**：
@@ -467,10 +472,10 @@ rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='data' \
 ```bash
 # 服务器上
 cd /opt/news_pipeline
-mkdir -p secrets data logs
-cp config/secrets.yml.example secrets/secrets.yml
-vim secrets/secrets.yml      # 同本地一样填值
-chmod 600 secrets/secrets.yml
+mkdir -p data logs
+cp config/secrets.yml.example config/secrets.yml
+chmod 600 config/secrets.yml
+vim config/secrets.yml       # 同本地一样填值
 ```
 
 ### 4.5 起服务
@@ -582,7 +587,7 @@ docker compose -f docker/compose.yml logs -f --tail=50
 ```bash
 # 在本地浏览器登录该站 → F12 拿新 cookie
 ssh root@<服务器>
-vim /opt/news_pipeline/secrets/secrets.yml   # 更新 xueqiu_cookie / ths_cookie
+vim /opt/news_pipeline/config/secrets.yml    # 更新 xueqiu_cookie / ths_cookie
 docker compose -f docker/compose.yml restart  # 配置热加载也行，但重启更稳
 ```
 

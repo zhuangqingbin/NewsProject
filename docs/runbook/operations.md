@@ -5,12 +5,11 @@
 1. SSH into 阿里云轻量服务器 (Ubuntu 22.04, 2c2g+).
 2. `apt update && apt install -y docker.io docker-compose-v2 sqlite3 ossutil`
 3. `git clone <repo> /opt/news_pipeline && cd /opt/news_pipeline`
-4. `cp config/secrets.yml.example config/secrets.yml && vim config/secrets.yml` — fill in real tokens
-5. `mkdir -p data logs secrets`
-6. Move secrets to its own dir: `mv config/secrets.yml secrets/secrets.yml`
-7. `docker compose -f docker/compose.yml up -d`
-8. `docker compose logs -f`
-9. Configure host cron (see `backup.md`)
+4. `cp config/secrets.yml.example config/secrets.yml && chmod 600 config/secrets.yml && vim config/secrets.yml` — fill in real tokens (gitignored)
+5. `mkdir -p data logs`
+6. `docker compose -f docker/compose.yml up -d`
+7. `docker compose logs -f`
+8. Configure host cron (see `backup.md`)
 
 ## Routine ops
 
@@ -47,7 +46,7 @@ These steps require real SSH access and secrets and cannot be automated here.
 ```bash
 ssh user@server "mkdir -p /opt/news_pipeline"
 rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='data' \
-  --exclude='secrets' ./ user@server:/opt/news_pipeline/
+  --exclude='config/secrets.yml' ./ user@server:/opt/news_pipeline/
 ```
 
 ### Step 2: Configure secrets
@@ -55,10 +54,10 @@ rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='data' \
 ```bash
 ssh user@server
 cd /opt/news_pipeline
-mkdir -p secrets data logs
-cp config/secrets.yml.example secrets/secrets.yml
-vim secrets/secrets.yml   # paste real values
-chmod 600 secrets/secrets.yml
+mkdir -p data logs
+cp config/secrets.yml.example config/secrets.yml
+chmod 600 config/secrets.yml
+vim config/secrets.yml      # paste real values
 ```
 
 ### Step 3: First run
