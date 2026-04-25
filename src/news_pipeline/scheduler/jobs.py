@@ -1,12 +1,10 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from news_pipeline.archive.schema import enriched_to_row
 from news_pipeline.archive.writer import ArchiveWriter
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.common.contracts import RawArticle
-from datetime import datetime
-
 from news_pipeline.common.enums import Market
 from news_pipeline.common.exceptions import AntiCrawlError, ScraperError
 from news_pipeline.common.timeutil import to_market_local, utc_now

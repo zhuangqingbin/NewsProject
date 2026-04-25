@@ -7,7 +7,6 @@ import pytest
 from news_pipeline.common.enums import Market
 from news_pipeline.scheduler.jobs import _choose_digest_key
 
-
 # ---------------------------------------------------------------------------
 # US market (America/New_York, UTC-4 in summer / UTC-5 in winter)
 # ---------------------------------------------------------------------------

@@ -1,8 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from news_pipeline.commands.server import build_app
-
 
 # ---------------------------------------------------------------------------
 # Helpers
