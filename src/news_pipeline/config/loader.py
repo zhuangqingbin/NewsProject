@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
@@ -46,7 +47,7 @@ class ConfigLoader:
     def __init__(self, base_dir: Path, debounce_ms: int = 250) -> None:
         self._dir = Path(base_dir)
         self._debounce_ms = debounce_ms
-        self._observer: Observer | None = None
+        self._observer: Any = None
         self._lock = threading.Lock()
         self._last_event_at: float = 0.0
         self._callback: Callable[[ConfigSnapshot], None] | None = None
@@ -60,7 +61,7 @@ class ConfigLoader:
             secrets=SecretsFile.model_validate(self._read("secrets.yml")),
         )
 
-    def _read(self, name: str) -> dict:
+    def _read(self, name: str) -> dict[str, object]:
         path = self._dir / name
         with path.open("r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}

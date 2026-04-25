@@ -26,7 +26,6 @@ def register_chart_cmds(d: CommandDispatcher, *, chart_factory: ChartFactory) ->
         # Phase-2 fix: add render_sentiment on ChartFactory.
         # MVP: reuse render_kline with kind="sentiment"
         url = await chart_factory.render_kline(
-            ChartRequest(ticker=ticker, kind="sentiment",
-                          window=f"{days}d", params={})
+            ChartRequest(ticker=ticker, kind="sentiment", window=f"{days}d", params={})
         )
         return f"📊 {ticker} 情绪曲线: {url}"

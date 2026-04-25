@@ -2,12 +2,12 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from news_pipeline.storage.db import Database
-from news_pipeline.storage.models import SQLModelBase
-from news_pipeline.storage.dao.source_state import SourceStateDAO
-from news_pipeline.storage.dao.push_log import PushLogDAO
 from news_pipeline.storage.dao.audit_log import AuditLogDAO
 from news_pipeline.storage.dao.dead_letter import DeadLetterDAO
+from news_pipeline.storage.dao.push_log import PushLogDAO
+from news_pipeline.storage.dao.source_state import SourceStateDAO
+from news_pipeline.storage.db import Database
+from news_pipeline.storage.models import SQLModelBase
 
 
 @pytest.fixture
@@ -16,8 +16,7 @@ async def daos(tmp_path):
     await db.initialize()
     async with db.engine.begin() as c:
         await c.run_sync(SQLModelBase.metadata.create_all)
-    yield (SourceStateDAO(db), PushLogDAO(db),
-           AuditLogDAO(db), DeadLetterDAO(db))
+    yield (SourceStateDAO(db), PushLogDAO(db), AuditLogDAO(db), DeadLetterDAO(db))
     await db.close()
 
 
@@ -47,7 +46,7 @@ async def test_audit_log_writes(daos):
 
 @pytest.mark.asyncio
 async def test_push_log_writes(daos):
-    src, plog, _, _ = daos
+    _src, plog, _, _ = daos
     # push_log.news_id FK → news_processed; insert prerequisite rows via raw SQL
     from sqlalchemy import text
 
@@ -67,7 +66,8 @@ async def test_push_log_writes(daos):
             )
         )
         await s.commit()
-    await plog.write(news_id=1, channel="tg_us", status="ok",
-                     http_status=200, response="", retries=0)
+    await plog.write(
+        news_id=1, channel="tg_us", status="ok", http_status=200, response="", retries=0
+    )
     cnt = await plog.count_today_failures("tg_us")
     assert cnt == 0

@@ -10,7 +10,8 @@ def test_upload_returns_public_url():
     bucket = MagicMock()
     bucket.put_object.return_value = MagicMock(status=200)
     u = OSSUploader(
-        bucket=bucket, endpoint="oss-cn-hangzhou.aliyuncs.com",
+        bucket=bucket,
+        endpoint="oss-cn-hangzhou.aliyuncs.com",
         bucket_name="news-charts",
     )
     url = u.upload(path_in_bucket="charts/2026/04/x.png", content=b"PNG")

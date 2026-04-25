@@ -36,6 +36,6 @@ class LLMClient(Protocol):
 
 def parse_json_or_none(text: str) -> dict[str, Any] | None:
     try:
-        return json.loads(text)
+        return dict(json.loads(text))
     except (json.JSONDecodeError, ValueError):
         return None

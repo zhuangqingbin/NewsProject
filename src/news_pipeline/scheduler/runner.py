@@ -15,7 +15,10 @@ class SchedulerRunner:
         self._sched = AsyncIOScheduler(timezone="UTC")
 
     def add_interval(
-        self, *, name: str, seconds: int,
+        self,
+        *,
+        name: str,
+        seconds: int,
         coro_factory: Callable[[], Any],
         jitter: int | None = None,
     ) -> None:
@@ -24,23 +27,45 @@ class SchedulerRunner:
                 await coro_factory()
             except Exception as e:
                 log.error("job_failed", name=name, error=str(e))
-        self._sched.add_job(_run, trigger=IntervalTrigger(seconds=seconds, jitter=jitter),
-                             id=name, name=name, replace_existing=True,
-                             max_instances=1, coalesce=True)
+
+        self._sched.add_job(
+            _run,
+            trigger=IntervalTrigger(seconds=seconds, jitter=jitter),
+            id=name,
+            name=name,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
 
     def add_cron(
-        self, *, name: str, hour: int, minute: int,
-        coro_factory: Callable[[], Any], timezone: str = "Asia/Shanghai",
+        self,
+        *,
+        name: str,
+        hour: int,
+        minute: int,
+        coro_factory: Callable[[], Any],
+        timezone: str = "Asia/Shanghai",
     ) -> None:
         async def _run() -> None:
             try:
                 await coro_factory()
             except Exception as e:
                 log.error("job_failed", name=name, error=str(e))
-        self._sched.add_job(_run, trigger=CronTrigger(
-            hour=hour, minute=minute, timezone=timezone,
-        ), id=name, name=name, replace_existing=True,
-            max_instances=1, coalesce=True)
+
+        self._sched.add_job(
+            _run,
+            trigger=CronTrigger(
+                hour=hour,
+                minute=minute,
+                timezone=timezone,
+            ),
+            id=name,
+            name=name,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
 
     def start(self) -> None:
         self._sched.start()

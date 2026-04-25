@@ -6,7 +6,9 @@ import respx
 from httpx import Response
 
 from news_pipeline.common.contracts import (
-    Badge, CommonMessage, Deeplink,
+    Badge,
+    CommonMessage,
+    Deeplink,
 )
 from news_pipeline.common.enums import Market
 from news_pipeline.pushers.feishu import FeishuPusher
@@ -14,10 +16,11 @@ from news_pipeline.pushers.feishu import FeishuPusher
 
 def _msg() -> CommonMessage:
     return CommonMessage(
-        title="NVDA -8%", summary="出口管制升级",
-        source_label="Reuters", source_url="https://reut/x",
-        badges=[Badge(text="bearish", color="red"),
-                Badge(text="high", color="yellow")],
+        title="NVDA -8%",
+        summary="出口管制升级",
+        source_label="Reuters",
+        source_url="https://reut/x",
+        badges=[Badge(text="bearish", color="red"), Badge(text="high", color="yellow")],
         chart_url="https://oss/chart.png",
         deeplinks=[Deeplink(label="原文", url="https://reut/x")],
         market=Market.US,
@@ -30,8 +33,7 @@ async def test_send_uses_card_format():
         route = mock.post("https://open.feishu.cn/hook/W").mock(
             return_value=Response(200, json={"code": 0, "msg": "ok"})
         )
-        p = FeishuPusher(channel_id="feishu_us",
-                         webhook="https://open.feishu.cn/hook/W")
+        p = FeishuPusher(channel_id="feishu_us", webhook="https://open.feishu.cn/hook/W")
         result = await p.send(_msg())
         assert result.ok is True
         sent = json.loads(route.calls[0].request.read().decode())

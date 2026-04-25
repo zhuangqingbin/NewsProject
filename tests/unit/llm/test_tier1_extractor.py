@@ -44,18 +44,29 @@ guardrails:
 async def test_tier1_returns_enriched(prompt):
     fake = AsyncMock()
     fake.call.return_value = LLMResponse(
-        text="{}", json_payload={
-            "summary": "..", "related_tickers": ["NVDA"],
-            "sectors": ["semiconductor"], "event_type": "policy",
-            "sentiment": "bearish", "magnitude": "high", "confidence": 0.8,
+        text="{}",
+        json_payload={
+            "summary": "..",
+            "related_tickers": ["NVDA"],
+            "sectors": ["semiconductor"],
+            "event_type": "policy",
+            "sentiment": "bearish",
+            "magnitude": "high",
+            "confidence": 0.8,
             "key_quotes": ["q"],
         },
-        usage=TokenUsage(1500, 300), model="deepseek-v3",
+        usage=TokenUsage(1500, 300),
+        model="deepseek-v3",
     )
     art = RawArticle(
-        source="x", market=Market.US,
-        fetched_at=datetime(2026, 4, 25), published_at=datetime(2026, 4, 25),
-        url="https://x/1", url_hash="h", title="t", body="b",
+        source="x",
+        market=Market.US,
+        fetched_at=datetime(2026, 4, 25),
+        published_at=datetime(2026, 4, 25),
+        url="https://x/1",
+        url_hash="h",
+        title="t",
+        body="b",
     )
     s = Tier1Summarizer(client=fake, prompt=prompt)
     out = await s.summarize(art, raw_id=42)

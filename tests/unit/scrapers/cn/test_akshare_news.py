@@ -1,5 +1,5 @@
 # tests/unit/scrapers/cn/test_akshare_news.py
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pandas as pd
 import pytest

@@ -15,9 +15,7 @@ async def test_cache_hit_skips_render():
     uploader = MagicMock()
     uploader.upload = MagicMock()
     f = ChartFactory(cache_dao=cache, kline_renderer=renderer, uploader=uploader)
-    url = await f.render_kline(
-        ChartRequest(ticker="NVDA", kind="kline", window="30d", params={})
-    )
+    url = await f.render_kline(ChartRequest(ticker="NVDA", kind="kline", window="30d", params={}))
     assert url == "https://oss/x.png"
     renderer.assert_not_called()
     uploader.upload.assert_not_called()
@@ -37,8 +35,6 @@ async def test_cache_miss_renders_uploads_caches():
         uploader=uploader,
         data_loader=lambda t, w: __import__("pandas").DataFrame(),
     )
-    url = await f.render_kline(
-        ChartRequest(ticker="NVDA", kind="kline", window="30d", params={})
-    )
+    url = await f.render_kline(ChartRequest(ticker="NVDA", kind="kline", window="30d", params={}))
     assert url == "https://oss/new.png"
     cache.put.assert_awaited_once()

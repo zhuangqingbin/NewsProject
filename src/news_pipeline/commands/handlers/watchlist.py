@@ -10,8 +10,7 @@ def _is_us(ticker: str) -> bool:
     return ticker.isalpha()
 
 
-def register_watchlist_cmds(d: CommandDispatcher, *,
-                              watchlist_path: Path) -> None:
+def register_watchlist_cmds(d: CommandDispatcher, *, watchlist_path: Path) -> None:
 
     @d.register("watch")
     async def watch(args: list[str], ctx: dict[str, Any]) -> str:
@@ -53,5 +52,7 @@ def register_watchlist_cmds(d: CommandDispatcher, *,
         cn = ", ".join(e["ticker"] for e in data.get("cn", []))
         macro = ", ".join(data.get("macro", []))
         sectors = ", ".join(data.get("sectors", []))
-        return (f"美股: {us or '(空)'}\nA股: {cn or '(空)'}\n"
-                f"宏观: {macro or '(空)'}\n板块: {sectors or '(空)'}")
+        return (
+            f"美股: {us or '(空)'}\nA股: {cn or '(空)'}\n"
+            f"宏观: {macro or '(空)'}\n板块: {sectors or '(空)'}"
+        )

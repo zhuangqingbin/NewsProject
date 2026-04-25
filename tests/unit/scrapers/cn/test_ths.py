@@ -1,12 +1,11 @@
 # tests/unit/scrapers/cn/test_ths.py
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 import respx
 from httpx import Response
 
 from news_pipeline.scrapers.cn.ths import ThsScraper
-
 
 SAMPLE_HTML = """
 <html><body>
@@ -33,6 +32,7 @@ async def test_fetch_parses():
 @pytest.mark.asyncio
 async def test_anticrawl_raises():
     from news_pipeline.common.exceptions import AntiCrawlError
+
     async with respx.mock() as mock:
         mock.get(url__regex=r"https?://news\.10jqka\.com\.cn/.*").mock(
             return_value=Response(403, text="")

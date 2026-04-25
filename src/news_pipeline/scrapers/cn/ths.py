@@ -36,11 +36,7 @@ class ThsScraper:
                     href = a.get("href", "")
                     if not href:
                         continue
-                    link = (
-                        href
-                        if href.startswith("http")
-                        else f"https://news.10jqka.com.cn{href}"
-                    )
+                    link = href if href.startswith("http") else f"https://news.10jqka.com.cn{href}"
                     ts_raw = a.get("data-time")
                     if not ts_raw:
                         continue

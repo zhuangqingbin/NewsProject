@@ -33,12 +33,18 @@ def test_enriched_to_row():
         extracted_at=datetime(2026, 4, 25, 10),
     )
     s = ScoredNews(
-        enriched=e, score=80.0, is_critical=True,
-        rule_hits=["sentiment_high"], llm_reason=None,
+        enriched=e,
+        score=80.0,
+        is_critical=True,
+        rule_hits=["sentiment_high"],
+        llm_reason=None,
     )
     row = enriched_to_row(
-        art, s, news_processed_id=42,
-        sent_to=["tg_us", "feishu_us"], chart_url=None,
+        art,
+        s,
+        news_processed_id=42,
+        sent_to=["tg_us", "feishu_us"],
+        chart_url=None,
     )
     assert row["news_id"] == 42
     assert row["market"] == "美股"

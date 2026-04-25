@@ -60,18 +60,16 @@ class TelegramPusher:
         try:
             status, resp_text = await _post()
         except httpx.HTTPError as e:
-            return SendResult(ok=False, http_status=None,
-                              response_body=str(e), retries=self._max)
-        return SendResult(ok=(status == 200), http_status=status,
-                          response_body=resp_text, retries=0)
+            return SendResult(ok=False, http_status=None, response_body=str(e), retries=self._max)
+        return SendResult(
+            ok=(status == 200), http_status=status, response_body=resp_text, retries=0
+        )
 
     def _render(self, msg: CommonMessage) -> str:
         title = md2_escape(msg.title)
         summary = md2_escape(msg.summary)
         badges = " ".join(f"`{md2_escape(b.text)}`" for b in msg.badges)
-        links = r"  \| ".join(
-            f"[{md2_escape(d.label)}]({d.url})" for d in msg.deeplinks
-        )
+        links = r"  \| ".join(f"[{md2_escape(d.label)}]({d.url})" for d in msg.deeplinks)
         chart = ""
         if msg.chart_url:
             chart = f"\n\n[📈 chart]({msg.chart_url})"

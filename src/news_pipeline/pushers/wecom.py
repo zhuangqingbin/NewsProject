@@ -39,18 +39,11 @@ class WecomPusher:
         try:
             status, resp = await _post()
         except httpx.HTTPError as e:
-            return SendResult(ok=False, http_status=None,
-                              response_body=str(e), retries=self._max)
+            return SendResult(ok=False, http_status=None, response_body=str(e), retries=self._max)
         ok = status == 200 and '"errcode":0' in resp
         return SendResult(ok=ok, http_status=status, response_body=resp, retries=0)
 
     def _render(self, msg: CommonMessage) -> str:
         badges = " ".join(f"`{b.text}`" for b in msg.badges)
         links = " | ".join(f"[{d.label}]({d.url})" for d in msg.deeplinks)
-        return (
-            f"**{msg.title}**\n"
-            f"> {msg.source_label}\n\n"
-            f"{msg.summary}\n\n"
-            f"{badges}\n\n"
-            f"{links}"
-        )
+        return f"**{msg.title}**\n> {msg.source_label}\n\n{msg.summary}\n\n{badges}\n\n{links}"

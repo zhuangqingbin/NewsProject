@@ -1,12 +1,10 @@
-from datetime import datetime, timedelta
-
 import pytest
 
+from news_pipeline.storage.dao.chart_cache import ChartCacheDAO
+from news_pipeline.storage.dao.digest_buffer import DigestBufferDAO
+from news_pipeline.storage.dao.metrics import MetricsDAO
 from news_pipeline.storage.db import Database
 from news_pipeline.storage.models import SQLModelBase
-from news_pipeline.storage.dao.digest_buffer import DigestBufferDAO
-from news_pipeline.storage.dao.chart_cache import ChartCacheDAO
-from news_pipeline.storage.dao.metrics import MetricsDAO
 
 
 @pytest.fixture
@@ -52,8 +50,9 @@ async def test_digest_enqueue_and_consume(daos):
 @pytest.mark.asyncio
 async def test_chart_cache_lookup(daos):
     _, cache, _ = daos
-    await cache.put(request_hash="abc", ticker="NVDA", kind="kline",
-                    oss_url="https://oss/x.png", ttl_days=30)
+    await cache.put(
+        request_hash="abc", ticker="NVDA", kind="kline", oss_url="https://oss/x.png", ttl_days=30
+    )
     found = await cache.get("abc")
     assert found is not None and found.oss_url == "https://oss/x.png"
 
@@ -61,10 +60,7 @@ async def test_chart_cache_lookup(daos):
 @pytest.mark.asyncio
 async def test_metrics_increment(daos):
     _, _, m = daos
-    await m.increment(date_iso="2026-04-25", name="scrape_ok",
-                      dimensions="source=finnhub", delta=5)
-    await m.increment(date_iso="2026-04-25", name="scrape_ok",
-                      dimensions="source=finnhub", delta=3)
-    val = await m.get(date_iso="2026-04-25", name="scrape_ok",
-                      dimensions="source=finnhub")
+    await m.increment(date_iso="2026-04-25", name="scrape_ok", dimensions="source=finnhub", delta=5)
+    await m.increment(date_iso="2026-04-25", name="scrape_ok", dimensions="source=finnhub", delta=3)
+    val = await m.get(date_iso="2026-04-25", name="scrape_ok", dimensions="source=finnhub")
     assert val == 8.0

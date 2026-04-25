@@ -34,7 +34,7 @@ async def test_report_includes_all_sources_and_channels() -> None:
 
 @pytest.mark.asyncio
 async def test_report_sums_7_days() -> None:
-    """Each of 7 days × each source/channel returns 2.0 → total 14."""
+    """Each of 7 days x each source/channel returns 2.0 -> total 14."""
     metrics = MagicMock()
     metrics.get = AsyncMock(side_effect=lambda **kw: 2.0)
     text = await build_weekly_report(
@@ -42,7 +42,7 @@ async def test_report_sums_7_days() -> None:
         sources=["src_a"],
         channels=["ch_a"],
     )
-    # 7 days × 2.0 = 14
+    # 7 days x 2.0 = 14
     assert "14" in text
 
 

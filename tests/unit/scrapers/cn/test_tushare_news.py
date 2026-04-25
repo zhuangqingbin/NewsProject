@@ -1,5 +1,5 @@
 # tests/unit/scrapers/cn/test_tushare_news.py
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pandas as pd
 import pytest
@@ -9,9 +9,9 @@ from news_pipeline.scrapers.cn.tushare_news import TushareNewsScraper
 
 class _FakePro:
     def news(self, src: str, start_date: str, end_date: str) -> pd.DataFrame:
-        return pd.DataFrame([
-            {"datetime": "2026-04-25 14:00:00", "content": "上证大涨", "title": "市场观察"}
-        ])
+        return pd.DataFrame(
+            [{"datetime": "2026-04-25 14:00:00", "content": "上证大涨", "title": "市场观察"}]
+        )
 
 
 @pytest.mark.asyncio

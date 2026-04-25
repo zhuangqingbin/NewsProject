@@ -24,10 +24,16 @@ async def test_watch_adds_to_yaml(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_list_shows_all(tmp_path: Path):
     wl = tmp_path / "watchlist.yml"
-    wl.write_text(yaml.safe_dump({
-        "us": [{"ticker": "NVDA"}], "cn": [{"ticker": "600519"}],
-        "macro": ["FOMC"], "sectors": ["semiconductor"],
-    }))
+    wl.write_text(
+        yaml.safe_dump(
+            {
+                "us": [{"ticker": "NVDA"}],
+                "cn": [{"ticker": "600519"}],
+                "macro": ["FOMC"],
+                "sectors": ["semiconductor"],
+            }
+        )
+    )
     d = CommandDispatcher()
     register_watchlist_cmds(d, watchlist_path=wl)
     out = await d.handle_text("/list", ctx={})
@@ -37,9 +43,11 @@ async def test_list_shows_all(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_news_shows_recent():
     proc_dao = MagicMock()
-    proc_dao.list_recent_for_ticker = AsyncMock(return_value=[
-        MagicMock(summary="出口管制升级", extracted_at="2026-04-25"),
-    ])
+    proc_dao.list_recent_for_ticker = AsyncMock(
+        return_value=[
+            MagicMock(summary="出口管制升级", extracted_at="2026-04-25"),
+        ]
+    )
     d = CommandDispatcher()
     register_news_cmds(d, processed_dao=proc_dao)
     out = await d.handle_text("/news NVDA", ctx={})

@@ -9,9 +9,7 @@ class PusherDispatcher:
     def __init__(self, registry: dict[str, PusherProtocol]) -> None:
         self._reg = registry
 
-    async def dispatch(
-        self, msg: CommonMessage, *, channels: list[str]
-    ) -> dict[str, SendResult]:
+    async def dispatch(self, msg: CommonMessage, *, channels: list[str]) -> dict[str, SendResult]:
         present = [(cid, self._reg[cid]) for cid in channels if cid in self._reg]
         coros = [p.send(msg) for _, p in present]
         results = await asyncio.gather(*coros, return_exceptions=True)

@@ -71,9 +71,9 @@ class NewsProcessedDAO:
             )
             return list(res.scalars())
 
-    async def list_recent_for_ticker(self, ticker: str,
-                                      limit: int = 10) -> list[NewsProcessed]:
+    async def list_recent_for_ticker(self, ticker: str, limit: int = 10) -> list[NewsProcessed]:
         from news_pipeline.storage.models import Entity, NewsEntity
+
         async with self._db.session() as s:
             res = await s.execute(
                 select(NewsProcessed)

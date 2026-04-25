@@ -13,9 +13,7 @@ class ChartCacheDAO:
 
     async def get(self, request_hash: str) -> ChartCache | None:
         async with self._db.session() as s:
-            res = await s.execute(
-                select(ChartCache).where(ChartCache.request_hash == request_hash)
-            )
+            res = await s.execute(select(ChartCache).where(ChartCache.request_hash == request_hash))
             row = res.scalar_one_or_none()
             if row is None:
                 return None

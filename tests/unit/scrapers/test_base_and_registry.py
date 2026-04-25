@@ -1,8 +1,6 @@
 # tests/unit/scrapers/test_base_and_registry.py
-from datetime import datetime, UTC
-from typing import Sequence
-
-import pytest
+from collections.abc import Sequence
+from datetime import datetime
 
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market

@@ -33,16 +33,10 @@ def build_registry(
 
     if "finnhub" in enabled:
         reg.register(
-            FinnhubScraper(
-                token=s["finnhub_token"], tickers=us_tickers, category="general"
-            )
+            FinnhubScraper(token=s["finnhub_token"], tickers=us_tickers, category="general")
         )
     if "sec_edgar" in enabled and sec_ciks:
-        reg.register(
-            SecEdgarScraper(
-                ciks=[sec_ciks[t] for t in us_tickers if t in sec_ciks]
-            )
-        )
+        reg.register(SecEdgarScraper(ciks=[sec_ciks[t] for t in us_tickers if t in sec_ciks]))
     if "yfinance_news" in enabled:
         reg.register(YFinanceNewsScraper(tickers=us_tickers))
     if "caixin_telegram" in enabled:

@@ -1,5 +1,5 @@
 # tests/unit/scrapers/us/test_finnhub.py
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 import respx
@@ -31,9 +31,7 @@ async def test_fetch_parses_articles():
         },
     ]
     async with respx.mock(assert_all_called=True) as mock:
-        mock.get("https://finnhub.io/api/v1/news").mock(
-            return_value=Response(200, json=sample)
-        )
+        mock.get("https://finnhub.io/api/v1/news").mock(return_value=Response(200, json=sample))
         scraper = FinnhubScraper(token="t1", tickers=["NVDA"], category="general")
         # timestamps 1714000000 ≈ 2024-04-25; use since before that
         items = await scraper.fetch(datetime(2024, 1, 1, tzinfo=UTC))
@@ -57,9 +55,7 @@ async def test_fetch_skips_old_items():
         },
     ]
     async with respx.mock() as mock:
-        mock.get("https://finnhub.io/api/v1/news").mock(
-            return_value=Response(200, json=sample)
-        )
+        mock.get("https://finnhub.io/api/v1/news").mock(return_value=Response(200, json=sample))
         scraper = FinnhubScraper(token="t1", tickers=[], category="general")
         items = await scraper.fetch(datetime(2030, 1, 1, tzinfo=UTC))
         assert items == []

@@ -4,7 +4,10 @@ from zoneinfo import ZoneInfo
 
 from news_pipeline.common.enums import Market
 from news_pipeline.common.timeutil import (
-    utc_now, ensure_utc, is_market_hours, to_market_local,
+    ensure_utc,
+    is_market_hours,
+    to_market_local,
+    utc_now,
 )
 
 

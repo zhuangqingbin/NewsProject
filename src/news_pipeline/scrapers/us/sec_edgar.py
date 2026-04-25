@@ -34,7 +34,7 @@ class SecEdgarScraper:
                 resp.raise_for_status()
                 feed = feedparser.parse(resp.text)
                 for e in feed.entries:
-                    ts = datetime(*e.updated_parsed[:6], tzinfo=UTC)
+                    ts = datetime(*e.updated_parsed[:6]).replace(tzinfo=UTC)
                     if ts < since:
                         continue
                     link = e.link

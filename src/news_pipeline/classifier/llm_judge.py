@@ -3,8 +3,8 @@ from news_pipeline.common.contracts import EnrichedNews
 from news_pipeline.llm.clients.base import LLMClient, LLMRequest
 
 JUDGE_SYSTEM = (
-    "你是判定器。给定一条新闻摘要 + 用户 watchlist, 判断是否值得\"立即推送\""
-    "（is_critical=true/false）。输出 JSON {\"is_critical\": bool, \"reason\": str}."  # noqa: RUF001
+    '你是判定器。给定一条新闻摘要 + 用户 watchlist, 判断是否值得"立即推送"'
+    '（is_critical=true/false）。输出 JSON {"is_critical": bool, "reason": str}.'  # noqa: RUF001
     "判定准则: 涉及用户 watchlist 中股票的实质性事件（业绩/重大变更/政策影响）→ true; "  # noqa: RUF001
     "噪音/普通市场评论/无关公司 → false."
 )

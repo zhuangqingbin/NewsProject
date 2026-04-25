@@ -8,23 +8,33 @@ from news_pipeline.pushers.common.message_builder import MessageBuilder
 
 def _make() -> tuple[RawArticle, ScoredNews]:
     art = RawArticle(
-        source="reuters", market=Market.US,
+        source="reuters",
+        market=Market.US,
         fetched_at=datetime(2026, 4, 25),
         published_at=datetime(2026, 4, 25, 22, 30),
-        url="https://reut.com/x", url_hash="h",
-        title="NVDA -8% on export controls", body="...",
+        url="https://reut.com/x",
+        url_hash="h",
+        title="NVDA -8% on export controls",
+        body="...",
     )
     e = EnrichedNews(
-        raw_id=1, summary="出口管制升级",
-        related_tickers=["NVDA", "TSM"], sectors=["semiconductor"],
-        event_type=EventType.POLICY, sentiment=Sentiment.BEARISH,
-        magnitude=Magnitude.HIGH, confidence=0.92,
+        raw_id=1,
+        summary="出口管制升级",
+        related_tickers=["NVDA", "TSM"],
+        sectors=["semiconductor"],
+        event_type=EventType.POLICY,
+        sentiment=Sentiment.BEARISH,
+        magnitude=Magnitude.HIGH,
+        confidence=0.92,
         key_quotes=["将 H100 列入实体清单"],
-        entities=[], relations=[],
-        model_used="claude-haiku-4-5", extracted_at=datetime(2026, 4, 25),
+        entities=[],
+        relations=[],
+        model_used="claude-haiku-4-5",
+        extracted_at=datetime(2026, 4, 25),
     )
-    s = ScoredNews(enriched=e, score=80, is_critical=True,
-                   rule_hits=["sentiment_high"], llm_reason=None)
+    s = ScoredNews(
+        enriched=e, score=80, is_critical=True, rule_hits=["sentiment_high"], llm_reason=None
+    )
     return art, s
 
 

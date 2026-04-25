@@ -36,7 +36,9 @@ class LLMPipeline:
         self._cost.check()
 
         verdict = await self._cls.classify(
-            art, watchlist_us=self._wl_us, watchlist_cn=self._wl_cn,
+            art,
+            watchlist_us=self._wl_us,
+            watchlist_cn=self._wl_cn,
         )
         decision = self._router.decide(art, verdict=verdict)
 

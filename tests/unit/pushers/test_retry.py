@@ -21,8 +21,7 @@ async def test_succeeds_first_try():
 async def test_retries_on_exception():
     calls = {"n": 0}
 
-    @async_retry(max_attempts=3, backoff_seconds=0.0,
-                 retry_on=(RuntimeError,))
+    @async_retry(max_attempts=3, backoff_seconds=0.0, retry_on=(RuntimeError,))
     async def fn():
         calls["n"] += 1
         if calls["n"] < 3:
@@ -35,8 +34,7 @@ async def test_retries_on_exception():
 
 @pytest.mark.asyncio
 async def test_does_not_retry_on_unmatched_exception():
-    @async_retry(max_attempts=3, backoff_seconds=0.0,
-                 retry_on=(RuntimeError,))
+    @async_retry(max_attempts=3, backoff_seconds=0.0, retry_on=(RuntimeError,))
     async def fn():
         raise ValueError("fatal")
 

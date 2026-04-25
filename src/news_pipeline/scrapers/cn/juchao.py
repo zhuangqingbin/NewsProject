@@ -31,13 +31,11 @@ class JuchaoScraper:
                 resp = await client.post(url, data=form)
                 resp.raise_for_status()
                 for ann in resp.json().get("announcements") or []:
-                    ts = datetime.fromtimestamp(
-                        int(ann["announcementTime"]) / 1000, tz=UTC
-                    )
+                    ts = datetime.fromtimestamp(int(ann["announcementTime"]) / 1000, tz=UTC)
                     if ts < since:
                         continue
                     link = "http://static.cninfo.com.cn/" + ann["adjunctUrl"]
-                    title = f'{ann["secName"]} {ann["announcementTitle"]}'
+                    title = f"{ann['secName']} {ann['announcementTitle']}"
                     out.append(
                         RawArticle(
                             source=self.source_id,

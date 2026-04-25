@@ -1,12 +1,11 @@
 # tests/unit/scrapers/cn/test_juchao.py
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 import respx
 from httpx import Response
 
 from news_pipeline.scrapers.cn.juchao import JuchaoScraper
-
 
 SAMPLE = {
     "announcements": [

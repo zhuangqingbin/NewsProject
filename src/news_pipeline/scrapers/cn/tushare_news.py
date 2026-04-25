@@ -53,9 +53,10 @@ class TushareNewsScraper:
             title = str(row.get("title") or row["content"][:60])
             content = str(row["content"])
             # Synthetic URL since tushare API doesn't always provide one
-            synthetic = f"https://tushare.local/{self._src}/" + hashlib.sha1(
-                (str(row["datetime"]) + content).encode()
-            ).hexdigest()[:16]
+            synthetic = (
+                f"https://tushare.local/{self._src}/"
+                + hashlib.sha1((str(row["datetime"]) + content).encode()).hexdigest()[:16]
+            )
             out.append(
                 RawArticle(
                     source=self.source_id,

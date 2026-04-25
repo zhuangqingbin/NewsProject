@@ -1,8 +1,13 @@
 # tests/unit/common/test_exceptions.py
 import pytest
+
 from news_pipeline.common.exceptions import (
-    PipelineError, ScraperError, LLMError, PusherError,
-    AntiCrawlError, CostCeilingExceeded,
+    AntiCrawlError,
+    CostCeilingExceeded,
+    LLMError,
+    PipelineError,
+    PusherError,
+    ScraperError,
 )
 
 

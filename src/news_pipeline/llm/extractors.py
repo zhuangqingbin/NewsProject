@@ -43,7 +43,7 @@ class Tier0Classifier:
         rendered = self._prompt.render(
             title=art.title,
             source=art.source,
-            tickers=",".join(art.raw_meta.get("tickers", []) or []),
+            tickers=",".join(art.raw_meta.get("tickers", []) or []),  # type: ignore[arg-type]
             watchlist=",".join(watchlist_us + watchlist_cn),
         )
         req = LLMRequest(

@@ -19,9 +19,7 @@ class AnthropicClient:
         _client: Any | None = None,
         timeout: float = 60.0,
     ) -> None:
-        self._client = _client or anthropic.AsyncAnthropic(
-            api_key=api_key, timeout=timeout
-        )
+        self._client = _client or anthropic.AsyncAnthropic(api_key=api_key, timeout=timeout)
 
     async def call(self, req: LLMRequest) -> LLMResponse:
         kwargs: dict[str, Any] = {

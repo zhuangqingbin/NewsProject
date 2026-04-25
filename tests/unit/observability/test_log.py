@@ -1,6 +1,5 @@
 # tests/unit/observability/test_log.py
 import json
-import logging
 
 from news_pipeline.observability.log import configure_logging, get_logger
 

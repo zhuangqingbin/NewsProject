@@ -14,9 +14,7 @@ class ModelPricing:
 
 
 class CostTracker:
-    def __init__(
-        self, *, daily_ceiling_cny: float, pricing: dict[str, ModelPricing]
-    ) -> None:
+    def __init__(self, *, daily_ceiling_cny: float, pricing: dict[str, ModelPricing]) -> None:
         self._ceiling = daily_ceiling_cny
         self._pricing = pricing
         self._daily_total: dict[str, float] = defaultdict(float)

@@ -26,8 +26,7 @@ class XueqiuScraper:
             for t in self._tickers:
                 stock = self._symbol(t)
                 url = (
-                    f"https://xueqiu.com/v4/statuses/stock_timeline.json"
-                    f"?symbol_id={stock}&count=20"
+                    f"https://xueqiu.com/v4/statuses/stock_timeline.json?symbol_id={stock}&count=20"
                 )
                 resp = await client.get(url, cookies=self._cookies)
                 if resp.status_code in (401, 403):
@@ -38,9 +37,7 @@ class XueqiuScraper:
                     )
                 resp.raise_for_status()
                 for item in resp.json().get("list", []):
-                    ts = datetime.fromtimestamp(
-                        int(item["created_at"]) / 1000, tz=UTC
-                    )
+                    ts = datetime.fromtimestamp(int(item["created_at"]) / 1000, tz=UTC)
                     if ts < since:
                         continue
                     link = "https://xueqiu.com" + item["target"]

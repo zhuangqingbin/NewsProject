@@ -23,7 +23,7 @@ class DashScopeClient:
 
     async def call(self, req: LLMRequest) -> LLMResponse:
         url = f"{self._base}/chat/completions"
-        body: dict = {
+        body: dict[str, object] = {
             "model": req.model,
             "messages": [
                 {"role": "system", "content": req.system},
@@ -45,9 +45,7 @@ class DashScopeClient:
             json_payload=parse_json_or_none(text) if req.json_mode else None,
             usage=TokenUsage(
                 input_tokens=int(usage.get("input_tokens", usage.get("prompt_tokens", 0))),
-                output_tokens=int(
-                    usage.get("output_tokens", usage.get("completion_tokens", 0))
-                ),
+                output_tokens=int(usage.get("output_tokens", usage.get("completion_tokens", 0))),
             ),
             model=req.model,
         )

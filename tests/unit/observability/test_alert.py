@@ -3,7 +3,7 @@ import pytest
 import respx
 from httpx import Response
 
-from news_pipeline.observability.alert import BarkAlerter, AlertLevel
+from news_pipeline.observability.alert import AlertLevel, BarkAlerter
 
 
 @pytest.mark.asyncio

@@ -2,7 +2,6 @@
 from datetime import datetime
 
 import pandas as pd
-import pytest
 
 from news_pipeline.charts.kline import render_kline
 

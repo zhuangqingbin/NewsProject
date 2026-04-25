@@ -1,12 +1,11 @@
 # tests/unit/scrapers/cn/test_caixin_telegram.py
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 import respx
 from httpx import Response
 
 from news_pipeline.scrapers.cn.caixin_telegram import CaixinTelegramScraper
-
 
 SAMPLE = {
     "data": {

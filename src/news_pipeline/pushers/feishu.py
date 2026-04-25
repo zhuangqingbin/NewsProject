@@ -55,8 +55,7 @@ class FeishuPusher:
         try:
             status, resp = await _post()
         except httpx.HTTPError as e:
-            return SendResult(ok=False, http_status=None,
-                              response_body=str(e), retries=self._max)
+            return SendResult(ok=False, http_status=None, response_body=str(e), retries=self._max)
         ok = status == 200 and '"code":0' in resp
         return SendResult(ok=ok, http_status=status, response_body=resp, retries=0)
 
@@ -81,11 +80,13 @@ class FeishuPusher:
             {"tag": "div", "text": {"tag": "lark_md", "content": body_text}},
         ]
         if msg.chart_url:
-            elements.append({
-                "tag": "img",
-                "img_key": str(msg.chart_url),
-                "alt": {"tag": "plain_text", "content": "chart"},
-            })
+            elements.append(
+                {
+                    "tag": "img",
+                    "img_key": str(msg.chart_url),
+                    "alt": {"tag": "plain_text", "content": "chart"},
+                }
+            )
         return {
             "msg_type": "interactive",
             "card": {

@@ -12,10 +12,10 @@ class CommandDispatcher:
         def deco(fn: CommandHandler) -> CommandHandler:
             self._handlers[name] = fn
             return fn
+
         return deco
 
-    async def handle_text(self, text: str, *,
-                           ctx: dict[str, Any]) -> str | None:
+    async def handle_text(self, text: str, *, ctx: dict[str, Any]) -> str | None:
         text = text.strip()
         if not text.startswith("/"):
             return None

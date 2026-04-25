@@ -31,7 +31,8 @@ guardrails: {max_input_tokens: 4000, retry_on_invalid_json: 1, fallback_model: d
 async def test_tier2_with_entities(prompt):
     fake = AsyncMock()
     fake.call.return_value = LLMResponse(
-        text="", json_payload={
+        text="",
+        json_payload={
             "summary": "出口管制",
             "related_tickers": ["NVDA", "TSM"],
             "sectors": ["semiconductor"],
@@ -41,22 +42,36 @@ async def test_tier2_with_entities(prompt):
             "confidence": 0.9,
             "key_quotes": ["…"],
             "entities": [
-                {"type": "company", "name": "NVIDIA", "ticker": "NVDA",
-                 "market": "us", "aliases": ["英伟达"]},
-                {"type": "company", "name": "TSMC", "ticker": "TSM",
-                 "market": "us", "aliases": []},
+                {
+                    "type": "company",
+                    "name": "NVIDIA",
+                    "ticker": "NVDA",
+                    "market": "us",
+                    "aliases": ["英伟达"],
+                },
+                {"type": "company", "name": "TSMC", "ticker": "TSM", "market": "us", "aliases": []},
             ],
             "relations": [
-                {"subject_name": "NVIDIA", "predicate": "supplies",
-                 "object_name": "TSMC", "confidence": 0.7}
+                {
+                    "subject_name": "NVIDIA",
+                    "predicate": "supplies",
+                    "object_name": "TSMC",
+                    "confidence": 0.7,
+                }
             ],
         },
-        usage=TokenUsage(2000, 500), model="claude-haiku-4-5",
+        usage=TokenUsage(2000, 500),
+        model="claude-haiku-4-5",
     )
     art = RawArticle(
-        source="reuters", market=Market.US,
-        fetched_at=datetime(2026, 4, 25), published_at=datetime(2026, 4, 25),
-        url="https://x/1", url_hash="h", title="t", body="b",
+        source="reuters",
+        market=Market.US,
+        fetched_at=datetime(2026, 4, 25),
+        published_at=datetime(2026, 4, 25),
+        url="https://x/1",
+        url_hash="h",
+        title="t",
+        body="b",
     )
     ext = Tier2DeepExtractor(client=fake, prompt=prompt)
     out = await ext.extract(art, raw_id=10, recent_context="")

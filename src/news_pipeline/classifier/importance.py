@@ -26,20 +26,29 @@ class ImportanceClassifier:
         # Above gray-zone ceiling → definitively critical, no LLM needed
         if score >= self._hi:
             return ScoredNews(
-                enriched=e, score=score, is_critical=True,
-                rule_hits=rule_names, llm_reason=None,
+                enriched=e,
+                score=score,
+                is_critical=True,
+                rule_hits=rule_names,
+                llm_reason=None,
             )
 
         # Below gray-zone floor → definitively not critical, no LLM needed
         if score < self._lo:
             return ScoredNews(
-                enriched=e, score=score, is_critical=False,
-                rule_hits=rule_names, llm_reason=None,
+                enriched=e,
+                score=score,
+                is_critical=False,
+                rule_hits=rule_names,
+                llm_reason=None,
             )
 
         # Gray zone [lo, hi) → LLM judge breaks the tie
         is_crit, reason = await self._judge.judge(e, watchlist_tickers=self._wl)
         return ScoredNews(
-            enriched=e, score=score, is_critical=is_crit,
-            rule_hits=rule_names, llm_reason=reason,
+            enriched=e,
+            score=score,
+            is_critical=is_crit,
+            rule_hits=rule_names,
+            llm_reason=reason,
         )

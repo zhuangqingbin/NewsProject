@@ -46,9 +46,7 @@ async def test_fts_search(tmp_path):
         )
         await s.commit()
         rows = (
-            await s.execute(
-                text("SELECT rowid FROM news_fts WHERE news_fts MATCH 'exports'")
-            )
+            await s.execute(text("SELECT rowid FROM news_fts WHERE news_fts MATCH 'exports'"))
         ).all()
         assert len(rows) == 1
     await db.close()

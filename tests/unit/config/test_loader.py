@@ -13,7 +13,9 @@ def cfg_dir(tmp_path: Path) -> Path:
     (tmp_path / "watchlist.yml").write_text("us: []\ncn: []\nmacro: []\nsectors: []\n")
     (tmp_path / "channels.yml").write_text("channels: {}\n")
     (tmp_path / "sources.yml").write_text("sources: {}\n")
-    (tmp_path / "secrets.yml").write_text("llm: {}\npush: {}\nstorage: {}\noss: {}\nsources: {}\nalert: {}\n")
+    (tmp_path / "secrets.yml").write_text(
+        "llm: {}\npush: {}\nstorage: {}\noss: {}\nsources: {}\nalert: {}\n"
+    )
     return tmp_path
 
 
@@ -54,7 +56,7 @@ def test_loader_loads_all(cfg_dir: Path) -> None:
 @pytest.mark.asyncio
 async def test_loader_hot_reload_emits_event(cfg_dir: Path) -> None:
     loader = ConfigLoader(cfg_dir, debounce_ms=50)
-    snap1 = loader.load()
+    loader.load()
     seen: list[str] = []
 
     def on_change(snap):  # type: ignore[no-untyped-def]
@@ -63,8 +65,9 @@ async def test_loader_hot_reload_emits_event(cfg_dir: Path) -> None:
     loader.start_watching(on_change)
     try:
         await asyncio.sleep(0.1)
-        new = _minimal_app_yml().replace("daily_cost_ceiling_cny: 5.0",
-                                          "daily_cost_ceiling_cny: 7.5")
+        new = _minimal_app_yml().replace(
+            "daily_cost_ceiling_cny: 5.0", "daily_cost_ceiling_cny: 7.5"
+        )
         (cfg_dir / "app.yml").write_text(new)
         for _ in range(20):
             await asyncio.sleep(0.1)

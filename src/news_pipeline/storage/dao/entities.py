@@ -21,9 +21,7 @@ class EntitiesDAO:
         metadata: dict[str, Any] | None = None,
     ) -> int:
         async with self._db.session() as s:
-            res = await s.execute(
-                select(Entity).where(Entity.type == type, Entity.name == name)
-            )
+            res = await s.execute(select(Entity).where(Entity.type == type, Entity.name == name))
             existing = res.scalar_one_or_none()
             if existing is not None:
                 # merge aliases
@@ -53,9 +51,7 @@ class EntitiesDAO:
 
     async def find(self, *, type: str, name: str) -> Entity | None:
         async with self._db.session() as s:
-            res = await s.execute(
-                select(Entity).where(Entity.type == type, Entity.name == name)
-            )
+            res = await s.execute(select(Entity).where(Entity.type == type, Entity.name == name))
             return res.scalar_one_or_none()
 
     async def find_by_ticker(self, ticker: str) -> Entity | None:
@@ -72,8 +68,6 @@ class EntitiesDAO:
         salience: float,
     ) -> None:
         async with self._db.session() as s:
-            row = NewsEntity(
-                news_id=news_id, entity_id=entity_id, role=role, salience=salience
-            )
+            row = NewsEntity(news_id=news_id, entity_id=entity_id, role=role, salience=salience)
             s.add(row)
             await s.commit()

@@ -1,5 +1,5 @@
 # tests/unit/scrapers/us/test_yfinance_news.py
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 

@@ -4,6 +4,7 @@ import asyncio
 import os
 import signal
 from pathlib import Path
+from typing import Any
 
 from news_pipeline.archive.feishu_table import FeishuBitableClient
 from news_pipeline.archive.writer import ArchiveWriter
@@ -51,8 +52,7 @@ from news_pipeline.storage.db import Database
 
 PRICING = {
     "deepseek-v3": ModelPricing(input_per_m_cny=0.5, output_per_m_cny=1.5),
-    "claude-haiku-4-5-20251001": ModelPricing(input_per_m_cny=7.0,
-                                               output_per_m_cny=35.0),
+    "claude-haiku-4-5-20251001": ModelPricing(input_per_m_cny=7.0, output_per_m_cny=35.0),
     "claude-sonnet-4-6": ModelPricing(input_per_m_cny=21.0, output_per_m_cny=105.0),
 }
 
@@ -88,20 +88,23 @@ async def _amain() -> None:
 
     prompts = PromptLoader(cfg_dir / "prompts")
     p_versions = snap.app.llm.prompt_versions
-    tier0 = Tier0Classifier(client=ds,
-                            prompt=prompts.load("tier0_classify",
-                                                 p_versions["tier0_classify"]))
-    tier1 = Tier1Summarizer(client=ds,
-                             prompt=prompts.load("tier1_summarize",
-                                                  p_versions["tier1_summarize"]))
-    tier2 = Tier2DeepExtractor(client=cl,
-                                prompt=prompts.load("tier2_extract",
-                                                     p_versions["tier2_extract"]))
-    cost = CostTracker(daily_ceiling_cny=snap.app.runtime.daily_cost_ceiling_cny,
-                        pricing=PRICING)
+    tier0 = Tier0Classifier(
+        client=ds, prompt=prompts.load("tier0_classify", p_versions["tier0_classify"])
+    )
+    tier1 = Tier1Summarizer(
+        client=ds, prompt=prompts.load("tier1_summarize", p_versions["tier1_summarize"])
+    )
+    tier2 = Tier2DeepExtractor(
+        client=cl, prompt=prompts.load("tier2_extract", p_versions["tier2_extract"])
+    )
+    cost = CostTracker(daily_ceiling_cny=snap.app.runtime.daily_cost_ceiling_cny, pricing=PRICING)
     llm_router = LLMRouter(first_party_sources={"sec_edgar", "juchao", "caixin_telegram"})
     llm = LLMPipeline(
-        tier0, tier1, tier2, llm_router, cost,
+        tier0,
+        tier1,
+        tier2,
+        llm_router,
+        cost,
         watchlist_us=[w.ticker for w in snap.watchlist.us],
         watchlist_cn=[w.ticker for w in snap.watchlist.cn],
     )
@@ -109,37 +112,51 @@ async def _amain() -> None:
     if snap.app.classifier.rules:
         rules = RuleEngine(snap.app.classifier.rules)
     else:
-        rules = RuleEngine(ClassifierRulesCfg(
-            price_move_critical_pct=5.0,
-            sources_always_critical=["sec_edgar", "juchao"],
-            sentiment_high_magnitude_critical=True,
-        ))
+        rules = RuleEngine(
+            ClassifierRulesCfg(
+                price_move_critical_pct=5.0,
+                sources_always_critical=["sec_edgar", "juchao"],
+                sentiment_high_magnitude_critical=True,
+            )
+        )
     judge = LLMJudge(client=ds, model=snap.app.llm.tier1_model)
     importance = ImportanceClassifier(
-        rules=rules, judge=judge,
+        rules=rules,
+        judge=judge,
         gray_zone=tuple(snap.app.classifier.llm_fallback_when_score),  # type: ignore[arg-type]
         watchlist_tickers=[w.ticker for w in snap.watchlist.us]
-                          + [w.ticker for w in snap.watchlist.cn],
+        + [w.ticker for w in snap.watchlist.cn],
     )
 
     pushers = build_pushers(snap.channels, snap.secrets)
     dispatcher = PusherDispatcher(pushers)
-    msg_builder = MessageBuilder(source_labels={
-        "finnhub": "Finnhub", "sec_edgar": "SEC EDGAR",
-        "yfinance_news": "Yahoo", "caixin_telegram": "财联社",
-        "akshare_news": "东财", "xueqiu": "雪球", "ths": "同花顺",
-        "juchao": "巨潮", "tushare_news": "Tushare",
-    })
+    msg_builder = MessageBuilder(
+        source_labels={
+            "finnhub": "Finnhub",
+            "sec_edgar": "SEC EDGAR",
+            "yfinance_news": "Yahoo",
+            "caixin_telegram": "财联社",
+            "akshare_news": "东财",
+            "xueqiu": "雪球",
+            "ths": "同花顺",
+            "juchao": "巨潮",
+            "tushare_news": "Tushare",
+        }
+    )
     burst = BurstSuppressor(
         window_seconds=snap.app.push.same_ticker_burst_window_min * 60,
         threshold=snap.app.push.same_ticker_burst_threshold,
     )
-    dispatch_router = DispatchRouter(channels_by_market={
-        "us": [c for c, ch in snap.channels.channels.items()
-                if ch.market == "us" and ch.enabled],
-        "cn": [c for c, ch in snap.channels.channels.items()
-                if ch.market == "cn" and ch.enabled],
-    })
+    dispatch_router = DispatchRouter(
+        channels_by_market={
+            "us": [
+                c for c, ch in snap.channels.channels.items() if ch.market == "us" and ch.enabled
+            ],
+            "cn": [
+                c for c, ch in snap.channels.channels.items() if ch.market == "cn" and ch.enabled
+            ],
+        }
+    )
 
     archive = None
     if snap.secrets.storage.get("feishu_app_id"):
@@ -163,19 +180,28 @@ async def _amain() -> None:
 
     dedup = Dedup(raw_dao, title_distance_max=snap.app.dedup.title_simhash_distance)
     sec_ciks: dict[str, str] = {"NVDA": "1045810", "TSLA": "1318605", "AAPL": "320193"}
-    scrapers = build_registry(snap.sources, snap.watchlist, snap.secrets,
-                                sec_ciks=sec_ciks)
+    scrapers = build_registry(snap.sources, snap.watchlist, snap.secrets, sec_ciks=sec_ciks)
 
     if once:
         for sid in scrapers.list_ids():
             await scrape_one_source(
-                scraper=scrapers.get(sid), dedup=dedup,
-                state_dao=state_dao, metrics=metrics,
+                scraper=scrapers.get(sid),
+                dedup=dedup,
+                state_dao=state_dao,
+                metrics=metrics,
             )
         await process_pending(
-            raw_dao=raw_dao, llm=llm, importance=importance, proc_dao=proc_dao,
-            msg_builder=msg_builder, router=dispatch_router, dispatcher=dispatcher,
-            push_log=push_log, digest_dao=digest_dao, archive=archive, burst=burst,
+            raw_dao=raw_dao,
+            llm=llm,
+            importance=importance,
+            proc_dao=proc_dao,
+            msg_builder=msg_builder,
+            router=dispatch_router,
+            dispatcher=dispatcher,
+            push_log=push_log,
+            digest_dao=digest_dao,
+            archive=archive,
+            burst=burst,
         )
         await db.close()
         return
@@ -184,37 +210,55 @@ async def _amain() -> None:
     for sid in scrapers.list_ids():
         scraper = scrapers.get(sid)
         src_cfg = snap.sources.sources.get(sid)
-        interval = (src_cfg.interval_sec if src_cfg and src_cfg.interval_sec
-                    else snap.app.scheduler.scrape.market_hours_interval_sec)
+        interval = (
+            src_cfg.interval_sec
+            if src_cfg and src_cfg.interval_sec
+            else snap.app.scheduler.scrape.market_hours_interval_sec
+        )
         runner.add_interval(
-            name=f"scrape_{sid}", seconds=interval, jitter=10,
-            coro_factory=lambda s=scraper: scrape_one_source(
-                scraper=s, dedup=dedup, state_dao=state_dao, metrics=metrics),
+            name=f"scrape_{sid}",
+            seconds=interval,
+            jitter=10,
+            coro_factory=lambda s=scraper: scrape_one_source(  # type: ignore[misc]
+                scraper=s, dedup=dedup, state_dao=state_dao, metrics=metrics
+            ),
         )
 
     runner.add_interval(
         name="process_pending",
         seconds=snap.app.scheduler.llm.process_interval_sec,
         coro_factory=lambda: process_pending(
-            raw_dao=raw_dao, llm=llm, importance=importance, proc_dao=proc_dao,
-            msg_builder=msg_builder, router=dispatch_router, dispatcher=dispatcher,
-            push_log=push_log, digest_dao=digest_dao, archive=archive, burst=burst,
+            raw_dao=raw_dao,
+            llm=llm,
+            importance=importance,
+            proc_dao=proc_dao,
+            msg_builder=msg_builder,
+            router=dispatch_router,
+            dispatcher=dispatcher,
+            push_log=push_log,
+            digest_dao=digest_dao,
+            archive=archive,
+            burst=burst,
         ),
     )
 
     # Digest cron jobs (4 per day)
-    for key, hm in [("morning_us", snap.app.scheduler.digest.morning_us),
-                    ("evening_us", snap.app.scheduler.digest.evening_us),
-                    ("morning_cn", snap.app.scheduler.digest.morning_cn),
-                    ("evening_cn", snap.app.scheduler.digest.evening_cn)]:
+    for key, hm in [
+        ("morning_us", snap.app.scheduler.digest.morning_us),
+        ("evening_us", snap.app.scheduler.digest.evening_us),
+        ("morning_cn", snap.app.scheduler.digest.morning_cn),
+        ("evening_cn", snap.app.scheduler.digest.evening_cn),
+    ]:
         h, m = map(int, hm.split(":"))
         market = "us" if "us" in key else "cn"
         channels = dispatch_router._by_market.get(market, [])
         runner.add_cron(
-            name=f"digest_{key}", hour=h, minute=m,
-            coro_factory=lambda k=key, mkt=market, chs=channels:
-                _digest_job_runner(k, mkt, chs, digest_dao, proc_dao,
-                                    msg_builder, dispatcher),
+            name=f"digest_{key}",
+            hour=h,
+            minute=m,
+            coro_factory=lambda k=key, mkt=market, chs=channels: _digest_job_runner(  # type: ignore[misc]
+                k, mkt, chs, digest_dao, proc_dao, msg_builder, dispatcher
+            ),
         )
 
     runner.start()
@@ -238,20 +282,25 @@ async def _amain() -> None:
 
 
 async def _digest_job_runner(
-    digest_key: str, market: str, channels: list[str],
-    digest_dao: DigestBufferDAO, proc_dao: NewsProcessedDAO,
-    msg_builder: MessageBuilder, dispatcher: PusherDispatcher,
+    digest_key: str,
+    market: str,
+    channels: list[str],
+    digest_dao: DigestBufferDAO,
+    proc_dao: NewsProcessedDAO,
+    msg_builder: MessageBuilder,
+    dispatcher: PusherDispatcher,
 ) -> int:
     class _DB:
-        def build_digest(self, *, items: list, market: str, digest_key: str) -> object:
+        def build_digest(self, *, items: list[Any], market: str, digest_key: str) -> object:
             from news_pipeline.common.contracts import Badge, CommonMessage
             from news_pipeline.common.enums import Market as _Market
+
             lines = "\n".join(f"• {p.summary[:120]}" for p in items[:30])
             return CommonMessage(
                 title=f"Digest {digest_key}",
                 summary=lines or "(no items)",
                 source_label="digest",
-                source_url="https://news-pipeline.local/",  # type: ignore[arg-type]
+                source_url="https://news-pipeline.local/",
                 badges=[Badge(text=digest_key, color="blue")],
                 chart_url=None,
                 deeplinks=[],
@@ -259,9 +308,13 @@ async def _digest_job_runner(
             )
 
     return await send_digest(
-        digest_key=digest_key, market=market, channels=channels,
-        digest_dao=digest_dao, proc_dao=proc_dao,
-        digest_builder=_DB(), dispatcher=dispatcher,
+        digest_key=digest_key,
+        market=market,
+        channels=channels,
+        digest_dao=digest_dao,
+        proc_dao=proc_dao,
+        digest_builder=_DB(),
+        dispatcher=dispatcher,
     )
 
 

@@ -12,8 +12,10 @@ from news_pipeline.pushers.wecom import WecomPusher
 
 def _msg() -> CommonMessage:
     return CommonMessage(
-        title="NVDA -8%", summary="出口管制",
-        source_label="Reuters", source_url="https://reut/x",
+        title="NVDA -8%",
+        summary="出口管制",
+        source_label="Reuters",
+        source_url="https://reut/x",
         badges=[Badge(text="bearish", color="red")],
         chart_url=None,
         deeplinks=[Deeplink(label="原文", url="https://reut/x")],
@@ -27,8 +29,7 @@ async def test_send_uses_markdown_msgtype():
         route = mock.post("https://qyapi.weixin.qq.com/W").mock(
             return_value=Response(200, json={"errcode": 0})
         )
-        p = WecomPusher(channel_id="wecom_us",
-                        webhook="https://qyapi.weixin.qq.com/W")
+        p = WecomPusher(channel_id="wecom_us", webhook="https://qyapi.weixin.qq.com/W")
         result = await p.send(_msg())
         assert result.ok is True
         sent = json.loads(route.calls[0].request.read().decode())

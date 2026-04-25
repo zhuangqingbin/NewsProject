@@ -11,9 +11,14 @@ from news_pipeline.pushers.dispatcher import PusherDispatcher
 
 def _msg() -> CommonMessage:
     return CommonMessage(
-        title="t", summary="s", source_label="x",
-        source_url="https://x.com", badges=[], chart_url=None,
-        deeplinks=[], market=Market.US,
+        title="t",
+        summary="s",
+        source_label="x",
+        source_url="https://x.com",
+        badges=[],
+        chart_url=None,
+        deeplinks=[],
+        market=Market.US,
     )
 
 

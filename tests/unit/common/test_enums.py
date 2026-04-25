@@ -1,6 +1,10 @@
 # tests/unit/common/test_enums.py
 from news_pipeline.common.enums import (
-    Market, Sentiment, Magnitude, EventType, EntityType, Predicate,
+    EntityType,
+    EventType,
+    Market,
+    Predicate,
+    Sentiment,
 )
 
 
@@ -14,14 +18,21 @@ def test_sentiment_membership():
 
 
 def test_event_type_includes_core():
-    for v in ("earnings", "m_and_a", "policy", "price_move",
-              "downgrade", "upgrade", "filing", "other"):
+    for v in (
+        "earnings",
+        "m_and_a",
+        "policy",
+        "price_move",
+        "downgrade",
+        "upgrade",
+        "filing",
+        "other",
+    ):
         assert EventType(v)
 
 
 def test_predicate_includes_core():
-    for v in ("supplies", "competes_with", "owns",
-              "regulates", "partners_with", "mentions"):
+    for v in ("supplies", "competes_with", "owns", "regulates", "partners_with", "mentions"):
         assert Predicate(v)
 
 

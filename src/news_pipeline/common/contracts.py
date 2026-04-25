@@ -28,7 +28,7 @@ class RawArticle(_Base):
     title: str
     title_simhash: int = 0
     body: str | None = None
-    raw_meta: dict = Field(default_factory=dict)
+    raw_meta: dict[str, object] = Field(default_factory=dict)
 
 
 class Entity(_Base):

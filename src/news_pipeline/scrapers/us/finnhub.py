@@ -13,9 +13,7 @@ class FinnhubScraper:
     source_id = "finnhub"
     market = Market.US
 
-    def __init__(
-        self, *, token: str, tickers: list[str], category: str = "general"
-    ) -> None:
+    def __init__(self, *, token: str, tickers: list[str], category: str = "general") -> None:
         self._token = token
         self._tickers = tickers
         self._category = category

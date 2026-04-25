@@ -20,9 +20,7 @@ async def _check() -> int:
     await db.initialize()
     cutoff = (utc_now() - timedelta(minutes=30)).replace(tzinfo=None)
     async with db.session() as s:
-        res = await s.execute(
-            select(RawNews.id).where(RawNews.fetched_at >= cutoff).limit(1)
-        )
+        res = await s.execute(select(RawNews).where(RawNews.fetched_at >= cutoff).limit(1))
         if res.first() is None:
             print("FAIL: no recent scrape")
             await db.close()

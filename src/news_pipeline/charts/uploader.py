@@ -3,9 +3,7 @@ from typing import Any
 
 
 class OSSUploader:
-    def __init__(
-        self, *, bucket: Any, endpoint: str, bucket_name: str, https: bool = True
-    ) -> None:
+    def __init__(self, *, bucket: Any, endpoint: str, bucket_name: str, https: bool = True) -> None:
         self._bucket = bucket
         self._endpoint = endpoint
         self._name = bucket_name

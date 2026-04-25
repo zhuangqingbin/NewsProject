@@ -9,7 +9,8 @@ from news_pipeline.storage.dao.source_state import SourceStateDAO
 
 
 def register_ops_cmds(
-    d: CommandDispatcher, *,
+    d: CommandDispatcher,
+    *,
     cost: CostTracker,
     state_dao: SourceStateDAO,
     digest_runner: Callable[[], Awaitable[int]],
@@ -17,8 +18,10 @@ def register_ops_cmds(
 
     @d.register("cost")
     async def cost_today(args: list[str], ctx: dict[str, Any]) -> str:
-        return (f"今日 LLM 成本: {cost.today_cost_cny():.2f} CNY"
-                f"\n剩余预算: {cost.remaining_today():.2f} CNY")
+        return (
+            f"今日 LLM 成本: {cost.today_cost_cny():.2f} CNY"
+            f"\n剩余预算: {cost.remaining_today():.2f} CNY"
+        )
 
     @d.register("pause")
     async def pause(args: list[str], ctx: dict[str, Any]) -> str:

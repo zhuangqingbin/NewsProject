@@ -1,5 +1,5 @@
 # tests/unit/common/test_hashing.py
-from news_pipeline.common.hashing import url_hash, title_simhash, hamming
+from news_pipeline.common.hashing import hamming, title_simhash, url_hash
 
 
 def test_url_hash_stable_and_deterministic():

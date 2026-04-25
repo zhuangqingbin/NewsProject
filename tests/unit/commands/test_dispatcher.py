@@ -1,7 +1,5 @@
 import asyncio
 
-import pytest
-
 from news_pipeline.commands.dispatcher import CommandDispatcher
 
 
