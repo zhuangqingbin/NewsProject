@@ -109,6 +109,8 @@ class Tier1Summarizer:
             user=rendered.user,
             json_mode=True,
             output_schema=rendered.output_schema,
+            cache_segments=rendered.cache_segments,
+            few_shot_examples=rendered.few_shot_examples,
             max_tokens=600,
         )
         resp = await self._client.call(req)
