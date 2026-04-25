@@ -4,6 +4,12 @@ from typing import Any
 from sqlalchemy import JSON, Index, UniqueConstraint
 from sqlmodel import Column, Field, SQLModel
 
+from news_pipeline.common.timeutil import utc_now
+
+
+def _naive_utc_now() -> datetime:
+    return utc_now().replace(tzinfo=None)
+
 SQLModelBase = SQLModel
 
 
@@ -67,7 +73,7 @@ class Entity(SQLModel, table=True):
     market: str | None = None
     aliases: list[str] | None = Field(default=None, sa_column=Column(JSON))
     metadata_: dict[str, Any] | None = Field(default=None, sa_column=Column("metadata", JSON))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_naive_utc_now)
 
 
 class NewsEntity(SQLModel, table=True):
@@ -92,7 +98,7 @@ class Relation(SQLModel, table=True):
     confidence: float
     valid_from: datetime | None = None
     valid_until: datetime | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_naive_utc_now)
 
 
 class SourceState(SQLModel, table=True):

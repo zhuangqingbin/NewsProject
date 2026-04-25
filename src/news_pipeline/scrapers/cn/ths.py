@@ -31,7 +31,20 @@ class ThsScraper:
                 if resp.status_code in (401, 403):
                     raise AntiCrawlError("ths blocked", source=self.source_id)
                 resp.raise_for_status()
-                soup = BeautifulSoup(resp.text, "html.parser")
+                body_text = resp.text
+                if not body_text.strip():
+                    raise AntiCrawlError(
+                        "ths returned empty body",
+                        source=self.source_id,
+                        status=resp.status_code,
+                    )
+                if "登录" in body_text or "captcha" in body_text.lower():
+                    raise AntiCrawlError(
+                        "ths returned login/captcha page",
+                        source=self.source_id,
+                        status=resp.status_code,
+                    )
+                soup = BeautifulSoup(body_text, "html.parser")
                 for a in soup.select(".news-link"):
                     href = a.get("href", "")
                     if not href:

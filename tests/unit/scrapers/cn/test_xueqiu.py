@@ -40,3 +40,40 @@ async def test_anticrawl_raises():
         s = XueqiuScraper(tickers=["600519"], cookie="x=1")
         with pytest.raises(AntiCrawlError):
             await s.fetch(datetime(2024, 4, 1, tzinfo=UTC))
+
+
+@pytest.mark.asyncio
+async def test_anticrawl_non_json_content_type():
+    """200 response with non-JSON content-type (e.g. HTML redirect) raises AntiCrawlError."""
+    from news_pipeline.common.exceptions import AntiCrawlError
+
+    async with respx.mock() as mock:
+        mock.get(url__regex=r"https://xueqiu\.com/.*").mock(
+            return_value=Response(
+                200,
+                text="<html>login</html>",
+                headers={"content-type": "text/html; charset=utf-8"},
+            )
+        )
+        s = XueqiuScraper(tickers=["600519"], cookie="x=1")
+        with pytest.raises(AntiCrawlError, match="non-JSON"):
+            await s.fetch(datetime(2024, 4, 1, tzinfo=UTC))
+
+
+@pytest.mark.asyncio
+async def test_anticrawl_error_code_nonzero():
+    """200 + JSON with error_code != 0 raises AntiCrawlError."""
+    from news_pipeline.common.exceptions import AntiCrawlError
+
+    error_payload = {"error_code": 401, "error_description": "need login", "list": []}
+    async with respx.mock() as mock:
+        mock.get(url__regex=r"https://xueqiu\.com/.*").mock(
+            return_value=Response(
+                200,
+                json=error_payload,
+                headers={"content-type": "application/json"},
+            )
+        )
+        s = XueqiuScraper(tickers=["600519"], cookie="x=1")
+        with pytest.raises(AntiCrawlError, match="error_code=401"):
+            await s.fetch(datetime(2024, 4, 1, tzinfo=UTC))

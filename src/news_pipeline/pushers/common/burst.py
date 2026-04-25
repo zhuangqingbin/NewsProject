@@ -20,5 +20,10 @@ class BurstSuppressor:
                 buf.popleft()
             if len(buf) >= self._th:
                 send = False
-            buf.append(now)
+        # Only record this attempt when it will actually be sent.
+        # If suppressed, do NOT append — otherwise continuous suppressed
+        # attempts extend the window forever and suppress never releases.
+        if send:
+            for t in tickers:
+                self._buckets[t].append(now)
         return send

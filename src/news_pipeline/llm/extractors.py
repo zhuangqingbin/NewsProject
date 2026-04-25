@@ -1,6 +1,5 @@
 # src/news_pipeline/llm/extractors.py
 from dataclasses import dataclass
-from datetime import datetime
 
 from news_pipeline.common.contracts import EnrichedNews, Entity, RawArticle, Relation
 from news_pipeline.common.enums import (
@@ -12,6 +11,7 @@ from news_pipeline.common.enums import (
     Sentiment,
 )
 from news_pipeline.common.exceptions import LLMError
+from news_pipeline.common.timeutil import utc_now
 from news_pipeline.llm.clients.base import LLMClient, LLMRequest
 from news_pipeline.llm.cost_tracker import CostTracker
 from news_pipeline.llm.prompts.loader import PromptHandle
@@ -109,6 +109,8 @@ class Tier1Summarizer:
             user=rendered.user,
             json_mode=True,
             output_schema=rendered.output_schema,
+            cache_segments=rendered.cache_segments,
+            few_shot_examples=rendered.few_shot_examples,
             max_tokens=600,
         )
         resp = await self._client.call(req)
@@ -129,7 +131,7 @@ class Tier1Summarizer:
             entities=[],
             relations=[],
             model_used=rendered.model_target,
-            extracted_at=datetime.utcnow(),
+            extracted_at=utc_now().replace(tzinfo=None),
         )
 
 
@@ -225,5 +227,5 @@ class Tier2DeepExtractor:
             entities=list(ents_by_name.values()),
             relations=relations,
             model_used=rendered.model_target,
-            extracted_at=datetime.utcnow(),
+            extracted_at=utc_now().replace(tzinfo=None),
         )

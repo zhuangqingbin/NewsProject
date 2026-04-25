@@ -40,3 +40,32 @@ async def test_anticrawl_raises():
         s = ThsScraper(tickers=["600519"], cookie="x=1")
         with pytest.raises(AntiCrawlError):
             await s.fetch(datetime(2024, 4, 1, tzinfo=UTC))
+
+
+@pytest.mark.asyncio
+async def test_anticrawl_login_page():
+    """200 response body containing '登录' (login prompt) raises AntiCrawlError."""
+    from news_pipeline.common.exceptions import AntiCrawlError
+
+    login_html = "<html><body>请先登录才能继续访问</body></html>"
+    async with respx.mock() as mock:
+        mock.get(url__regex=r"https?://news\.10jqka\.com\.cn/.*").mock(
+            return_value=Response(200, text=login_html)
+        )
+        s = ThsScraper(tickers=["600519"], cookie="x=1")
+        with pytest.raises(AntiCrawlError, match="login/captcha"):
+            await s.fetch(datetime(2024, 4, 1, tzinfo=UTC))
+
+
+@pytest.mark.asyncio
+async def test_anticrawl_empty_body():
+    """200 response with empty body raises AntiCrawlError (silent failure mode)."""
+    from news_pipeline.common.exceptions import AntiCrawlError
+
+    async with respx.mock() as mock:
+        mock.get(url__regex=r"https?://news\.10jqka\.com\.cn/.*").mock(
+            return_value=Response(200, text="")
+        )
+        s = ThsScraper(tickers=["600519"], cookie="x=1")
+        with pytest.raises(AntiCrawlError, match="empty body"):
+            await s.fetch(datetime(2024, 4, 1, tzinfo=UTC))

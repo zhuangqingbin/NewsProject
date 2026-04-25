@@ -36,7 +36,21 @@ class XueqiuScraper:
                         status=resp.status_code,
                     )
                 resp.raise_for_status()
-                for item in resp.json().get("list", []):
+                content_type = resp.headers.get("content-type", "")
+                if "application/json" not in content_type:
+                    raise AntiCrawlError(
+                        f"xueqiu returned non-JSON ({content_type[:60]})",
+                        source=self.source_id,
+                        status=resp.status_code,
+                    )
+                data = resp.json()
+                if data.get("error_code", 0) != 0:
+                    raise AntiCrawlError(
+                        f"xueqiu error_code={data.get('error_code')} "
+                        f"desc={data.get('error_description')}",
+                        source=self.source_id,
+                    )
+                for item in data.get("list", []):
                     ts = datetime.fromtimestamp(int(item["created_at"]) / 1000, tz=UTC)
                     if ts < since:
                         continue
