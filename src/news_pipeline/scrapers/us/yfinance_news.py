@@ -1,7 +1,7 @@
 # src/news_pipeline/scrapers/us/yfinance_news.py
 import asyncio
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
-from typing import Callable, Sequence
 
 import yfinance as yf
 

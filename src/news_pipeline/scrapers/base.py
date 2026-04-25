@@ -1,6 +1,7 @@
 # src/news_pipeline/scrapers/base.py
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Protocol, Sequence, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market

@@ -1,6 +1,6 @@
 # src/news_pipeline/scrapers/us/sec_edgar.py
+from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Sequence
 
 import feedparser
 

@@ -1,7 +1,7 @@
 # src/news_pipeline/scrapers/cn/akshare_news.py
 import asyncio
-from datetime import UTC, datetime
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
+from datetime import datetime
 
 import akshare as ak
 import pandas as pd

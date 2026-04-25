@@ -1,6 +1,6 @@
 # src/news_pipeline/scrapers/us/finnhub.py
+from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Sequence
 
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
