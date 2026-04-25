@@ -1,0 +1,10 @@
+sources:
+  finnhub:        {enabled: true, interval_sec: 300}
+  sec_edgar:      {enabled: true, interval_sec: 120}
+  yfinance_news:  {enabled: true, interval_sec: 600}
+  caixin_telegram: {enabled: true, interval_sec: 60}
+  akshare_news:   {enabled: true, interval_sec: 180}
+  juchao:         {enabled: true, interval_sec: 120}
+  xueqiu:         {enabled: true, interval_sec: 300}
+  ths:            {enabled: true, interval_sec: 300}
+  tushare_news:   {enabled: true, interval_sec: 600}

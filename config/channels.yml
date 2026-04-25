@@ -1,0 +1,25 @@
+channels:
+  tg_us:
+    type: telegram
+    market: us
+    options: {bot_token_key: tg_bot_token_us, chat_id_key: tg_chat_id_us}
+  feishu_us:
+    type: feishu
+    market: us
+    options: {webhook_key: feishu_hook_us, sign_key: feishu_sign_us}
+  wecom_us:
+    type: wecom
+    market: us
+    options: {webhook_key: wecom_hook_us}
+  tg_cn:
+    type: telegram
+    market: cn
+    options: {bot_token_key: tg_bot_token_cn, chat_id_key: tg_chat_id_cn}
+  feishu_cn:
+    type: feishu
+    market: cn
+    options: {webhook_key: feishu_hook_cn, sign_key: feishu_sign_cn}
+  wecom_cn:
+    type: wecom
+    market: cn
+    options: {webhook_key: wecom_hook_cn}
