@@ -1,40 +1,52 @@
 # tests/unit/charts/test_factory.py
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
 from news_pipeline.charts.factory import ChartFactory, ChartRequest
 
+_PNG_MAGIC = b"\x89PNG"
+
+
+def _make_renderer(return_val: bytes):  # type: ignore[no-untyped-def]
+    def renderer(df, ticker, news_markers):  # type: ignore[no-untyped-def]
+        return return_val
+
+    return renderer
+
+
+def _make_bad_renderer():  # type: ignore[no-untyped-def]
+    def renderer(df, ticker, news_markers):  # type: ignore[no-untyped-def]
+        return "not bytes"
+
+    return renderer
+
+
+def _noop_loader(ticker: str, window: str):  # type: ignore[no-untyped-def]
+    return __import__("pandas").DataFrame()
+
 
 @pytest.mark.asyncio
-async def test_cache_hit_skips_render():
-    cache = MagicMock()
-    cache.get = AsyncMock(return_value=MagicMock(oss_url="https://oss/x.png"))
-    cache.put = AsyncMock()
-    renderer = MagicMock(return_value=b"PNG")
-    uploader = MagicMock()
-    uploader.upload = MagicMock()
-    f = ChartFactory(cache_dao=cache, kline_renderer=renderer, uploader=uploader)
-    url = await f.render_kline(ChartRequest(ticker="NVDA", kind="kline", window="30d", params={}))
-    assert url == "https://oss/x.png"
-    renderer.assert_not_called()
-    uploader.upload.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_cache_miss_renders_uploads_caches():
-    cache = MagicMock()
-    cache.get = AsyncMock(return_value=None)
-    cache.put = AsyncMock()
-    renderer = MagicMock(return_value=b"PNG")
-    uploader = MagicMock()
-    uploader.upload = MagicMock(return_value="https://oss/new.png")
+async def test_render_kline_returns_png_bytes():
     f = ChartFactory(
-        cache_dao=cache,
-        kline_renderer=renderer,
-        uploader=uploader,
-        data_loader=lambda t, w: __import__("pandas").DataFrame(),
+        kline_renderer=_make_renderer(_PNG_MAGIC + b"\r\n\x1a\n" + b"X" * 100),
+        data_loader=_noop_loader,
     )
-    url = await f.render_kline(ChartRequest(ticker="NVDA", kind="kline", window="30d", params={}))
-    assert url == "https://oss/new.png"
-    cache.put.assert_awaited_once()
+    result = await f.render_kline(ChartRequest(ticker="NVDA", kind="kline", window="30d"))
+    assert isinstance(result, bytes)
+    assert result[:4] == _PNG_MAGIC
+
+
+@pytest.mark.asyncio
+async def test_render_kline_no_data_loader_raises():
+    f = ChartFactory(kline_renderer=_make_renderer(_PNG_MAGIC))
+    with pytest.raises(RuntimeError, match="no data_loader"):
+        await f.render_kline(ChartRequest(ticker="NVDA", kind="kline", window="30d"))
+
+
+@pytest.mark.asyncio
+async def test_render_kline_bad_renderer_raises():
+    f = ChartFactory(
+        kline_renderer=_make_bad_renderer(),
+        data_loader=_noop_loader,
+    )
+    with pytest.raises(RuntimeError, match="renderer must return bytes"):
+        await f.render_kline(ChartRequest(ticker="NVDA", kind="kline", window="30d"))

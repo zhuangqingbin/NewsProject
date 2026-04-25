@@ -28,6 +28,20 @@ def _msg() -> CommonMessage:
     )
 
 
+def _msg_with_chart() -> CommonMessage:
+    return CommonMessage(
+        title="NVDA chart",
+        summary="K线图",
+        source_label="Reuters",
+        source_url="https://reut/x",
+        badges=[Badge(text="NVDA", color="blue")],
+        chart_url=None,
+        chart_image=b"\x89PNG\r\n\x1a\nFAKEDATA",
+        deeplinks=[],
+        market=Market.US,
+    )
+
+
 @pytest.mark.asyncio
 async def test_send_escapes_and_returns_ok():
     async with respx.mock() as mock:
@@ -53,3 +67,21 @@ async def test_send_failure_returns_not_ok():
         result = await p.send(_msg())
         assert result.ok is False
         assert result.http_status == 400
+
+
+@pytest.mark.asyncio
+async def test_send_with_chart_image_uses_send_photo():
+    # assert_all_called=False because we don't want to register sendMessage at all
+    async with respx.mock(assert_all_called=False) as mock:
+        send_photo_route = mock.post("https://api.telegram.org/botT/sendPhoto").mock(
+            return_value=Response(200, json={"ok": True})
+        )
+        p = TelegramPusher(channel_id="tg_us", bot_token="T", chat_id="C")
+        result = await p.send(_msg_with_chart())
+        assert result.ok is True
+        # sendPhoto was called
+        assert send_photo_route.called
+        # Multipart body contains the filename and PNG bytes
+        body = send_photo_route.calls[0].request.read()
+        assert b"chart.png" in body
+        assert b"\x89PNG" in body

@@ -8,6 +8,7 @@ import httpx
 
 from news_pipeline.common.contracts import CommonMessage
 from news_pipeline.pushers.base import SendResult
+from news_pipeline.pushers.common.feishu_auth import FeishuTenantAuth
 from news_pipeline.pushers.common.retry import async_retry
 
 _BADGE_COLOR_MAP = {
@@ -26,17 +27,19 @@ class FeishuPusher:
         channel_id: str,
         webhook: str,
         sign_secret: str | None = None,
+        image_auth: FeishuTenantAuth | None = None,
         timeout: float = 10.0,
         max_retries: int = 3,
     ) -> None:
         self.channel_id = channel_id
         self._webhook = webhook
         self._secret = sign_secret
+        self._image_auth = image_auth
         self._timeout = timeout
         self._max = max_retries
 
     async def send(self, msg: CommonMessage) -> SendResult:
-        body = self._build_card(msg)
+        body = await self._build_card(msg)
         if self._secret:
             ts = str(int(time.time()))
             body["timestamp"] = ts
@@ -84,7 +87,27 @@ class FeishuPusher:
         h = hmac.new(string_to_sign.encode(), digestmod=hashlib.sha256)
         return b64encode(h.digest()).decode()
 
-    def _build_card(self, msg: CommonMessage) -> dict:  # type: ignore[type-arg]
+    async def _upload_image(self, image_bytes: bytes) -> str:
+        """Upload PNG bytes to Feishu image API, return image_key."""
+        assert self._image_auth is not None
+        token = await self._image_auth.get_token()
+        url = "https://open.feishu.cn/open-apis/im/v1/images"
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                data={"image_type": "message"},
+                files={"image": ("chart.png", image_bytes, "image/png")},
+            )
+            r.raise_for_status()
+            data = r.json()
+            if data.get("code") != 0:
+                if data.get("code") in (99991663, 99991664):
+                    self._image_auth.invalidate()
+                raise RuntimeError(f"feishu image upload failed: {data}")
+            return str(data["data"]["image_key"])
+
+    async def _build_card(self, msg: CommonMessage) -> dict:  # type: ignore[type-arg]
         # template color = first badge color (sentiment usually)
         first_color = _BADGE_COLOR_MAP.get(
             msg.badges[0].color if msg.badges else "gray",
@@ -99,7 +122,20 @@ class FeishuPusher:
         elements: list[dict] = [  # type: ignore[type-arg]
             {"tag": "div", "text": {"tag": "lark_md", "content": body_text}},
         ]
-        if msg.chart_url:
+        # Prefer inline chart_image (upload to Feishu, get image_key)
+        if msg.chart_image is not None and self._image_auth is not None:
+            image_key = await self._upload_image(msg.chart_image)
+            elements.append(
+                {
+                    "tag": "img",
+                    "img_key": image_key,
+                    "alt": {"tag": "plain_text", "content": "chart"},
+                    "mode": "fit_horizontal",
+                    "preview": True,
+                }
+            )
+        elif msg.chart_url:
+            # Legacy: chart_url fallback (deprecated)
             elements.append(
                 {
                     "tag": "img",

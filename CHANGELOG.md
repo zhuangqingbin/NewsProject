@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.1.4 (2026-04-25)
+
+### Removed
+- WeCom (企业微信) channels — code kept for future re-enablement
+- OSS (阿里云对象存储) for chart hosting — charts now embedded inline
+- `chart_cache` table (migration 0003)
+- `oss2` dependency from pyproject.toml
+
+### Added
+- Telegram `sendPhoto` API support for chart embedding (multipart/form-data)
+- Feishu image upload via `im/v1/images` API; cards include `img_key` directly
+- `news_pipeline.pushers.common.feishu_auth.FeishuTenantAuth` shared helper
+  - Handles tenant_access_token caching with expiry tracking + asyncio.Lock
+  - Used by both FeishuPusher (image upload) and FeishuBitableClient (archive)
+  - Resolves review issue I1
+
+### Changed
+- `CommonMessage.chart_image: bytes | None` field (preferred over deprecated `chart_url`)
+- `ChartFactory.render_kline()` returns `bytes` instead of OSS URL
+- next-steps.md §1.9 rewritten with clearer cookie acquisition workflow
+- §1.6 (企微) deleted; sections renumbered; §1.6 repurposed as OSS backup-only
+
 ## v0.1.3 (2026-04-25)
 
 ### Fixed / Improved

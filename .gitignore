@@ -18,3 +18,8 @@ config/secrets.yml
 
 # OS
 .DS_Store
+
+# Local scratch / test files (often contain real secrets when ad-hoc testing)
+/t.py
+/scratch/
+*.scratch.py

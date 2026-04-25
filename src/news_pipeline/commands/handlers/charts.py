@@ -12,10 +12,10 @@ def register_chart_cmds(d: CommandDispatcher, *, chart_factory: ChartFactory) ->
             return "用法: /chart TICKER [window=30d]"
         ticker = args[0]
         window = args[1] if len(args) > 1 else "30d"
-        url = await chart_factory.render_kline(
+        png = await chart_factory.render_kline(
             ChartRequest(ticker=ticker, kind="kline", window=window, params={})
         )
-        return f"📈 {ticker} K线: {url}"
+        return f"📈 {ticker} K线图已生成 ({len(png)} bytes)"
 
     @d.register("sentiment")
     async def sentiment(args: list[str], ctx: dict[str, Any]) -> str:
@@ -25,7 +25,7 @@ def register_chart_cmds(d: CommandDispatcher, *, chart_factory: ChartFactory) ->
         days = args[1] if len(args) > 1 else "7"
         # Phase-2 fix: add render_sentiment on ChartFactory.
         # MVP: reuse render_kline with kind="sentiment"
-        url = await chart_factory.render_kline(
+        png = await chart_factory.render_kline(
             ChartRequest(ticker=ticker, kind="sentiment", window=f"{days}d", params={})
         )
-        return f"📊 {ticker} 情绪曲线: {url}"
+        return f"📊 {ticker} 情绪曲线已生成 ({len(png)} bytes)"
