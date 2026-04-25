@@ -2,7 +2,7 @@
 import asyncio
 import hashlib
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -13,7 +13,7 @@ from news_pipeline.common.timeutil import ensure_utc, utc_now
 
 
 def _default_pro_factory() -> object:
-    import tushare as ts  # noqa: PLC0415
+    import tushare as ts
 
     return ts.pro_api()
 
@@ -53,7 +53,7 @@ class TushareNewsScraper:
             title = str(row.get("title") or row["content"][:60])
             content = str(row["content"])
             # Synthetic URL since tushare API doesn't always provide one
-            synthetic = "https://tushare.local/{}/".format(self._src) + hashlib.sha1(
+            synthetic = f"https://tushare.local/{self._src}/" + hashlib.sha1(
                 (str(row["datetime"]) + content).encode()
             ).hexdigest()[:16]
             out.append(
