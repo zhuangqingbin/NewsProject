@@ -1,0 +1,6 @@
+us:
+  - {ticker: NVDA, alerts: [price_5pct, earnings, downgrade, sec_filing]}
+cn:
+  - {ticker: "600519", alerts: [price_5pct, announcement]}
+macro: [FOMC, CPI, NFP, 央行, MLF, LPR]
+sectors: [semiconductor, ai, ev, 新能源, 半导体, 白酒]

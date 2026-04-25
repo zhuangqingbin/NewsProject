@@ -1,0 +1,10 @@
+# config/entity_aliases.yml — used to normalize LLM-extracted entity names
+NVIDIA: [NVIDIA, NVDA, 英伟达, 老黄家]
+AMD: [AMD, Advanced Micro Devices, 超威半导体]
+TSMC: [TSMC, Taiwan Semiconductor, TSM, 台积电]
+ASML: [ASML, ASML Holding]
+Tesla: [Tesla, TSLA, 特斯拉]
+Apple: [Apple, AAPL, 苹果]
+Microsoft: [Microsoft, MSFT, 微软]
+贵州茅台: [贵州茅台, 茅台, 600519]
+宁德时代: [宁德时代, CATL, 300750]

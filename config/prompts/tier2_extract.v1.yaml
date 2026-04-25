@@ -1,0 +1,65 @@
+# config/prompts/tier2_extract.v1.yaml
+name: tier2_extract
+version: 1
+model_target: claude-haiku-4-5-20251001
+description: "Deep extractor with entities + relations"
+cache_segments: [system, few_shot_examples]
+system: |
+  你是金融新闻深度分析助手。除了 tier1 的全部字段, 还需抽取:
+  - entities: 提及的公司/人物/事件/板块/政策/产品 (含 type, name, ticker, market, aliases)
+  - relations: 实体间关系 (subject, predicate, object, confidence) — predicate 取自 [supplies, competes_with, owns, regulates, partners_with, mentions]
+  - key_quotes: 1-3 个最关键的原文引用
+  严格按 schema 输出 JSON。如果某关系不能从原文支撑, 不要瞎编。
+output_schema_inline:
+  type: object
+  required: [summary, related_tickers, sectors, event_type, sentiment, magnitude, confidence, entities, relations]
+  properties:
+    summary: {type: string}
+    related_tickers: {type: array, items: {type: string}}
+    sectors: {type: array, items: {type: string}}
+    event_type: {type: string}
+    sentiment: {type: string, enum: [bullish, bearish, neutral]}
+    magnitude: {type: string, enum: [low, medium, high]}
+    confidence: {type: number, minimum: 0, maximum: 1}
+    key_quotes: {type: array, items: {type: string}}
+    entities:
+      type: array
+      items:
+        type: object
+        required: [type, name]
+        properties:
+          type: {type: string, enum: [company, person, event, sector, policy, product]}
+          name: {type: string}
+          ticker: {type: [string, "null"]}
+          market: {type: [string, "null"], enum: [us, cn, null]}
+          aliases: {type: array, items: {type: string}}
+    relations:
+      type: array
+      items:
+        type: object
+        required: [subject_name, predicate, object_name, confidence]
+        properties:
+          subject_name: {type: string}
+          predicate: {type: string, enum: [supplies, competes_with, owns, regulates, partners_with, mentions]}
+          object_name: {type: string}
+          confidence: {type: number}
+few_shot_examples:
+  - input: "标题: NVDA 因新出口管制将无法对华销售 H100; 正文: ..."
+    output: |
+      {"summary":"...","related_tickers":["NVDA","TSM","ASML"],"sectors":["semiconductor"],"event_type":"policy","sentiment":"bearish","magnitude":"high","confidence":0.92,"entities":[{"type":"company","name":"NVIDIA","ticker":"NVDA","market":"us","aliases":["英伟达"]},{"type":"company","name":"TSMC","ticker":"TSM","market":"us","aliases":["台积电"]}],"relations":[{"subject_name":"NVIDIA","predicate":"supplies","object_name":"TSMC","confidence":0.7}]}
+user_template: |
+  ## 来源
+  {source}
+  ## 时间
+  {published_at}
+  ## 标题
+  {title}
+  ## 正文
+  {body}
+
+  ## 上下文 (该公司近 7 天相关新闻摘要, 可空)
+  {recent_context}
+guardrails:
+  max_input_tokens: 4000
+  retry_on_invalid_json: 1
+  fallback_model: deepseek-v3
