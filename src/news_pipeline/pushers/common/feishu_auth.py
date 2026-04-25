@@ -38,7 +38,7 @@ class FeishuTenantAuth:
                 self._token = data["tenant_access_token"]
                 self._expires_at = now + float(data.get("expire", 7200))
                 log.info("feishu_tenant_token_refreshed")
-                return self._token  # type: ignore[return-value]
+                return self._token
 
     def invalidate(self) -> None:
         self._token = None

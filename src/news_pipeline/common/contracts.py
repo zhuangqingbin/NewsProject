@@ -87,7 +87,8 @@ class CommonMessage(_Base):
     source_url: HttpUrl
     badges: list[Badge]
     chart_url: HttpUrl | None  # deprecated: prefer chart_image
-    chart_image: bytes | None = None  # PNG bytes for inline embedding (TG sendPhoto / Feishu img_key)
+    # PNG bytes for inline embedding (TG sendPhoto / Feishu img_key)
+    chart_image: bytes | None = None
     deeplinks: list[Deeplink]
     market: Market
 
