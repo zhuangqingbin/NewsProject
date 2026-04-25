@@ -28,6 +28,7 @@ dependencies = [
   "simhash>=2.1",
   "pyyaml>=6.0",
   "tenacity>=9.0",
+  "greenlet>=3.4.0",
 ]
 
 [dependency-groups]
