@@ -4,7 +4,6 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
   "pydantic>=2.7",
-  "pydantic-settings>=2.3",
   "sqlmodel>=0.0.21",
   "alembic>=1.13",
   "aiosqlite>=0.20",
