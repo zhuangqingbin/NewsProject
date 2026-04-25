@@ -60,6 +60,26 @@ class FeishuPusher:
         return SendResult(ok=ok, http_status=status, response_body=resp, retries=0)
 
     def _sign(self, timestamp: str) -> str:
+        """Compute Feishu custom-bot message signature.
+
+        Algorithm per Feishu official docs (custom bot security settings):
+        https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot
+
+        The HMAC key is ``"{timestamp}\\n{secret}"`` encoded as UTF-8; the
+        message is empty (``b""`` — the default when no ``msg`` is passed to
+        ``hmac.new``).  The digest is SHA-256, base64-encoded.
+
+        Feishu's published Python sample::
+
+            string_to_sign = '{}\\n{}'.format(timestamp, secret)
+            hmac_code = hmac.new(
+                string_to_sign.encode("utf-8"), digestmod=hashlib.sha256
+            ).digest()
+            sign = base64.b64encode(hmac_code).decode('utf-8')
+
+        This implementation is identical to that sample and has been verified
+        correct against a known test vector (see test_feishu_sign.py).
+        """
         string_to_sign = f"{timestamp}\n{self._secret}"
         h = hmac.new(string_to_sign.encode(), digestmod=hashlib.sha256)
         return b64encode(h.digest()).decode()
