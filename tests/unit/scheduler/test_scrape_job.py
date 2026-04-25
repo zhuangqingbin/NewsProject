@@ -1,6 +1,7 @@
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 from news_pipeline.common.contracts import RawArticle
@@ -67,3 +68,133 @@ async def test_scrape_skips_when_paused():
     n = await scrape_one_source(scraper=scraper, dedup=dedup, state_dao=state_dao, metrics=metrics)
     assert n == 0
     scraper.fetch.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Fix I6: error categorization tests
+# ---------------------------------------------------------------------------
+
+
+def _make_state_dao() -> MagicMock:
+    dao = MagicMock()
+    dao.get = AsyncMock(return_value=None)
+    dao.is_paused = AsyncMock(return_value=False)
+    dao.record_error = AsyncMock()
+    dao.set_paused = AsyncMock()
+    dao.update_watermark = AsyncMock()
+    return dao
+
+
+def _make_metrics() -> MagicMock:
+    m = MagicMock()
+    m.increment = AsyncMock()
+    return m
+
+
+@pytest.mark.asyncio
+async def test_transient_timeout_no_bark():
+    """httpx.TimeoutException → categorized as transient, record_error called, NO Bark."""
+    scraper = MagicMock()
+    scraper.source_id = "finnhub"
+    scraper.fetch = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
+
+    bark = MagicMock()
+    bark.send = AsyncMock()
+
+    state_dao = _make_state_dao()
+    metrics = _make_metrics()
+
+    n = await scrape_one_source(
+        scraper=scraper,
+        dedup=MagicMock(),
+        state_dao=state_dao,
+        metrics=metrics,
+        bark=bark,
+    )
+    assert n == 0
+    state_dao.record_error.assert_awaited_once()
+    bark.send.assert_not_awaited()  # transient — no alert
+
+
+@pytest.mark.asyncio
+async def test_transient_http5xx_no_bark():
+    """httpx.HTTPStatusError with status 500 → transient, no Bark."""
+    scraper = MagicMock()
+    scraper.source_id = "xueqiu"
+
+    # Build a minimal HTTPStatusError with status 503
+    req = httpx.Request("GET", "https://example.com")
+    resp = httpx.Response(503, request=req)
+    scraper.fetch = AsyncMock(
+        side_effect=httpx.HTTPStatusError("Server Error", request=req, response=resp)
+    )
+
+    bark = MagicMock()
+    bark.send = AsyncMock()
+
+    state_dao = _make_state_dao()
+    metrics = _make_metrics()
+
+    n = await scrape_one_source(
+        scraper=scraper,
+        dedup=MagicMock(),
+        state_dao=state_dao,
+        metrics=metrics,
+        bark=bark,
+    )
+    assert n == 0
+    state_dao.record_error.assert_awaited_once()
+    bark.send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_structural_keyerror_triggers_bark_urgent():
+    """KeyError → categorized as structural, Bark urgent called."""
+    scraper = MagicMock()
+    scraper.source_id = "akshare_news"
+    scraper.fetch = AsyncMock(side_effect=KeyError("missing field"))
+
+    bark = MagicMock()
+    bark.send = AsyncMock(return_value=True)
+
+    state_dao = _make_state_dao()
+    metrics = _make_metrics()
+
+    n = await scrape_one_source(
+        scraper=scraper,
+        dedup=MagicMock(),
+        state_dao=state_dao,
+        metrics=metrics,
+        bark=bark,
+    )
+    assert n == 0
+    state_dao.record_error.assert_awaited_once()
+    bark.send.assert_awaited_once()
+    # Verify the alert level is URGENT
+    call_kwargs = bark.send.call_args
+    from news_pipeline.observability.alert import AlertLevel
+
+    assert call_kwargs.kwargs.get("level") == AlertLevel.URGENT or (
+        len(call_kwargs.args) >= 3 and call_kwargs.args[2] == AlertLevel.URGENT
+    )
+
+
+@pytest.mark.asyncio
+async def test_structural_no_bark_when_bark_none():
+    """Structural error with bark=None → no crash, record_error still called."""
+    scraper = MagicMock()
+    scraper.source_id = "ths"
+    scraper.fetch = AsyncMock(side_effect=ValueError("unexpected format"))
+
+    state_dao = _make_state_dao()
+    metrics = _make_metrics()
+
+    n = await scrape_one_source(
+        scraper=scraper,
+        dedup=MagicMock(),
+        state_dao=state_dao,
+        metrics=metrics,
+        bark=None,
+    )
+    assert n == 0
+    state_dao.record_error.assert_awaited_once()
