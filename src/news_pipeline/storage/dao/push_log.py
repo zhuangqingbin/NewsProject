@@ -45,3 +45,20 @@ class PushLogDAO:
                 )
             )
             return int(res.scalar() or 0)
+
+    async def failure_counts_by_channel(self, window_minutes: int = 60) -> dict[str, int]:
+        """Return failure counts per channel in the last window_minutes.
+
+        Used by C-4 push failure alert job.
+        """
+        cutoff = (utc_now() - timedelta(minutes=window_minutes)).replace(tzinfo=None)
+        async with self._db.session() as s:
+            res = await s.execute(
+                select(PushLog.channel, func.count().label("cnt"))
+                .where(
+                    PushLog.status == "failed",
+                    PushLog.sent_at >= cutoff,
+                )
+                .group_by(PushLog.channel)
+            )
+            return {row.channel: int(row.cnt) for row in res}

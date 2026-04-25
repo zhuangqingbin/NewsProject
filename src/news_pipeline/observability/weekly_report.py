@@ -1,8 +1,10 @@
 """Weekly metrics report builder."""
 
+from collections import defaultdict
 from datetime import timedelta
 
 from news_pipeline.common.timeutil import utc_now
+from news_pipeline.storage.dao.dead_letter import DeadLetterDAO
 from news_pipeline.storage.dao.metrics import MetricsDAO
 
 
@@ -51,3 +53,18 @@ async def build_weekly_report(
         lines.append(f"  {c}: {int(total)}")
 
     return "\n".join(lines)
+
+
+async def build_dlq_summary(*, dlq: DeadLetterDAO) -> str:
+    """Build a short summary of unresolved dead-letter items grouped by kind.
+
+    Returns an empty string if there are no unresolved items.
+    Used by C-7 weekly DLQ Bark alert.
+    """
+    items = await dlq.list_unresolved()
+    if not items:
+        return ""
+    by_kind: dict[str, int] = defaultdict(int)
+    for item in items:
+        by_kind[item.kind] += 1
+    return "\n".join(f"- {k}: {v}" for k, v in sorted(by_kind.items()))

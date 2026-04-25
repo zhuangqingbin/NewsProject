@@ -40,6 +40,7 @@ async def test_pipeline_routes_to_tier2_when_watchlist_hit():
     router.decide = MagicMock(return_value="tier2")
     cost = MagicMock()
     cost.check = MagicMock()
+    cost.check_async = AsyncMock()  # check_async is awaited in pipeline.process
 
     p = LLMPipeline(classifier, tier1, tier2, router, cost, watchlist_us=["NVDA"], watchlist_cn=[])
     out = await p.process(_art(), raw_id=1)
@@ -60,6 +61,7 @@ async def test_pipeline_skips_when_classifier_says_irrelevant():
     router.decide = MagicMock(return_value="skip")
     cost = MagicMock()
     cost.check = MagicMock()
+    cost.check_async = AsyncMock()  # check_async is awaited in pipeline.process
     p = LLMPipeline(classifier, tier1, tier2, router, cost, [], [])
     out = await p.process(_art(), raw_id=1)
     assert out is None
@@ -71,6 +73,7 @@ async def test_pipeline_cost_ceiling_short_circuits():
     classifier.classify = AsyncMock()
     cost = MagicMock()
     cost.check = MagicMock(side_effect=CostCeilingExceeded("over"))
+    cost.check_async = AsyncMock(side_effect=CostCeilingExceeded("over"))
     p = LLMPipeline(classifier, MagicMock(), MagicMock(), MagicMock(), cost, [], [])
     with pytest.raises(CostCeilingExceeded):
         await p.process(_art(), raw_id=1)
