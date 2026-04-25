@@ -14,6 +14,7 @@ from news_pipeline.classifier.rules import RuleEngine
 from news_pipeline.config.loader import ConfigLoader
 from news_pipeline.config.schema import ClassifierRulesCfg
 from news_pipeline.dedup.dedup import Dedup
+from news_pipeline.llm.client_selection import is_anthropic_configured, pick_client_and_model
 from news_pipeline.llm.clients.anthropic import AnthropicClient
 from news_pipeline.llm.clients.dashscope import DashScopeClient
 from news_pipeline.llm.cost_tracker import CostTracker, ModelPricing
@@ -84,11 +85,36 @@ async def _amain() -> None:
 
     # LLM clients
     ds = DashScopeClient(api_key=snap.secrets.llm.get("dashscope_api_key", ""))
-    cl = AnthropicClient(api_key=snap.secrets.llm.get("anthropic_api_key", ""))
+
+    anthropic_key = snap.secrets.llm.get("anthropic_api_key", "").strip()
+    has_anthropic = is_anthropic_configured(anthropic_key)
+    cl: AnthropicClient | None = AnthropicClient(api_key=anthropic_key) if has_anthropic else None
+
+    if not has_anthropic:
+        log.warning(
+            "anthropic_not_configured_fallback_to_tier1",
+            tier2_configured=snap.app.llm.tier2_model,
+            tier3_configured=snap.app.llm.tier3_model,
+            fallback_model=snap.app.llm.tier1_model,
+        )
 
     prompts = PromptLoader(cfg_dir / "prompts")
     p_versions = snap.app.llm.prompt_versions
     cost = CostTracker(daily_ceiling_cny=snap.app.runtime.daily_cost_ceiling_cny, pricing=PRICING)
+
+    tier2_client, tier2_model = pick_client_and_model(
+        snap.app.llm.tier2_model,
+        anthropic_client=cl,
+        dashscope_client=ds,
+        tier1_fallback_model=snap.app.llm.tier1_model,
+    )
+    _tier3_client, _tier3_model = pick_client_and_model(
+        snap.app.llm.tier3_model,
+        anthropic_client=cl,
+        dashscope_client=ds,
+        tier1_fallback_model=snap.app.llm.tier1_model,
+    )
+
     tier0 = Tier0Classifier(
         client=ds,
         prompt=prompts.load("tier0_classify", p_versions["tier0_classify"]),
@@ -100,9 +126,10 @@ async def _amain() -> None:
         cost=cost,
     )
     tier2 = Tier2DeepExtractor(
-        client=cl,
+        client=tier2_client,
         prompt=prompts.load("tier2_extract", p_versions["tier2_extract"]),
         cost=cost,
+        model_override=tier2_model,
     )
     llm_router = LLMRouter(first_party_sources={"sec_edgar", "juchao", "caixin_telegram"})
     llm = LLMPipeline(
