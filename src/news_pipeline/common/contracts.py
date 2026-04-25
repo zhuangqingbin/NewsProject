@@ -5,7 +5,12 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 from news_pipeline.common.enums import (
-    EntityType, EventType, Magnitude, Market, Predicate, Sentiment,
+    EntityType,
+    EventType,
+    Magnitude,
+    Market,
+    Predicate,
+    Sentiment,
 )
 
 

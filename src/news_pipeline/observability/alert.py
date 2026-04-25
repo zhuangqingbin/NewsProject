@@ -27,9 +27,7 @@ class BarkAlerter:
         self._last_sent: dict[str, float] = {}
         self._timeout = timeout
 
-    async def send(
-        self, title: str, body: str, level: AlertLevel = AlertLevel.INFO
-    ) -> bool:
+    async def send(self, title: str, body: str, level: AlertLevel = AlertLevel.INFO) -> bool:
         key = f"{level}:{title}"
         now = time.monotonic()
         last = self._last_sent.get(key)

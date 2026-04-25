@@ -24,9 +24,7 @@ def configure_logging(level: str = "INFO", json_output: bool = True) -> None:
         processors.append(structlog.dev.ConsoleRenderer())
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, level.upper())
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, level.upper())),
         cache_logger_on_first_use=True,
     )
 

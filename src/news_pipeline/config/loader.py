@@ -3,16 +3,20 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 import yaml
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from news_pipeline.config.schema import (
-    AppConfig, ChannelsFile, SecretsFile, SourcesFile, WatchlistFile,
+    AppConfig,
+    ChannelsFile,
+    SecretsFile,
+    SourcesFile,
+    WatchlistFile,
 )
 from news_pipeline.observability.log import get_logger
 
@@ -64,8 +68,7 @@ class ConfigLoader:
     def start_watching(self, callback: Callable[[ConfigSnapshot], None]) -> None:
         self._callback = callback
         self._observer = Observer()
-        self._observer.schedule(_Handler(self._on_event), str(self._dir),
-                                recursive=False)
+        self._observer.schedule(_Handler(self._on_event), str(self._dir), recursive=False)
         self._observer.start()
 
     def stop_watching(self) -> None:

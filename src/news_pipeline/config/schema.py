@@ -83,8 +83,13 @@ class DeadLetterCfg(_Base):
     auto_retry_kinds: list[str]
     notify_only_kinds: list[str]
     weekly_summary_day: Literal[
-        "monday", "tuesday", "wednesday", "thursday",
-        "friday", "saturday", "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
     ]
 
 
