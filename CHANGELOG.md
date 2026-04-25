@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.1.3 (2026-04-25)
+
+### Fixed / Improved
+- **I5**: Replace deprecated `datetime.utcnow()` with `utc_now()` in `extractors.py` (Tier-1 and Tier-2 `extracted_at`) and `storage/models.py` (Entity/Relation `created_at` default_factory). Eliminates Python 3.12+ deprecation warnings.
+- **I7**: Wrap `runner.shutdown()` in `asyncio.wait_for(timeout=30)` in `main.py`. On timeout, logs `shutdown_timeout` and proceeds to `db.close()` instead of hanging indefinitely.
+- **I8**: `BurstSuppressor.should_send()` no longer appends to the bucket when suppressed. Fixes a bug where continuous suppressed attempts extended the window forever, making suppression permanent. Window now naturally releases once entries age out.
+- **I10**: Enhanced anti-crawl detection for xueqiu and ths scrapers:
+  - xueqiu: raises `AntiCrawlError` on non-JSON `Content-Type` and on `error_code != 0` in JSON payload.
+  - ths: raises `AntiCrawlError` on empty body and on pages containing `登录` / `captcha`.
+- **I3**: `Tier1Summarizer` now forwards `cache_segments` and `few_shot_examples` from the rendered prompt into `LLMRequest`, matching Tier-2 behaviour. Anthropic prompt caching will activate if Tier-1 model is ever swapped to Claude. (`tier1_summarize.v1.yaml` already had `cache_segments: [system]`.)
+- **I4**: `CostTracker` is now thread-safe. Added `threading.Lock` guarding `_daily_total` mutations in `record()` and reads in `today_cost_cny()`.
+
+### Tests
+- `test_burst.py`: 2 new cases — window expiry releases suppression, continuous suppressed calls do not extend window (regression for I8 bug).
+- `test_xueqiu.py`: 2 new cases — non-JSON content-type, error_code != 0.
+- `test_ths.py`: 2 new cases — login page detection, empty body detection.
+- `test_cost_tracker.py`: 1 new case — 1000 concurrent `record()` calls via `ThreadPoolExecutor` assert exact total.
+- Total: 181 passed, 2 skipped.
+
 ## v0.1.2 (2026-04-25)
 
 ### Added
