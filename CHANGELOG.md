@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.1.6 (2026-04-26)
+
+### Removed
+- Feishu self-built application integration (entire `archive/` module + `pushers/common/feishu_auth.py`)
+- Feishu bitable archive (multidim table writeback)
+- Feishu image upload via `im/v1/images` (chart embedding in Feishu cards)
+- Helper scripts: diagnose_feishu / init_feishu_table / add_app_collaborator
+- `lark-oapi` dependency
+
+### Changed
+- Feishu push now uses ONLY custom robot webhook + sign secret (no self-built app needed)
+- TG sendPhoto for chart embedding still works (keeps `chart_image` field)
+- Feishu chart embedding silently dropped (cards never include image)
+- secrets.yml schema simplified: no `storage:` section
+
+### Why
+Feishu's permission model for self-built apps + bitable is hostile to single-developer
+use. After 2+ hours debugging 91403 across 个人云 / 共享空间 / Wiki / advanced perms /
+all OAuth scope combinations, decided to wholesale eliminate the surface area.
+SQLite remains source of truth; browse via Datasette.
+
 ## v0.1.4 (2026-04-25)
 
 ### Removed
