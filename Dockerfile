@@ -10,7 +10,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/app/.venv \
-    UV_INDEX_URL=${UV_INDEX_URL}
+    UV_INDEX_URL=${UV_INDEX_URL} \
+    UV_HTTP_TIMEOUT=300
 
 # gcc needed for C-extension wheels (pyahocorasick) on platforms with no prebuilt wheel.
 RUN apt-get update \
