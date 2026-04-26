@@ -36,18 +36,18 @@ def test_pattern_chinese():
 
 
 def test_pattern_frozen():
-    p = Pattern(text="x", is_english=True, kind=PatternKind.TICKER,
-                market=Market.US, owner="X")
+    p = Pattern(text="x", is_english=True, kind=PatternKind.TICKER, market=Market.US, owner="X")
     try:
         p.text = "y"  # type: ignore[misc]
     except dataclasses.FrozenInstanceError:
         return
-    assert False, "Pattern must be frozen"
+    raise AssertionError("Pattern must be frozen")
 
 
 def test_match():
-    p = Pattern(text="nvda", is_english=True, kind=PatternKind.TICKER,
-                market=Market.US, owner="NVDA")
+    p = Pattern(
+        text="nvda", is_english=True, kind=PatternKind.TICKER, market=Market.US, owner="NVDA"
+    )
     m = Match(pattern=p, start=0, end=3, matched_text="nvda")
     assert m.start == 0 and m.end == 3
     assert m.matched_text == "nvda"

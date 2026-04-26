@@ -84,7 +84,7 @@ nav:
     - Scheduler: components/scheduler.md
     - Bot Commands: components/commands.md
     - Observability: components/observability.md
-    - Rules Engine (v0.3.0 planned): components/rules.md
+    - Rules Engine: components/rules.md
   - Operations:
     - Configuration: operations/configuration.md
     - Secrets: operations/secrets.md

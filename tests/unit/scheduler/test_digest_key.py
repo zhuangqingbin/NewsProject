@@ -1,5 +1,6 @@
 # tests/unit/scheduler/test_digest_key.py
 """Unit tests for _choose_digest_key (C4) — correct morning/evening selection."""
+
 from datetime import UTC, datetime
 
 import pytest

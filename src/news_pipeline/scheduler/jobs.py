@@ -10,14 +10,14 @@ from news_pipeline.common.exceptions import AntiCrawlError
 from news_pipeline.common.timeutil import ensure_utc, to_market_local, utc_now
 from news_pipeline.dedup.dedup import Dedup
 from news_pipeline.llm.pipeline import LLMPipeline
-from news_pipeline.rules.engine import RulesEngine
-from news_pipeline.rules.verdict import RulesVerdict
 from news_pipeline.observability.alert import AlertLevel, BarkAlerter
 from news_pipeline.observability.log import get_logger
 from news_pipeline.pushers.common.burst import BurstSuppressor
 from news_pipeline.pushers.common.message_builder import MessageBuilder
 from news_pipeline.pushers.dispatcher import PusherDispatcher
 from news_pipeline.router.routes import DispatchRouter
+from news_pipeline.rules.engine import RulesEngine
+from news_pipeline.rules.verdict import RulesVerdict
 from news_pipeline.scrapers.base import ScraperProtocol
 from news_pipeline.storage.dao.digest_buffer import DigestBufferDAO
 from news_pipeline.storage.dao.metrics import MetricsDAO
@@ -244,13 +244,16 @@ async def process_pending(
                 await raw_dao.mark_status(raw_id, "skipped")
                 continue
         else:
-            assert verdict is not None and verdict.matched, \
+            assert verdict is not None and verdict.matched, (
                 "rules-only mode requires rules.enable=True and rules.match=True"
+            )
             enriched = synth_enriched_from_rules(art, verdict, raw_id=raw_id)
 
         # === 3. Score ===
         scored = await importance.score_news(
-            enriched, source=raw.source, verdict=verdict,
+            enriched,
+            source=raw.source,
+            verdict=verdict,
         )
 
         # gray_zone_action='skip' signal → drop without persisting
@@ -283,7 +286,8 @@ async def process_pending(
             msg = msg_builder.build_from_rules(art, scored, verdict)
 
         plans = router.route(
-            scored, msg,
+            scored,
+            msg,
             markets=verdict.markets if verdict is not None else None,
         )
 

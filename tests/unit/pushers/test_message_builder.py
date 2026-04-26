@@ -53,8 +53,12 @@ def test_build_from_rules_includes_verdict_badges():
 
     art, scored = _make()
     verdict = RulesVerdict(
-        matched=True, tickers=["NVDA"], related_tickers=["AMD"],
-        sectors=["semiconductor"], macros=["FOMC"], markets=["us"],
+        matched=True,
+        tickers=["NVDA"],
+        related_tickers=["AMD"],
+        sectors=["semiconductor"],
+        macros=["FOMC"],
+        markets=["us"],
         score_boost=85.0,
     )
     b = MessageBuilder(source_labels={"reuters": "Reuters"})
@@ -72,7 +76,10 @@ def test_build_from_rules_generic_only():
 
     art, scored = _make()
     verdict = RulesVerdict(
-        matched=True, generic_hits=["powell"], markets=["us"], score_boost=0.0,
+        matched=True,
+        generic_hits=["powell"],
+        markets=["us"],
+        score_boost=0.0,
     )
     b = MessageBuilder(source_labels={"reuters": "Reuters"})
     msg = b.build_from_rules(art, scored, verdict)

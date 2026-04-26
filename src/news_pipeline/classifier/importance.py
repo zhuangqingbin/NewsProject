@@ -43,13 +43,19 @@ class ImportanceClassifier:
 
         if score >= self._hi:
             return ScoredNews(
-                enriched=e, score=score, is_critical=True,
-                rule_hits=rule_names, llm_reason=None,
+                enriched=e,
+                score=score,
+                is_critical=True,
+                rule_hits=rule_names,
+                llm_reason=None,
             )
         if score < self._lo:
             return ScoredNews(
-                enriched=e, score=score, is_critical=False,
-                rule_hits=rule_names, llm_reason=None,
+                enriched=e,
+                score=score,
+                is_critical=False,
+                rule_hits=rule_names,
+                llm_reason=None,
             )
 
         # Gray zone
@@ -66,13 +72,19 @@ class ImportanceClassifier:
                 is_crit = False
                 gz_reason = "rules-only-grayzone-digest"
             return ScoredNews(
-                enriched=e, score=score, is_critical=is_crit,
-                rule_hits=rule_names, llm_reason=gz_reason,
+                enriched=e,
+                score=score,
+                is_critical=is_crit,
+                rule_hits=rule_names,
+                llm_reason=gz_reason,
             )
 
         # LLM-enabled gray zone: judge breaks the tie
         is_crit, reason = await self._judge.judge(e, watchlist_tickers=self._wl)
         return ScoredNews(
-            enriched=e, score=score, is_critical=is_crit,
-            rule_hits=rule_names, llm_reason=reason,
+            enriched=e,
+            score=score,
+            is_critical=is_crit,
+            rule_hits=rule_names,
+            llm_reason=reason,
         )

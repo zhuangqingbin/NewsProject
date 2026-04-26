@@ -31,9 +31,10 @@ def test_full_verdict():
 
 def test_frozen():
     import dataclasses
+
     v = RulesVerdict(matched=False)
     try:
         v.matched = True  # type: ignore[misc]
     except dataclasses.FrozenInstanceError:
         return
-    assert False, "RulesVerdict must be frozen"
+    raise AssertionError("RulesVerdict must be frozen")

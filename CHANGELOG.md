@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.3.0 (2026-04-26)
+
+### Added
+- New `rules/` module: pluggable keyword-matching engine (Aho-Corasick default, MatcherProtocol for future extensions)
+- `rules.enable` (default true) + `llm.enable` (default false) two-section watchlist
+- Rules-only mode: zero LLM cost, < 1ms per article, deterministic matching
+- `gray_zone_action`: configurable skip / digest / push for ambiguous cases
+- Schema validators: at-least-one-enabled, ticker-unique, sector/macro ref validity
+- `synth_enriched_from_rules()` — build EnrichedNews without LLM (body[:200] excerpt)
+- `LLMPipeline.process_with_rules()` — skip Tier-0 when rules already classified
+- `MessageBuilder.build_from_rules()` — push card with rules badges (tickers, sectors, macros, generic)
+- `DispatchRouter.route(markets=...)` — multi-market routing for shared news (e.g., FOMC 影响 A 股)
+- Migration script `scripts/migrate_watchlist_v0_3_0.py`
+- Pre-flight check: `_word_boundary_ok` treats CJK chars as boundaries so 'FOMC加息' matches FOMC
+
+### Breaking
+- `WatchlistFile` schema changed: top-level `us/cn/macro/sectors` → `rules` + `llm` sections
+- Old watchlist.yml format rejected at startup; run migration script first
+- `WatchlistEntry` removed (replaced by `TickerEntry` with name/aliases/sectors/macro_links)
+
+### Internal
+- `ImportanceClassifier` accepts `verdict: RulesVerdict | None`, `gray_zone_action`, `llm_enabled`
+- `process_pending` accepts `rules_engine`, `rules_enabled`, `llm_enabled` kwargs (default LLM-only behavior preserved)
+- `LLMPipeline.__init__` accepts optional `first_party_sources` set
+- Skip signal via `llm_reason='rules-only-grayzone-skip'` (avoids negative score that ScoredNews rejects)
+
+### Performance
+- Rules pipeline: ~350 patterns build in < 10ms, match in < 1ms per 1KB article
+- Replaces LLM Tier-0 (1-2 seconds + DashScope token cost) for the common case
+
 ## v0.2.0 (2026-04-26)
 
 ### Added

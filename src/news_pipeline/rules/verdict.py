@@ -13,10 +13,10 @@ class RulesVerdict:
     """
 
     matched: bool
-    tickers: list[str] = field(default_factory=list)         # direct ticker/alias hits
-    related_tickers: list[str] = field(default_factory=list) # via sector/macro associations
-    sectors: list[str] = field(default_factory=list)         # sector_keywords hits
-    macros: list[str] = field(default_factory=list)          # macro_keywords hits
-    generic_hits: list[str] = field(default_factory=list)    # keyword_list hits
-    markets: list[str] = field(default_factory=list)         # 'us' / 'cn' / both
-    score_boost: float = 0.0                                  # 0-100, added to classifier score
+    tickers: list[str] = field(default_factory=list)  # direct ticker/alias hits
+    related_tickers: list[str] = field(default_factory=list)  # via sector/macro associations
+    sectors: list[str] = field(default_factory=list)  # sector_keywords hits
+    macros: list[str] = field(default_factory=list)  # macro_keywords hits
+    generic_hits: list[str] = field(default_factory=list)  # keyword_list hits
+    markets: list[str] = field(default_factory=list)  # 'us' / 'cn' / both
+    score_boost: float = 0.0  # 0-100, added to classifier score

@@ -114,6 +114,7 @@ class AppConfig(_Base):
 # --- watchlist.yml ---
 class TickerEntry(_Base):
     """One stock under rules.us or rules.cn."""
+
     ticker: str
     name: str
     aliases: list[str] = Field(default_factory=list)
@@ -124,6 +125,7 @@ class TickerEntry(_Base):
 
 class MarketKeywords(_Base):
     """A keyword list split by market."""
+
     us: list[str] = Field(default_factory=list)
     cn: list[str] = Field(default_factory=list)
 
@@ -167,9 +169,7 @@ class WatchlistFile(_Base):
             tickers = [t.ticker for t in getattr(self.rules, market)]
             if len(tickers) != len(set(tickers)):
                 dups = sorted({t for t in tickers if tickers.count(t) > 1})
-                raise ValueError(
-                    f"rules.{market}: duplicate tickers {dups}"
-                )
+                raise ValueError(f"rules.{market}: duplicate tickers {dups}")
         return self
 
     @model_validator(mode="after")

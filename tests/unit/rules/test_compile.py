@@ -4,13 +4,17 @@ from news_pipeline.rules.patterns import PatternKind
 
 def _section():
     from news_pipeline.config.schema import (
-        MarketKeywords, RulesSection, TickerEntry,
+        MarketKeywords,
+        RulesSection,
+        TickerEntry,
     )
+
     return RulesSection(
         enable=True,
         us=[
             TickerEntry(
-                ticker="NVDA", name="NVIDIA",
+                ticker="NVDA",
+                name="NVIDIA",
                 aliases=["英伟达"],
                 sectors=["semiconductor"],
                 macro_links=["FOMC"],
@@ -18,7 +22,8 @@ def _section():
         ],
         cn=[
             TickerEntry(
-                ticker="600519", name="贵州茅台",
+                ticker="600519",
+                name="贵州茅台",
                 aliases=["茅台"],
                 sectors=["白酒"],
                 macro_links=["央行"],
@@ -31,11 +36,14 @@ def _section():
 
 
 def test_compile_emits_all_pattern_kinds():
-    patterns, sec_idx, mac_idx = _compile(_section())
+    patterns, _sec_idx, _mac_idx = _compile(_section())
     kinds = {p.kind for p in patterns}
     assert kinds == {
-        PatternKind.TICKER, PatternKind.ALIAS,
-        PatternKind.SECTOR, PatternKind.MACRO, PatternKind.GENERIC,
+        PatternKind.TICKER,
+        PatternKind.ALIAS,
+        PatternKind.SECTOR,
+        PatternKind.MACRO,
+        PatternKind.GENERIC,
     }
 
 
@@ -77,6 +85,7 @@ def test_compile_chinese_pattern_marked_not_english():
 
 def test_compile_empty_section():
     from news_pipeline.config.schema import RulesSection
+
     patterns, sec_idx, mac_idx = _compile(RulesSection(enable=True))
     assert patterns == []
     assert sec_idx == {}

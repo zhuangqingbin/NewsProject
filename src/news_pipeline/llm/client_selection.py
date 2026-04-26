@@ -5,6 +5,7 @@ Anthropic is optional: if the API key is absent or unconfigured, Tier-2 and
 Tier-3 requests that would have targeted a ``claude-*`` model are automatically
 rerouted to DashScope using the Tier-1 model.
 """
+
 from news_pipeline.llm.clients.base import LLMClient
 
 

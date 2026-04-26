@@ -10,6 +10,7 @@ from news_pipeline.common.timeutil import utc_now
 def _naive_utc_now() -> datetime:
     return utc_now().replace(tzinfo=None)
 
+
 SQLModelBase = SQLModel
 
 

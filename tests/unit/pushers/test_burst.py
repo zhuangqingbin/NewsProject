@@ -30,9 +30,9 @@ def test_window_expiry_releases_suppression(monkeypatch):
     seq = iter([1000.0, 1100.0, 1200.0, 1250.0, 1600.0])
     monkeypatch.setattr(time, "monotonic", lambda: next(seq))
     s = BurstSuppressor(window_seconds=300, threshold=3)
-    assert s.should_send(["NVDA"]) is True   # t=1000, buf=[1000]
-    assert s.should_send(["NVDA"]) is True   # t=1100, buf=[1000,1100]
-    assert s.should_send(["NVDA"]) is True   # t=1200, buf=[1000,1100,1200]
+    assert s.should_send(["NVDA"]) is True  # t=1000, buf=[1000]
+    assert s.should_send(["NVDA"]) is True  # t=1100, buf=[1000,1100]
+    assert s.should_send(["NVDA"]) is True  # t=1200, buf=[1000,1100,1200]
     assert s.should_send(["NVDA"]) is False  # t=1250, suppressed - buf unchanged
     # t=1600: cutoff=1300, so 1000 and 1100 expire → buf=[1200] → len<3 → send
     assert s.should_send(["NVDA"]) is True
@@ -51,9 +51,9 @@ def test_suppressed_attempts_do_not_extend_window(monkeypatch):
     seq = iter([0.0, 60.0, 120.0, 180.0, 240.0, 300.0, 360.0])
     monkeypatch.setattr(time, "monotonic", lambda: next(seq))
     s = BurstSuppressor(window_seconds=300, threshold=3)
-    assert s.should_send(["TSLA"]) is True   # t=0
-    assert s.should_send(["TSLA"]) is True   # t=60
-    assert s.should_send(["TSLA"]) is True   # t=120, buf=[0,60,120]
+    assert s.should_send(["TSLA"]) is True  # t=0
+    assert s.should_send(["TSLA"]) is True  # t=60
+    assert s.should_send(["TSLA"]) is True  # t=120, buf=[0,60,120]
     assert s.should_send(["TSLA"]) is False  # t=180, suppressed
     assert s.should_send(["TSLA"]) is False  # t=240, suppressed
     assert s.should_send(["TSLA"]) is False  # t=300, suppressed (cutoff=0, all 3 still in)

@@ -2,7 +2,11 @@ import pytest
 from pydantic import ValidationError
 
 from news_pipeline.config.schema import (
-    LLMSection, MarketKeywords, RulesSection, TickerEntry, WatchlistFile,
+    LLMSection,
+    MarketKeywords,
+    RulesSection,
+    TickerEntry,
+    WatchlistFile,
 )
 
 
@@ -31,47 +35,64 @@ def test_only_llm_enabled_passes():
 
 def test_duplicate_ticker_rejects():
     with pytest.raises(ValidationError, match="duplicate tickers"):
-        WatchlistFile(rules=RulesSection(
-            us=[
-                TickerEntry(ticker="NVDA", name="NVIDIA"),
-                TickerEntry(ticker="NVDA", name="NVIDIA Corp"),
-            ],
-        ))
+        WatchlistFile(
+            rules=RulesSection(
+                us=[
+                    TickerEntry(ticker="NVDA", name="NVIDIA"),
+                    TickerEntry(ticker="NVDA", name="NVIDIA Corp"),
+                ],
+            )
+        )
 
 
 def test_invalid_sector_ref_rejects():
     with pytest.raises(ValidationError, match="not in sector_keywords"):
-        WatchlistFile(rules=RulesSection(
-            us=[TickerEntry(
-                ticker="NVDA", name="NVIDIA",
-                sectors=["nonexistent_sector"],
-            )],
-            sector_keywords=MarketKeywords(us=["semiconductor"]),
-        ))
+        WatchlistFile(
+            rules=RulesSection(
+                us=[
+                    TickerEntry(
+                        ticker="NVDA",
+                        name="NVIDIA",
+                        sectors=["nonexistent_sector"],
+                    )
+                ],
+                sector_keywords=MarketKeywords(us=["semiconductor"]),
+            )
+        )
 
 
 def test_invalid_macro_link_rejects():
     with pytest.raises(ValidationError, match="not in macro_keywords"):
-        WatchlistFile(rules=RulesSection(
-            us=[TickerEntry(
-                ticker="NVDA", name="NVIDIA",
-                macro_links=["nonexistent_macro"],
-            )],
-            macro_keywords=MarketKeywords(us=["FOMC"]),
-        ))
+        WatchlistFile(
+            rules=RulesSection(
+                us=[
+                    TickerEntry(
+                        ticker="NVDA",
+                        name="NVIDIA",
+                        macro_links=["nonexistent_macro"],
+                    )
+                ],
+                macro_keywords=MarketKeywords(us=["FOMC"]),
+            )
+        )
 
 
 def test_valid_full_config():
-    w = WatchlistFile(rules=RulesSection(
-        us=[TickerEntry(
-            ticker="NVDA", name="NVIDIA",
-            aliases=["英伟达"],
-            sectors=["semiconductor"],
-            macro_links=["FOMC"],
-        )],
-        sector_keywords=MarketKeywords(us=["semiconductor"]),
-        macro_keywords=MarketKeywords(us=["FOMC"]),
-    ))
+    w = WatchlistFile(
+        rules=RulesSection(
+            us=[
+                TickerEntry(
+                    ticker="NVDA",
+                    name="NVIDIA",
+                    aliases=["英伟达"],
+                    sectors=["semiconductor"],
+                    macro_links=["FOMC"],
+                )
+            ],
+            sector_keywords=MarketKeywords(us=["semiconductor"]),
+            macro_keywords=MarketKeywords(us=["FOMC"]),
+        )
+    )
     assert len(w.rules.us) == 1
     assert w.rules.us[0].ticker == "NVDA"
 

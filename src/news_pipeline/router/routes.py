@@ -25,7 +25,11 @@ class DispatchRouter:
             channels = self._by_market.get(mkt, [])
             if not channels:
                 continue
-            plans.append(DispatchPlan(
-                message=msg, channels=channels, immediate=scored.is_critical,
-            ))
+            plans.append(
+                DispatchPlan(
+                    message=msg,
+                    channels=channels,
+                    immediate=scored.is_critical,
+                )
+            )
         return plans

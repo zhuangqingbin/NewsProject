@@ -24,6 +24,7 @@ def async_retry(
             match retry_on (e.g. a permanent-error subclass of RuntimeError).
             Exclusions are checked before retry_on, so subclasses take priority.
     """
+
     def deco(fn: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         @wraps(fn)
         async def wrapper(*args: object, **kwargs: object) -> T:

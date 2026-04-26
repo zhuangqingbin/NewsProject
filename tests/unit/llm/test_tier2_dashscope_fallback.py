@@ -1,5 +1,6 @@
 # tests/unit/llm/test_tier2_dashscope_fallback.py
 """Integration-style test: Tier2DeepExtractor with DashScope client + model_override."""
+
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock

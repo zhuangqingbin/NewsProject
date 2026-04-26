@@ -4,7 +4,6 @@ from pydantic import ValidationError
 
 from news_pipeline.config.schema import (
     AppConfig,
-    WatchlistFile,
 )
 
 
@@ -71,5 +70,3 @@ def test_app_config_rejects_bad_score_range():
     raw_bad = {"classifier": {"llm_fallback_when_score": [40]}}
     with pytest.raises(ValidationError):
         AppConfig.model_validate(raw_bad)
-
-

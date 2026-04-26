@@ -3,7 +3,9 @@ from datetime import UTC, datetime
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
 from news_pipeline.config.schema import (
-    MarketKeywords, RulesSection, TickerEntry,
+    MarketKeywords,
+    RulesSection,
+    TickerEntry,
 )
 from news_pipeline.rules.engine import RulesEngine, _compute_boost
 from news_pipeline.rules.matcher import AhoCorasickMatcher
@@ -12,18 +14,24 @@ from news_pipeline.rules.matcher import AhoCorasickMatcher
 def _section():
     return RulesSection(
         enable=True,
-        us=[TickerEntry(
-            ticker="NVDA", name="NVIDIA",
-            aliases=["英伟达"],
-            sectors=["semiconductor"],
-            macro_links=["FOMC"],
-        )],
-        cn=[TickerEntry(
-            ticker="600519", name="贵州茅台",
-            aliases=["茅台"],
-            sectors=["白酒"],
-            macro_links=["央行"],
-        )],
+        us=[
+            TickerEntry(
+                ticker="NVDA",
+                name="NVIDIA",
+                aliases=["英伟达"],
+                sectors=["semiconductor"],
+                macro_links=["FOMC"],
+            )
+        ],
+        cn=[
+            TickerEntry(
+                ticker="600519",
+                name="贵州茅台",
+                aliases=["茅台"],
+                sectors=["白酒"],
+                macro_links=["央行"],
+            )
+        ],
         keyword_list=MarketKeywords(us=["powell"], cn=[]),
         macro_keywords=MarketKeywords(us=["FOMC"], cn=["央行"]),
         sector_keywords=MarketKeywords(us=["semiconductor"], cn=["白酒"]),
@@ -32,11 +40,16 @@ def _section():
 
 def _article(title: str, body: str = "", market: Market = Market.US) -> RawArticle:
     return RawArticle(
-        source="x", market=market,
+        source="x",
+        market=market,
         fetched_at=datetime(2026, 4, 26, tzinfo=UTC),
         published_at=datetime(2026, 4, 26, tzinfo=UTC),
-        url="https://x.com/1", url_hash="h1", title=title, body=body,
-        title_simhash=0, raw_meta={},
+        url="https://x.com/1",
+        url_hash="h1",
+        title=title,
+        body=body,
+        title_simhash=0,
+        raw_meta={},
     )
 
 

@@ -90,16 +90,20 @@ class MessageBuilder:
         deeplinks = [Deeplink(label="原文", url=str(art.url))]
         for t in (verdict.tickers + verdict.related_tickers)[:3]:
             if art.market == Market.US:
-                deeplinks.append(Deeplink(
-                    label=f"Yahoo {t}",
-                    url=f"https://finance.yahoo.com/quote/{t}",
-                ))
+                deeplinks.append(
+                    Deeplink(
+                        label=f"Yahoo {t}",
+                        url=f"https://finance.yahoo.com/quote/{t}",
+                    )
+                )
             else:
                 prefix = "sh" if t.startswith("6") else "sz"
-                deeplinks.append(Deeplink(
-                    label=f"东财 {t}",
-                    url=f"https://quote.eastmoney.com/{prefix}{t}.html",
-                ))
+                deeplinks.append(
+                    Deeplink(
+                        label=f"东财 {t}",
+                        url=f"https://quote.eastmoney.com/{prefix}{t}.html",
+                    )
+                )
 
         return CommonMessage(
             title=art.title,

@@ -78,9 +78,7 @@ class CostTracker:
                     f"今日 LLM 成本 {today_cost:.2f} CNY >= ceiling {self._ceiling:.2f}",
                     level=AlertLevel.URGENT,
                 )
-            raise CostCeilingExceeded(
-                f"daily LLM cost {today_cost:.2f} >= {self._ceiling:.2f}"
-            )
+            raise CostCeilingExceeded(f"daily LLM cost {today_cost:.2f} >= {self._ceiling:.2f}")
 
         if (
             today_cost >= self._ceiling * self._warn_threshold

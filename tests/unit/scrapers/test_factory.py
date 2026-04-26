@@ -18,10 +18,12 @@ def test_factory_builds_registry_for_enabled_sources():
             "xueqiu": SourceDef(enabled=False),
         }
     )
-    watchlist = WatchlistFile(rules=RulesSection(
-        us=[TickerEntry(ticker="NVDA", name="NVIDIA")],
-        cn=[TickerEntry(ticker="600519", name="贵州茅台")],
-    ))
+    watchlist = WatchlistFile(
+        rules=RulesSection(
+            us=[TickerEntry(ticker="NVDA", name="NVIDIA")],
+            cn=[TickerEntry(ticker="600519", name="贵州茅台")],
+        )
+    )
     secrets = SecretsFile(
         sources={
             "finnhub_token": "T",

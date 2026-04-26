@@ -9,15 +9,21 @@ from news_pipeline.rules.patterns import Pattern, PatternKind
 
 def _en(text: str, owner: str = "X", kind: PatternKind = PatternKind.TICKER) -> Pattern:
     return Pattern(
-        text=text.lower(), is_english=text.isascii(),
-        kind=kind, market=Market.US, owner=owner,
+        text=text.lower(),
+        is_english=text.isascii(),
+        kind=kind,
+        market=Market.US,
+        owner=owner,
     )
 
 
 def _cn(text: str, owner: str = "X", kind: PatternKind = PatternKind.ALIAS) -> Pattern:
     return Pattern(
-        text=text.lower(), is_english=text.isascii(),
-        kind=kind, market=Market.CN, owner=owner,
+        text=text.lower(),
+        is_english=text.isascii(),
+        kind=kind,
+        market=Market.CN,
+        owner=owner,
     )
 
 
@@ -67,10 +73,12 @@ def test_case_insensitive():
 
 def test_multiple_patterns_same_text():
     m = AhoCorasickMatcher()
-    m.rebuild([
-        _en("AI", owner="AI", kind=PatternKind.GENERIC),
-        _en("AI", owner="AI", kind=PatternKind.SECTOR),
-    ])
+    m.rebuild(
+        [
+            _en("AI", owner="AI", kind=PatternKind.GENERIC),
+            _en("AI", owner="AI", kind=PatternKind.SECTOR),
+        ]
+    )
     matches = m.find_all("AI is the future")
     assert len(matches) == 2
     kinds = {m.pattern.kind for m in matches}
@@ -99,5 +107,6 @@ def test_factory_aho_corasick():
 
 def test_factory_unknown_raises():
     import pytest
+
     with pytest.raises(ValueError, match="unknown matcher"):
         build_matcher("xxx", {})

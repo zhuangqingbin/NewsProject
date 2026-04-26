@@ -386,7 +386,9 @@ async def _probe_scrapers(reg: ScraperRegistry, bark: BarkAlerter | None) -> Non
     for sid in reg.list_ids():
         scraper = reg.get(sid)
         try:
-            since = utc_now() - timedelta(minutes=5)  # aware UTC; scrapers compare against tz-aware ts
+            since = utc_now() - timedelta(
+                minutes=5
+            )  # aware UTC; scrapers compare against tz-aware ts
             items = await asyncio.wait_for(scraper.fetch(since), timeout=15)
             log.info("scraper_probe_ok", source=sid, items=len(items))
         except Exception as e:

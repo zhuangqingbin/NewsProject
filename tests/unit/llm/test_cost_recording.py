@@ -1,5 +1,6 @@
 # tests/unit/llm/test_cost_recording.py
 """Regression: cost.record() is called exactly once per LLM extractor call (C1)."""
+
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock

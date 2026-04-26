@@ -72,14 +72,22 @@ async def test_process_with_rules_routes_to_tier2_when_ticker_hit():
     from news_pipeline.rules.verdict import RulesVerdict
 
     classifier = MagicMock()
-    tier1 = MagicMock(); tier1.summarize = AsyncMock()
-    tier2 = MagicMock(); tier2.extract = AsyncMock(return_value="enriched_t2")
+    tier1 = MagicMock()
+    tier1.summarize = AsyncMock()
+    tier2 = MagicMock()
+    tier2.extract = AsyncMock(return_value="enriched_t2")
     router = MagicMock()
-    cost = MagicMock(); cost.check_async = AsyncMock()
+    cost = MagicMock()
+    cost.check_async = AsyncMock()
 
     p = LLMPipeline(
-        classifier, tier1, tier2, router, cost,
-        watchlist_us=["NVDA"], watchlist_cn=[],
+        classifier,
+        tier1,
+        tier2,
+        router,
+        cost,
+        watchlist_us=["NVDA"],
+        watchlist_cn=[],
         first_party_sources={"sec_edgar"},
     )
     verdict = RulesVerdict(matched=True, tickers=["NVDA"], score_boost=50.0)
@@ -94,14 +102,22 @@ async def test_process_with_rules_routes_to_tier1_when_no_ticker():
     from news_pipeline.rules.verdict import RulesVerdict
 
     classifier = MagicMock()
-    tier1 = MagicMock(); tier1.summarize = AsyncMock(return_value="enriched_t1")
-    tier2 = MagicMock(); tier2.extract = AsyncMock()
+    tier1 = MagicMock()
+    tier1.summarize = AsyncMock(return_value="enriched_t1")
+    tier2 = MagicMock()
+    tier2.extract = AsyncMock()
     router = MagicMock()
-    cost = MagicMock(); cost.check_async = AsyncMock()
+    cost = MagicMock()
+    cost.check_async = AsyncMock()
 
     p = LLMPipeline(
-        classifier, tier1, tier2, router, cost,
-        watchlist_us=[], watchlist_cn=[],
+        classifier,
+        tier1,
+        tier2,
+        router,
+        cost,
+        watchlist_us=[],
+        watchlist_cn=[],
     )
     verdict = RulesVerdict(matched=True, sectors=["semi"], score_boost=20.0)
     out = await p.process_with_rules(_art(), verdict, raw_id=1)

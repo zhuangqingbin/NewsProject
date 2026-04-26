@@ -1,10 +1,8 @@
-# Rules Engine（v0.3.0 计划中）
+# Rules Engine
 
-!!! info "状态：设计完成，待实施"
-    本页描述 v0.3.0 的 watchlist 重设计（rules + llm 双段架构）。
-    完整 spec：[`docs/superpowers/specs/2026-04-26-watchlist-rules-design.md`](../superpowers/specs/2026-04-26-watchlist-rules-design.md)
-    
-    当前生产版本 v0.1.7 仍用扁平 watchlist + LLM Tier-0 全跑。
+!!! success "状态：v0.3.0 已上线"
+    本页是当前生产生效的 watchlist 双段架构（rules + llm）。
+    完整 spec：[设计文档](../superpowers/specs/2026-04-26-watchlist-rules-design.md)
 
 ---
 

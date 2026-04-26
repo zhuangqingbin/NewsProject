@@ -14,6 +14,7 @@ The expected value below was generated once by running that exact snippet
 and is pinned here as a regression guard.  If this test fails the signing
 implementation has diverged from Feishu's spec.
 """
+
 import hashlib
 import hmac
 from base64 import b64encode

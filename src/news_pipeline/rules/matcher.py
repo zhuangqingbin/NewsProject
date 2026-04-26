@@ -11,11 +11,9 @@ class MatcherProtocol(Protocol):
     future TfidfMatcher / EmbeddingMatcher / RegexMatcher / CompositeMatcher.
     """
 
-    def rebuild(self, patterns: list[Pattern]) -> None:
-        ...
+    def rebuild(self, patterns: list[Pattern]) -> None: ...
 
-    def find_all(self, text: str) -> list[Match]:
-        ...
+    def find_all(self, text: str) -> list[Match]: ...
 
 
 def _is_word_char(c: str) -> bool:
@@ -66,10 +64,14 @@ class AhoCorasickMatcher:
                 start_idx = end_idx - len(p.text) + 1
                 if p.is_english and not _word_boundary_ok(text_lc, start_idx, end_idx):
                     continue
-                out.append(Match(
-                    pattern=p, start=start_idx, end=end_idx,
-                    matched_text=text_lc[start_idx : end_idx + 1],
-                ))
+                out.append(
+                    Match(
+                        pattern=p,
+                        start=start_idx,
+                        end=end_idx,
+                        matched_text=text_lc[start_idx : end_idx + 1],
+                    )
+                )
         return out
 
 
