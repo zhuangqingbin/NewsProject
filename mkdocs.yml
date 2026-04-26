@@ -1,0 +1,101 @@
+site_name: "News Pipeline"
+site_description: "Financial news scraper → LLM pipeline → multi-platform pusher"
+site_author: "qingbin"
+docs_dir: docs
+site_dir: site
+
+# Historical artifacts — kept in repo for reference but not in nav.
+validation:
+  nav:
+    omitted_files: ignore        # don't warn about files outside nav
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    absolute_links: warn
+    unrecognized_links: warn
+
+not_in_nav: |
+  /superpowers/**
+  /runbook/**
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Overview: getting-started/overview.md
+    - Architecture: getting-started/architecture.md
+    - Current Deployment: getting-started/deployment-current.md
+  - Components:
+    - Scrapers: components/scrapers.md
+    - Deduplication: components/dedup.md
+    - LLM Pipeline: components/llm-pipeline.md
+    - Classifier: components/classifier.md
+    - Dispatch Router: components/dispatch-router.md
+    - Pushers: components/pushers.md
+    - Charts: components/charts.md
+    - Storage: components/storage.md
+    - Scheduler: components/scheduler.md
+    - Bot Commands: components/commands.md
+    - Observability: components/observability.md
+  - Operations:
+    - Configuration: operations/configuration.md
+    - Secrets: operations/secrets.md
+    - Daily Ops: operations/daily-ops.md
+    - Monitoring: operations/monitoring.md
+    - Upgrading: operations/upgrading.md
+    - Backup: operations/backup.md
+    - Troubleshooting: operations/troubleshooting.md
+  - Reference:
+    - Config Schema: reference/config-schema.md
+    - DB Schema: reference/db-schema.md
+    - LLM Cost: reference/llm-cost.md
+    - Changelog: reference/changelog.md
+    - Architecture Decisions: reference/architecture-decisions.md
+  - Glossary: glossary.md
