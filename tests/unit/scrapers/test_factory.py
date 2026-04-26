@@ -1,9 +1,10 @@
 # tests/unit/scrapers/test_factory.py
 from news_pipeline.config.schema import (
+    RulesSection,
     SecretsFile,
     SourceDef,
     SourcesFile,
-    WatchlistEntry,
+    TickerEntry,
     WatchlistFile,
 )
 from news_pipeline.scrapers.factory import build_registry
@@ -17,10 +18,10 @@ def test_factory_builds_registry_for_enabled_sources():
             "xueqiu": SourceDef(enabled=False),
         }
     )
-    watchlist = WatchlistFile(
-        us=[WatchlistEntry(ticker="NVDA")],
-        cn=[WatchlistEntry(ticker="600519")],
-    )
+    watchlist = WatchlistFile(rules=RulesSection(
+        us=[TickerEntry(ticker="NVDA", name="NVIDIA")],
+        cn=[TickerEntry(ticker="600519", name="贵州茅台")],
+    ))
     secrets = SecretsFile(
         sources={
             "finnhub_token": "T",

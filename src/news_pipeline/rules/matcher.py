@@ -18,9 +18,15 @@ class MatcherProtocol(Protocol):
         ...
 
 
+def _is_word_char(c: str) -> bool:
+    """Word char = ASCII alphanumeric. CJK chars are treated as boundaries
+    so 'FOMC加息' word-boundary-matches FOMC."""
+    return c.isascii() and c.isalnum()
+
+
 def _word_boundary_ok(text: str, start: int, end: int) -> bool:
-    left_ok = (start == 0) or not text[start - 1].isalnum()
-    right_ok = (end == len(text) - 1) or not text[end + 1].isalnum()
+    left_ok = (start == 0) or not _is_word_char(text[start - 1])
+    right_ok = (end == len(text) - 1) or not _is_word_char(text[end + 1])
     return left_ok and right_ok
 
 

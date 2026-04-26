@@ -30,6 +30,8 @@ services:
   # Default binds to 127.0.0.1 only (secure). To access remotely, either:
   #   a) SSH tunnel: ssh -L 8001:localhost:8001 user@server
   #   b) Bind public + add nginx + basic auth (change "127.0.0.1:8001:8001" → "8001:8001")
+  ports:                  
+    - "127.0.0.1:9001"   # ← 改这里
   datasette:
     image: datasetteproject/datasette:latest
     container_name: news_datasette

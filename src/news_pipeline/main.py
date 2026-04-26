@@ -141,8 +141,8 @@ async def _amain() -> None:
         tier2,
         llm_router,
         cost,
-        watchlist_us=[w.ticker for w in snap.watchlist.us],
-        watchlist_cn=[w.ticker for w in snap.watchlist.cn],
+        watchlist_us=[w.ticker for w in snap.watchlist.rules.us],
+        watchlist_cn=[w.ticker for w in snap.watchlist.rules.cn],
     )
 
     if snap.app.classifier.rules:
@@ -160,8 +160,8 @@ async def _amain() -> None:
         rules=rules,
         judge=judge,
         gray_zone=tuple(snap.app.classifier.llm_fallback_when_score),  # type: ignore[arg-type]
-        watchlist_tickers=[w.ticker for w in snap.watchlist.us]
-        + [w.ticker for w in snap.watchlist.cn],
+        watchlist_tickers=[w.ticker for w in snap.watchlist.rules.us]
+        + [w.ticker for w in snap.watchlist.rules.cn],
     )
 
     pushers = build_pushers(snap.channels, snap.secrets)

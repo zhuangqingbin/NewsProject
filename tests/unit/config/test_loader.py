@@ -10,7 +10,9 @@ from news_pipeline.config.loader import ConfigLoader
 @pytest.fixture
 def cfg_dir(tmp_path: Path) -> Path:
     (tmp_path / "app.yml").write_text(_minimal_app_yml())
-    (tmp_path / "watchlist.yml").write_text("us: []\ncn: []\nmacro: []\nsectors: []\n")
+    (tmp_path / "watchlist.yml").write_text(
+        "rules:\n  enable: true\n  us: []\n  cn: []\nllm:\n  enable: false\n  us: []\n  cn: []\n  macro: []\n  sectors: []\n"
+    )
     (tmp_path / "channels.yml").write_text("channels: {}\n")
     (tmp_path / "sources.yml").write_text("sources: {}\n")
     (tmp_path / "secrets.yml").write_text(
@@ -49,7 +51,8 @@ def test_loader_loads_all(cfg_dir: Path) -> None:
     loader = ConfigLoader(cfg_dir)
     snap = loader.load()
     assert snap.app.runtime.daily_cost_ceiling_cny == 5.0
-    assert snap.watchlist.us == []
+    assert snap.watchlist.rules.us == []
+    assert snap.watchlist.llm.us == []
     assert snap.channels.channels == {}
 
 

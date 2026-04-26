@@ -26,8 +26,8 @@ def build_registry(
     sec_ciks: Mapping[str, str] | None = None,
 ) -> ScraperRegistry:
     reg = ScraperRegistry()
-    us_tickers = [w.ticker for w in watchlist.us]
-    cn_tickers = [w.ticker for w in watchlist.cn]
+    us_tickers = [w.ticker for w in watchlist.rules.us]
+    cn_tickers = [w.ticker for w in watchlist.rules.cn]
     enabled = {k for k, v in sources.sources.items() if v.enabled}
     s = secrets.sources
 

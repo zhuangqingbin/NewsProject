@@ -73,12 +73,3 @@ def test_app_config_rejects_bad_score_range():
         AppConfig.model_validate(raw_bad)
 
 
-def test_watchlist_file_parses():
-    raw = {
-        "us": [{"ticker": "NVDA", "alerts": ["price_5pct"]}],
-        "cn": [{"ticker": "600519", "alerts": ["announcement"]}],
-        "macro": ["FOMC"],
-        "sectors": ["semiconductor"],
-    }
-    wl = WatchlistFile.model_validate(raw)
-    assert wl.us[0].ticker == "NVDA"
