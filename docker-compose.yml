@@ -1,0 +1,57 @@
+# One-shot deploy: docker compose up -d
+#
+# Bind mounts (created on first run if missing):
+#   ./config — yaml configs you edit (incl. secrets.yml)
+#   ./data   — SQLite db + state (persists across container restarts)
+#   ./logs   — structlog json output
+#
+# Datasette browses ./data/news.db at http://127.0.0.1:8001 (loopback only).
+# To browse remotely:  ssh -L 8001:localhost:8001 user@server
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        UV_INDEX_URL: ${UV_INDEX_URL:-}
+    image: news-pipeline:latest
+    container_name: news_pipeline
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TZ: ${TZ:-Asia/Shanghai}
+    healthcheck:
+      test: ["CMD", "python", "-m", "news_pipeline.healthcheck"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+
+  datasette:
+    image: datasetteproject/datasette:latest
+    container_name: news_datasette
+    restart: unless-stopped
+    depends_on:
+      - app
+    command: >-
+      datasette /data/news.db
+      --host 0.0.0.0 --port 8001
+      --setting sql_time_limit_ms 5000
+      --setting default_page_size 50
+      --setting suggest_facets on
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - "127.0.0.1:8001:8001"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
