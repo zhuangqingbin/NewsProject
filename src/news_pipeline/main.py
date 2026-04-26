@@ -167,25 +167,45 @@ async def _amain() -> None:
         + [w.ticker for w in snap.watchlist.cn],
     )
 
-    # Build shared FeishuTenantAuth (used by both archive writer and image pusher)
+    # Build shared FeishuTenantAuth (used by both archive writer and image pusher).
+    # Archive is enabled only when feishu_app_token is also configured (separate from
+    # auth — you may want feishu image upload via auth without bitable archive,
+    # or set app_token=REPLACE_ME to disable archive while keeping push image upload).
+    def _is_filled(value: str | None) -> bool:
+        return bool(value) and value not in ("REPLACE_ME", "")
+
     archive = None
     feishu_auth: FeishuTenantAuth | None = None
-    if snap.secrets.storage.get("feishu_app_id"):
+    storage_secrets = snap.secrets.storage
+    if _is_filled(storage_secrets.get("feishu_app_id")) and _is_filled(
+        storage_secrets.get("feishu_app_secret")
+    ):
         feishu_auth = FeishuTenantAuth(
-            app_id=snap.secrets.storage["feishu_app_id"],
-            app_secret=snap.secrets.storage["feishu_app_secret"],
+            app_id=storage_secrets["feishu_app_id"],
+            app_secret=storage_secrets["feishu_app_secret"],
         )
-        us_cli = FeishuBitableClient(
-            app_token=snap.secrets.storage["feishu_app_token"],
-            table_id=snap.secrets.storage["feishu_table_us"],
-            auth=feishu_auth,
-        )
-        cn_cli = FeishuBitableClient(
-            app_token=snap.secrets.storage["feishu_app_token"],
-            table_id=snap.secrets.storage["feishu_table_cn"],
-            auth=feishu_auth,
-        )
-        archive = ArchiveWriter(clients_by_market={"us": us_cli, "cn": cn_cli})
+        if (
+            _is_filled(storage_secrets.get("feishu_app_token"))
+            and _is_filled(storage_secrets.get("feishu_table_us"))
+            and _is_filled(storage_secrets.get("feishu_table_cn"))
+        ):
+            us_cli = FeishuBitableClient(
+                app_token=storage_secrets["feishu_app_token"],
+                table_id=storage_secrets["feishu_table_us"],
+                auth=feishu_auth,
+            )
+            cn_cli = FeishuBitableClient(
+                app_token=storage_secrets["feishu_app_token"],
+                table_id=storage_secrets["feishu_table_cn"],
+                auth=feishu_auth,
+            )
+            archive = ArchiveWriter(clients_by_market={"us": us_cli, "cn": cn_cli})
+            log.info("archive_enabled", market_count=2)
+        else:
+            log.warning(
+                "archive_disabled",
+                reason="feishu_app_token / feishu_table_* not configured",
+            )
 
     pushers = build_pushers(snap.channels, snap.secrets, image_auth=feishu_auth)
     dispatcher = PusherDispatcher(pushers)
