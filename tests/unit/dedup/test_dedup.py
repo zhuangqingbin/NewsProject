@@ -1,11 +1,12 @@
 # tests/unit/dedup/test_dedup.py
-from datetime import datetime
+from datetime import timedelta
 
 import pytest
 
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
 from news_pipeline.common.hashing import title_simhash, url_hash
+from news_pipeline.common.timeutil import utc_now
 from news_pipeline.dedup.dedup import Dedup
 from news_pipeline.storage.dao.raw_news import RawNewsDAO
 from news_pipeline.storage.db import Database
@@ -25,11 +26,14 @@ async def setup(tmp_path):
 
 
 def _article(url: str, title: str) -> RawArticle:
+    # Use recent (utc_now - 1h) timestamps so simhash neighbor lookup
+    # (24h window) always finds the article — avoids date-relative test rot.
+    recent = (utc_now() - timedelta(hours=1)).replace(tzinfo=None)
     return RawArticle(
         source="x",
         market=Market.US,
-        fetched_at=datetime(2026, 4, 25),
-        published_at=datetime(2026, 4, 25),
+        fetched_at=recent,
+        published_at=recent,
         url=url,
         url_hash=url_hash(url),
         title=title,

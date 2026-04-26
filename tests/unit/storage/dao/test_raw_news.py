@@ -55,6 +55,13 @@ async def test_pending_query(dao):
 
 @pytest.mark.asyncio
 async def test_simhash_neighbor_lookup(dao):
+    # Use recent timestamp so the 24h window query always finds it
+    # (avoids hardcoded-date test rot once the calendar moves on).
+    from datetime import timedelta
+
+    from news_pipeline.common.timeutil import utc_now
+
+    recent_iso = (utc_now() - timedelta(hours=1)).replace(tzinfo=None).isoformat()
     await dao.insert(
         source="x",
         market="us",
@@ -64,8 +71,8 @@ async def test_simhash_neighbor_lookup(dao):
         title_simhash=0xFFFF0000,
         body=None,
         raw_meta={},
-        fetched_at_iso="2026-04-25T00:00:00",
-        published_at_iso="2026-04-25T00:00:00",
+        fetched_at_iso=recent_iso,
+        published_at_iso=recent_iso,
     )
     candidates = await dao.list_recent_simhashes(window_hours=24)
     assert any(s == 0xFFFF0000 for _id, s in candidates)
