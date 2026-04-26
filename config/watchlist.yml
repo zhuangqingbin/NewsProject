@@ -1,6 +1,39 @@
-us:
-  - {ticker: NVDA, alerts: [price_5pct, earnings, downgrade, sec_filing]}
-cn:
-  - {ticker: "600519", alerts: [price_5pct, announcement]}
-macro: [FOMC, CPI, NFP, 央行, MLF, LPR]
-sectors: [semiconductor, ai, ev, 新能源, 半导体, 白酒]
+rules:
+  enable: true
+  gray_zone_action: digest
+  matcher: aho_corasick
+
+  us:
+    - ticker: NVDA
+      name: NVIDIA
+      aliases: [英伟达, 老黄家, Jensen Huang]
+      sectors: [semiconductor, ai]
+      macro_links: [FOMC, CPI]
+      alerts: [price_5pct, earnings, downgrade, sec_filing]
+
+  cn:
+    - ticker: "600519"
+      name: 贵州茅台
+      aliases: [茅台]
+      sectors: [白酒]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+
+  keyword_list:
+    us: [Powell, recession]
+    cn: [证监会, 国常会]
+
+  macro_keywords:
+    us: [FOMC, CPI, NFP]
+    cn: [央行, MLF, LPR]
+
+  sector_keywords:
+    us: [semiconductor, ai, ev]
+    cn: [新能源, 半导体, 白酒]
+
+llm:
+  enable: false
+  us: [NVDA]
+  cn: ["600519"]
+  macro: [FOMC, CPI, NFP, 央行, MLF, LPR]
+  sectors: [semiconductor, ai, ev, 新能源, 半导体, 白酒]
