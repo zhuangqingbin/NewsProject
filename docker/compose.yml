@@ -24,3 +24,30 @@ services:
         limits:
           memory: 1.5G
           cpus: '1.5'
+
+  # Datasette: SQLite browser at http://localhost:8001 (read-only).
+  # Replaces the old Feishu bitable archive — much simpler.
+  # Default binds to 127.0.0.1 only (secure). To access remotely, either:
+  #   a) SSH tunnel: ssh -L 8001:localhost:8001 user@server
+  #   b) Bind public + add nginx + basic auth (change "127.0.0.1:8001:8001" → "8001:8001")
+  datasette:
+    image: datasetteproject/datasette:latest
+    container_name: news_datasette
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - ../data:/data:ro
+    command: >-
+      datasette /data/news.db
+      --host 0.0.0.0
+      --port 8001
+      --setting allow_download on
+      --setting suggest_facets on
+      --setting default_page_size 50
+      --setting sql_time_limit_ms 5000
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
