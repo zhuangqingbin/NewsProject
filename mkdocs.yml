@@ -3,7 +3,7 @@ site_description: "Financial news scraper → LLM pipeline → multi-platform pu
 site_author: "qingbin"
 docs_dir: docs
 site_dir: site
-
+dev_addr: 127.0.0.1:3000
 # Historical artifacts — kept in repo for reference but not in nav.
 validation:
   nav:
@@ -84,6 +84,7 @@ nav:
     - Scheduler: components/scheduler.md
     - Bot Commands: components/commands.md
     - Observability: components/observability.md
+    - Rules Engine (v0.3.0 planned): components/rules.md
   - Operations:
     - Configuration: operations/configuration.md
     - Secrets: operations/secrets.md
