@@ -90,8 +90,6 @@ async def test_process_pending_routes_critical_immediately():
     push_log.write = AsyncMock()
     digest_dao = MagicMock()
     digest_dao.enqueue = AsyncMock()
-    archive = MagicMock()
-    archive.write = AsyncMock(return_value="r1")
     burst = MagicMock()
     burst.should_send = MagicMock(return_value=True)
 
@@ -105,14 +103,11 @@ async def test_process_pending_routes_critical_immediately():
         dispatcher=dispatcher,
         push_log=push_log,
         digest_dao=digest_dao,
-        archive=archive,
         burst=burst,
-        archive_enabled=True,
     )
     assert n == 1
     dispatcher.dispatch.assert_awaited_once()
     digest_dao.enqueue.assert_not_awaited()
-    archive.write.assert_awaited_once()
 
 
 @pytest.mark.asyncio

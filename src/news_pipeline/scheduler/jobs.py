@@ -3,8 +3,6 @@ from typing import Any
 
 import httpx
 
-from news_pipeline.archive.schema import enriched_to_row
-from news_pipeline.archive.writer import ArchiveWriter
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
@@ -166,9 +164,7 @@ async def process_pending(
     dispatcher: PusherDispatcher,
     push_log: PushLogDAO,
     digest_dao: DigestBufferDAO,
-    archive: ArchiveWriter | None,
     burst: BurstSuppressor,
-    archive_enabled: bool = True,
     batch_size: int = 25,
 ) -> int:
     pending = await raw_dao.list_pending(limit=batch_size)
@@ -235,19 +231,6 @@ async def process_pending(
                         scheduled_digest=_choose_digest_key(art.market, utc_now()),
                     )
                     break  # one entry per news enough; channel resolved at digest time
-
-        if archive is not None and archive_enabled:
-            try:
-                row = enriched_to_row(
-                    art,
-                    scored,
-                    news_processed_id=proc_id,
-                    sent_to=sent_to,
-                    chart_url=str(msg.chart_url) if msg.chart_url else None,
-                )
-                await archive.write(market=art.market.value, row=row)
-            except Exception as e:
-                log.warning("archive_failed", news_id=proc_id, error=str(e))
 
         processed += 1
     return processed

@@ -71,7 +71,7 @@ docker compose -f docker/compose.yml logs -f
 Expected within 5 min:
 - `scheduler_started` log line listing ~12 jobs
 - `scrape_done` lines for each enabled source
-- Eventually: `archive_failed` warning if 飞书 bitable token wrong, but main pipeline still moves
+- Eventually: push lands in your TG/飞书 after first critical news is processed
 - After ~30 min: an actual push lands in your TG/飞书
 
 ### Step 4: Validate end-to-end
