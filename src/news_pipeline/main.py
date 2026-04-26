@@ -34,6 +34,8 @@ from news_pipeline.pushers.common.message_builder import MessageBuilder
 from news_pipeline.pushers.dispatcher import PusherDispatcher
 from news_pipeline.pushers.factory import build_pushers
 from news_pipeline.router.routes import DispatchRouter
+from news_pipeline.rules.engine import RulesEngine
+from news_pipeline.rules.matcher import build_matcher
 from news_pipeline.scheduler.jobs import (
     alert_on_push_failures,
     process_pending,
@@ -141,9 +143,27 @@ async def _amain() -> None:
         tier2,
         llm_router,
         cost,
-        watchlist_us=[w.ticker for w in snap.watchlist.rules.us],
-        watchlist_cn=[w.ticker for w in snap.watchlist.rules.cn],
+        watchlist_us=[w.ticker for w in snap.watchlist.rules.us] + snap.watchlist.llm.us,
+        watchlist_cn=[w.ticker for w in snap.watchlist.rules.cn] + snap.watchlist.llm.cn,
+        first_party_sources={"sec_edgar", "juchao", "caixin_telegram"},
     )
+
+    # === v0.3.0 RulesEngine ===
+    rules_enabled = snap.watchlist.rules.enable
+    llm_enabled = snap.watchlist.llm.enable
+    rules_engine: RulesEngine | None = None
+    if rules_enabled:
+        matcher = build_matcher(
+            snap.watchlist.rules.matcher,
+            snap.watchlist.rules.matcher_options,
+        )
+        rules_engine = RulesEngine(snap.watchlist.rules, matcher)
+        log.info(
+            "rules_engine_built",
+            us_tickers=len(snap.watchlist.rules.us),
+            cn_tickers=len(snap.watchlist.rules.cn),
+            matcher=snap.watchlist.rules.matcher,
+        )
 
     if snap.app.classifier.rules:
         rules = RuleEngine(snap.app.classifier.rules)
@@ -161,7 +181,11 @@ async def _amain() -> None:
         judge=judge,
         gray_zone=tuple(snap.app.classifier.llm_fallback_when_score),  # type: ignore[arg-type]
         watchlist_tickers=[w.ticker for w in snap.watchlist.rules.us]
-        + [w.ticker for w in snap.watchlist.rules.cn],
+        + [w.ticker for w in snap.watchlist.rules.cn]
+        + snap.watchlist.llm.us
+        + snap.watchlist.llm.cn,
+        gray_zone_action=snap.watchlist.rules.gray_zone_action,
+        llm_enabled=llm_enabled,
     )
 
     pushers = build_pushers(snap.channels, snap.secrets)
@@ -225,6 +249,9 @@ async def _amain() -> None:
             push_log=push_log,
             digest_dao=digest_dao,
             burst=burst,
+            rules_enabled=rules_enabled,
+            llm_enabled=llm_enabled,
+            rules_engine=rules_engine,
         )
         await db.close()
         return
@@ -261,6 +288,9 @@ async def _amain() -> None:
             push_log=push_log,
             digest_dao=digest_dao,
             burst=burst,
+            rules_enabled=rules_enabled,
+            llm_enabled=llm_enabled,
+            rules_engine=rules_engine,
         ),
     )
 

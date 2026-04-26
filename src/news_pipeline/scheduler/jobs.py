@@ -10,6 +10,7 @@ from news_pipeline.common.exceptions import AntiCrawlError
 from news_pipeline.common.timeutil import ensure_utc, to_market_local, utc_now
 from news_pipeline.dedup.dedup import Dedup
 from news_pipeline.llm.pipeline import LLMPipeline
+from news_pipeline.rules.engine import RulesEngine
 from news_pipeline.rules.verdict import RulesVerdict
 from news_pipeline.observability.alert import AlertLevel, BarkAlerter
 from news_pipeline.observability.log import get_logger
@@ -198,8 +199,19 @@ async def process_pending(
     push_log: PushLogDAO,
     digest_dao: DigestBufferDAO,
     burst: BurstSuppressor,
+    rules_enabled: bool = False,
+    llm_enabled: bool = True,
+    rules_engine: RulesEngine | None = None,
     batch_size: int = 25,
 ) -> int:
+    """Pull pending raw_news, run pipeline based on rules/llm enable flags.
+
+    4 enable combos (validated by config schema, exactly one branch hit):
+    - rules=T,  llm=F: rules-only, synth EnrichedNews from verdict
+    - rules=T,  llm=T: rules gates, then LLM enriches matched articles
+    - rules=F,  llm=T: classic LLM-only path (Tier-0 classifies)
+    - rules=F,  llm=F: rejected at config load (at_least_one_enabled)
+    """
     pending = await raw_dao.list_pending(limit=batch_size)
     processed = 0
     for raw in pending:
@@ -207,17 +219,45 @@ async def process_pending(
             continue
         raw_id: int = raw.id
         art = _raw_to_article(raw)
-        try:
-            enriched = await llm.process(art, raw_id=raw_id)
-        except Exception as e:
-            log.error("llm_failed", raw_id=raw_id, error=str(e))
-            await raw_dao.mark_status(raw_id, "dead", error=str(e))
-            continue
-        if enriched is None:
-            await raw_dao.mark_status(raw_id, "skipped")
+
+        # === 1. Rules gate ===
+        verdict: RulesVerdict | None = None
+        if rules_enabled and rules_engine is not None:
+            verdict = rules_engine.match(art)
+            if not verdict.matched:
+                await raw_dao.mark_status(raw_id, "skipped_rules")
+                continue
+
+        # === 2. EnrichedNews source ===
+        enriched: Any
+        if llm_enabled:
+            try:
+                if verdict is not None and verdict.matched:
+                    enriched = await llm.process_with_rules(art, verdict, raw_id=raw_id)
+                else:
+                    enriched = await llm.process(art, raw_id=raw_id)
+            except Exception as e:
+                log.error("llm_failed", raw_id=raw_id, error=str(e))
+                await raw_dao.mark_status(raw_id, "dead", error=str(e))
+                continue
+            if enriched is None:
+                await raw_dao.mark_status(raw_id, "skipped")
+                continue
+        else:
+            assert verdict is not None and verdict.matched, \
+                "rules-only mode requires rules.enable=True and rules.match=True"
+            enriched = synth_enriched_from_rules(art, verdict, raw_id=raw_id)
+
+        # === 3. Score ===
+        scored = await importance.score_news(
+            enriched, source=raw.source, verdict=verdict,
+        )
+
+        # gray_zone_action='skip' signal → drop without persisting
+        if scored.llm_reason == "rules-only-grayzone-skip":
+            await raw_dao.mark_status(raw_id, "skipped_grayzone")
             continue
 
-        scored = await importance.score_news(enriched, source=raw.source)
         proc_id = await proc_dao.insert(
             raw_id=raw_id,
             summary=enriched.summary,
@@ -235,9 +275,17 @@ async def process_pending(
         )
         await raw_dao.mark_status(raw_id, "processed")
 
-        msg = msg_builder.build(art, scored, chart_url=None)
-        plans = router.route(scored, msg)
-        sent_to: list[str] = []
+        # === 4. Render + route + push ===
+        if llm_enabled:
+            msg = msg_builder.build(art, scored, chart_url=None)
+        else:
+            assert verdict is not None
+            msg = msg_builder.build_from_rules(art, scored, verdict)
+
+        plans = router.route(
+            scored, msg,
+            markets=verdict.markets if verdict is not None else None,
+        )
 
         for p in plans:
             if p.immediate:
@@ -254,16 +302,13 @@ async def process_pending(
                         response=r.response_body,
                         retries=r.retries,
                     )
-                    if r.ok:
-                        sent_to.append(ch)
             else:
-                for _ch in p.channels:
-                    await digest_dao.enqueue(
-                        news_id=proc_id,
-                        market=art.market.value,
-                        scheduled_digest=_choose_digest_key(art.market, utc_now()),
-                    )
-                    break  # one entry per news enough; channel resolved at digest time
+                await digest_dao.enqueue(
+                    news_id=proc_id,
+                    market=art.market.value,
+                    scheduled_digest=_choose_digest_key(art.market, utc_now()),
+                )
+                break  # one digest entry per news; channel resolved at digest time
 
         processed += 1
     return processed
