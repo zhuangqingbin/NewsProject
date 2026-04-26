@@ -12,10 +12,22 @@ rules:
       alerts: [price_5pct, earnings, downgrade, sec_filing]
 
   cn:
-    - ticker: "600519"
-      name: 贵州茅台
-      aliases: [茅台]
-      sectors: [白酒]
+    - ticker: "688525"
+      name: 佰维存储
+      aliases: [佰维存储]
+      sectors: [半导体, 存储]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "002050"
+      name: 三花智控
+      aliases: [三花]
+      sectors: [机器人, 液冷]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "300308"
+      name: 中际旭创
+      aliases: [中际]
+      sectors: [通信, CPO, 共封装光学]
       macro_links: [央行, MLF, LPR]
       alerts: [price_5pct, announcement]
 
@@ -29,7 +41,7 @@ rules:
 
   sector_keywords:
     us: [semiconductor, ai, ev]
-    cn: [新能源, 半导体, 白酒]
+    cn: [新能源, 半导体, 白酒, 存储, 机器人, 液冷, 通信, CPO, 共封装光学]
 
 llm:
   enable: false
