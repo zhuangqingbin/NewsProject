@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.0 (2026-04-26)
+
+### Added
+- Comprehensive mkdocs documentation site under `docs/`
+- mkdocs + mkdocs-material in dev deps
+- 18 documentation pages organized into getting-started / components / operations / reference
+- Mermaid diagrams for architecture, data flow, ER schema
+- Glossary
+
+### Notes
+- Source code unchanged; this is documentation only
+- Existing `docs/superpowers/` and `docs/runbook/` are linked / referenced from new pages
+
 ## v0.1.6 (2026-04-26)
 
 ### Removed

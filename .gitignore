@@ -23,3 +23,7 @@ config/secrets.yml
 /t.py
 /scratch/
 *.scratch.py
+
+
+# mkdocs build output
+/site/

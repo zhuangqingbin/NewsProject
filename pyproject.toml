@@ -40,6 +40,9 @@ dev = [
   "ruff>=0.7",
   "mypy>=1.13",
   "types-pyyaml>=6.0",
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "pymdown-extensions>=10.0",
 ]
 
 [tool.pytest.ini_options]
