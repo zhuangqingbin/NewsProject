@@ -4,12 +4,13 @@ from typing import Any
 import httpx
 
 from news_pipeline.classifier.importance import ImportanceClassifier
-from news_pipeline.common.contracts import RawArticle
-from news_pipeline.common.enums import Market
+from news_pipeline.common.contracts import EnrichedNews, RawArticle
+from news_pipeline.common.enums import EventType, Magnitude, Market, Sentiment
 from news_pipeline.common.exceptions import AntiCrawlError
 from news_pipeline.common.timeutil import ensure_utc, to_market_local, utc_now
 from news_pipeline.dedup.dedup import Dedup
 from news_pipeline.llm.pipeline import LLMPipeline
+from news_pipeline.rules.verdict import RulesVerdict
 from news_pipeline.observability.alert import AlertLevel, BarkAlerter
 from news_pipeline.observability.log import get_logger
 from news_pipeline.pushers.common.burst import BurstSuppressor
@@ -32,6 +33,38 @@ _TRANSIENT_EXC = (
     httpx.TimeoutException,
     httpx.ConnectError,
 )
+
+
+def synth_enriched_from_rules(
+    art: RawArticle, verdict: RulesVerdict, *, raw_id: int
+) -> EnrichedNews:
+    """Build EnrichedNews from rules match without invoking LLM.
+
+    Rules-only mode: summary = body[:200] truncation. sentiment/magnitude
+    default to neutral/low (no LLM inference). model_used='rules-only' so
+    push_log + downstream can distinguish.
+    """
+    body = art.body or ""
+    body_excerpt = body[:200].rstrip()
+    summary = body_excerpt or art.title
+
+    related = sorted(set(verdict.tickers + verdict.related_tickers))
+
+    return EnrichedNews(
+        raw_id=raw_id,
+        summary=summary,
+        related_tickers=related,
+        sectors=list(verdict.sectors),
+        event_type=EventType.OTHER,
+        sentiment=Sentiment.NEUTRAL,
+        magnitude=Magnitude.LOW,
+        confidence=0.0,
+        key_quotes=[],
+        entities=[],
+        relations=[],
+        model_used="rules-only",
+        extracted_at=utc_now().replace(tzinfo=None),
+    )
 
 
 def _is_transient(exc: BaseException) -> bool:

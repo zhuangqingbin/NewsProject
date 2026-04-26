@@ -1,4 +1,6 @@
 # src/news_pipeline/llm/pipeline.py
+from typing import TYPE_CHECKING
+
 from news_pipeline.common.contracts import EnrichedNews, RawArticle
 from news_pipeline.llm.cost_tracker import CostTracker
 from news_pipeline.llm.extractors import (
@@ -8,6 +10,9 @@ from news_pipeline.llm.extractors import (
 )
 from news_pipeline.llm.router import LLMRouter
 from news_pipeline.observability.log import get_logger
+
+if TYPE_CHECKING:
+    from news_pipeline.rules.verdict import RulesVerdict
 
 log = get_logger(__name__)
 
@@ -22,6 +27,7 @@ class LLMPipeline:
         cost_tracker: CostTracker,
         watchlist_us: list[str],
         watchlist_cn: list[str],
+        first_party_sources: set[str] | None = None,
     ) -> None:
         self._cls = classifier
         self._t1 = tier1
@@ -30,10 +36,9 @@ class LLMPipeline:
         self._cost = cost_tracker
         self._wl_us = watchlist_us
         self._wl_cn = watchlist_cn
+        self._first_party_sources = first_party_sources or set()
 
     async def process(self, art: RawArticle, *, raw_id: int) -> EnrichedNews | None:
-        # Check cost ceiling first — raises CostCeilingExceeded if over limit
-        # check_async also fires Bark alerts at 80% warn and 100% urgent thresholds
         await self._cost.check_async()
 
         verdict = await self._cls.classify(
@@ -48,5 +53,16 @@ class LLMPipeline:
             return None
         if decision == "tier1":
             return await self._t1.summarize(art, raw_id=raw_id)
-        # decision == "tier2"
         return await self._t2.extract(art, raw_id=raw_id, recent_context="")
+
+    async def process_with_rules(
+        self, art: RawArticle, verdict: "RulesVerdict", *, raw_id: int
+    ) -> EnrichedNews | None:
+        """Rules + LLM mode: rules already classified relevant, skip Tier-0.
+        Direct ticker hit OR first-party source → Tier-2 deep extract.
+        Otherwise → Tier-1 summary.
+        """
+        await self._cost.check_async()
+        if verdict.tickers or art.source in self._first_party_sources:
+            return await self._t2.extract(art, raw_id=raw_id, recent_context="")
+        return await self._t1.summarize(art, raw_id=raw_id)

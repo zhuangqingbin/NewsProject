@@ -46,3 +46,36 @@ def test_build_includes_badges_and_deeplinks():
     assert "bearish" in badge_texts and "high" in badge_texts
     assert any(d.label.startswith("原文") or d.label == "原文" for d in msg.deeplinks)
     assert msg.market == Market.US
+
+
+def test_build_from_rules_includes_verdict_badges():
+    from news_pipeline.rules.verdict import RulesVerdict
+
+    art, scored = _make()
+    verdict = RulesVerdict(
+        matched=True, tickers=["NVDA"], related_tickers=["AMD"],
+        sectors=["semiconductor"], macros=["FOMC"], markets=["us"],
+        score_boost=85.0,
+    )
+    b = MessageBuilder(source_labels={"reuters": "Reuters"})
+    msg = b.build_from_rules(art, scored, verdict)
+    badge_texts = [bd.text for bd in msg.badges]
+    assert "NVDA" in badge_texts
+    assert "AMD" in badge_texts
+    assert "#semiconductor" in badge_texts
+    assert any("FOMC" in t for t in badge_texts)
+    assert "rules" in badge_texts
+
+
+def test_build_from_rules_generic_only():
+    from news_pipeline.rules.verdict import RulesVerdict
+
+    art, scored = _make()
+    verdict = RulesVerdict(
+        matched=True, generic_hits=["powell"], markets=["us"], score_boost=0.0,
+    )
+    b = MessageBuilder(source_labels={"reuters": "Reuters"})
+    msg = b.build_from_rules(art, scored, verdict)
+    badge_texts = [bd.text for bd in msg.badges]
+    assert any("powell" in t for t in badge_texts)
+    assert "rules" in badge_texts

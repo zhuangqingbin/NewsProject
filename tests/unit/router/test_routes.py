@@ -64,3 +64,28 @@ def test_non_critical_routes_to_digest():
     )
     plans = r.route(_scored("cn", critical=False), _msg(Market.CN))
     assert plans[0].immediate is False
+
+
+def test_route_with_markets_param_multi():
+    r = DispatchRouter(channels_by_market={
+        "us": ["tg_us", "feishu_us"],
+        "cn": ["tg_cn", "feishu_cn"],
+    })
+    plans = r.route(
+        _scored("us", critical=True), _msg(Market.US),
+        markets=["us", "cn"],
+    )
+    assert len(plans) == 2
+    market_channels = {tuple(sorted(p.channels)) for p in plans}
+    assert ("feishu_us", "tg_us") in market_channels
+    assert ("feishu_cn", "tg_cn") in market_channels
+
+
+def test_route_without_markets_falls_back_to_msg_market():
+    r = DispatchRouter(channels_by_market={
+        "us": ["tg_us"],
+        "cn": ["tg_cn"],
+    })
+    plans = r.route(_scored("us", critical=True), _msg(Market.US))
+    assert len(plans) == 1
+    assert "tg_us" in plans[0].channels
