@@ -23,14 +23,21 @@ RUN pip install --no-cache-dir ${UV_INDEX_URL:+--index-url ${UV_INDEX_URL}} uv==
 
 WORKDIR /app
 
-# Resolve deps first (cacheable layer)
+# Resolve deps first (cacheable layer). Retry on transient mirror errors
+# (connection reset / EOF / timeout) — common on slow CN networks.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN for i in 1 2 3 4 5; do \
+      uv sync --frozen --no-dev --no-install-project && exit 0 || \
+      { echo ">>> uv sync attempt $i failed, retrying in 5s..."; sleep 5; }; \
+    done; exit 1
 
 # Install the project itself (alembic migrations live under src/news_pipeline/storage/migrations/)
 COPY src/ ./src/
 COPY alembic.ini ./
-RUN uv sync --frozen --no-dev
+RUN for i in 1 2 3 4 5; do \
+      uv sync --frozen --no-dev && exit 0 || \
+      { echo ">>> uv sync (project) attempt $i failed, retrying in 5s..."; sleep 5; }; \
+    done; exit 1
 
 
 FROM python:3.12-slim AS runtime
