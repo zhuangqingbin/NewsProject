@@ -2,6 +2,7 @@ sources:
   finnhub:        {enabled: true, interval_sec: 300}
   sec_edgar:      {enabled: true, interval_sec: 120}
   caixin_telegram: {enabled: true, interval_sec: 60}
+  eastmoney_global: {enabled: true, interval_sec: 180}
   akshare_news:   {enabled: true, interval_sec: 180}
   juchao:         {enabled: true, interval_sec: 120}
   # Sources below are temporarily disabled — endpoints/API have shifted since

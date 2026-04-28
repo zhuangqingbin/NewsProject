@@ -8,6 +8,7 @@ from news_pipeline.config.schema import (
 )
 from news_pipeline.scrapers.cn.akshare_news import AkshareNewsScraper
 from news_pipeline.scrapers.cn.caixin_telegram import CaixinTelegramScraper
+from news_pipeline.scrapers.cn.eastmoney_global import EastmoneyGlobalScraper
 from news_pipeline.scrapers.cn.juchao import JuchaoScraper
 from news_pipeline.scrapers.cn.ths import ThsScraper
 from news_pipeline.scrapers.cn.tushare_news import TushareNewsScraper
@@ -41,6 +42,8 @@ def build_registry(
         reg.register(YFinanceNewsScraper(tickers=us_tickers))
     if "caixin_telegram" in enabled:
         reg.register(CaixinTelegramScraper())
+    if "eastmoney_global" in enabled:
+        reg.register(EastmoneyGlobalScraper())
     if "akshare_news" in enabled and cn_tickers:
         reg.register(AkshareNewsScraper(tickers=cn_tickers))
     if "juchao" in enabled and cn_tickers:

@@ -94,7 +94,7 @@ async def scrape_one_source(
     dedup: Dedup,
     state_dao: SourceStateDAO,
     metrics: MetricsDAO,
-    lookback_minutes: int = 60,
+    lookback_minutes: int = 1440,
     bark: BarkAlerter | None = None,
 ) -> int:
     if await state_dao.is_paused(scraper.source_id):
@@ -164,9 +164,15 @@ async def scrape_one_source(
             name=("scrape_new" if decision.is_new else "scrape_dup"),
             dimensions=f"source={scraper.source_id}",
         )
+    # Watermark = max published_at of returned items (not "now"), so that
+    # back-filled items appearing later in the source feed don't get skipped
+    # by `ts < since`. URL + simhash dedup handles the small re-overlap.
+    new_watermark = (
+        max(ensure_utc(it.published_at) for it in items) if items else utc_now()
+    )
     await state_dao.update_watermark(
         scraper.source_id,
-        last_fetched_at=utc_now().replace(tzinfo=None),
+        last_fetched_at=new_watermark.replace(tzinfo=None),
     )
     log.info("scrape_done", source=scraper.source_id, new=new_count, total=len(items))
     return new_count

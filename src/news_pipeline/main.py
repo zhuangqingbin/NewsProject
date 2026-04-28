@@ -196,6 +196,7 @@ async def _amain() -> None:
             "sec_edgar": "SEC EDGAR",
             "yfinance_news": "Yahoo",
             "caixin_telegram": "财联社",
+            "eastmoney_global": "东财快讯",
             "akshare_news": "东财",
             "xueqiu": "雪球",
             "ths": "同花顺",

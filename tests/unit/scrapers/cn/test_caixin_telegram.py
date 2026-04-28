@@ -1,41 +1,47 @@
 # tests/unit/scrapers/cn/test_caixin_telegram.py
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 
+import pandas as pd
 import pytest
-import respx
-from httpx import Response
 
 from news_pipeline.scrapers.cn.caixin_telegram import CaixinTelegramScraper
 
-SAMPLE = {
-    "data": {
-        "roll_data": [
+
+def _fake_cls(symbol: str) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
             {
-                "id": 1,
-                "title": "央行降准",
-                "brief": "降准0.5%",
-                "ctime": 1714000000,
-                "shareurl": "https://www.cls.cn/d/1",
+                "标题": "央行降准0.5%",
+                "内容": "央行宣布降准",
+                "发布日期": date(2026, 4, 28),
+                "发布时间": time(11, 0, 0),
             },
             {
-                "id": 2,
-                "title": "茅台一季报",
-                "brief": "营收+20%",
-                "ctime": 1714000500,
-                "shareurl": "https://www.cls.cn/d/2",
+                "标题": "",
+                "内容": "茅台一季报营收同比+20%",
+                "发布日期": date(2026, 4, 28),
+                "发布时间": time(11, 5, 0),
             },
         ]
-    }
-}
+    )
 
 
 @pytest.mark.asyncio
-async def test_fetch_parses_roll():
-    async with respx.mock() as mock:
-        mock.get(url__regex=r"https://www\.cls\.cn/v3/.*").mock(
-            return_value=Response(200, json=SAMPLE)
-        )
-        s = CaixinTelegramScraper()
-        items = await s.fetch(datetime(2024, 1, 1, tzinfo=UTC))
-        assert len(items) == 2
-        assert items[0].source == "caixin_telegram"
+async def test_fetch_parses_dataframe():
+    s = CaixinTelegramScraper(news_callable=_fake_cls)
+    items = await s.fetch(datetime(2026, 4, 1, tzinfo=UTC))
+    assert len(items) == 2
+    assert items[0].source == "caixin_telegram"
+    assert items[0].title == "央行降准0.5%"
+    # second item has empty title — falls back to body excerpt
+    assert items[1].title.startswith("茅台一季报")
+    # synthesized URL must be https for HttpUrl validation
+    assert str(items[0].url).startswith("https://www.cls.cn/telegraph/")
+
+
+@pytest.mark.asyncio
+async def test_since_filter_skips_old():
+    s = CaixinTelegramScraper(news_callable=_fake_cls)
+    # since after both items' published_at
+    items = await s.fetch(datetime(2026, 4, 28, 12, 0, tzinfo=UTC))
+    assert len(items) == 0
