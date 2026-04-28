@@ -77,11 +77,38 @@ docker compose up -d
 
 ## 日常运维
 
+### 决策树：我改了东西，要怎么生效？
+
+```
+改了什么？
+├── 只改 config/*.yml（watchlist / channels / sources / secrets …）
+│     → docker compose restart app                    ← 秒级，不用 build
+│
+├── 改了 src/*.py 或 alembic 迁移
+│     → docker compose up -d --build                  ← rebuild，~30 秒
+│
+├── 改了 pyproject.toml / uv.lock（加/删依赖）
+│     → docker compose up -d --build                  ← 2-5 分钟（重装依赖）
+│
+├── 改了 Dockerfile / docker-compose.yml
+│     → docker compose up -d --build                  ← rebuild
+│
+├── git pull 拉了新代码（不知道改了啥）
+│     → git pull && docker compose up -d --build      ← 全量保险
+│
+└── 啥都没改，就想重启一下
+      → docker compose restart app                    ← 1-2 秒
+```
+
+`docker compose up -d --build` 自带"内容没变就跳过"的层缓存，多 build 一次也不亏，只是多等几秒。**有疑问就 `--build`，不会错。**
+
+### 命令速查
+
 | 你做的事 | 命令 |
 |---|---|
 | 首次部署 | `docker compose up -d`（慢） |
 | 只改 config（watchlist.yml 等） | `docker compose restart app`（秒级） |
-| 改了 src 代码 | `docker compose up -d --build`（~30 秒） |
+| 改了 src 代码 / Dockerfile / 依赖 | `docker compose up -d --build` |
 | 拉新代码 + 重启 | `git pull && docker compose up -d --build` |
 | 看实时日志 | `docker compose logs -f app` |
 | 看历史日志 | `docker compose logs --tail 100 app` |
@@ -89,6 +116,17 @@ docker compose up -d
 | 看状态 | `docker compose ps` |
 | 进容器手动跑命令 | `docker compose exec app python -m news_pipeline.commands.<...>` |
 | 浏览 SQLite（远程） | `ssh -L 8001:localhost:8001 server` 然后开 <http://localhost:8001> |
+
+### `restart` vs `up -d --build` 区别
+
+| | `restart app` | `up -d --build` |
+|---|---|---|
+| 重新加载 config（bind mount） | ✅ | ✅ |
+| 加载新代码（src/*.py） | ❌（image 里还是老代码） | ✅ |
+| 加载新依赖 | ❌ | ✅ |
+| 用时 | 1-2 秒 | 30 秒（代码改）~ 5 分钟（依赖改） |
+
+> ⚠️ **常见坑**：改了 `src/` 的 .py 后只跑 `restart`，会发现"为啥没生效"——因为 image 里还是旧代码。这种情况一定要 `--build`。
 
 ---
 
@@ -218,3 +256,4 @@ uv run mkdocs serve   # 开 http://localhost:8000
 - [日常运维](docs/operations/daily-ops.md) — 常用命令
 - [故障排查](docs/operations/troubleshooting.md) — 已知问题
 - [配置](docs/operations/configuration.md) — 每个 yaml 字段
+

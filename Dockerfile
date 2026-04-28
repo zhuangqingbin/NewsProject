@@ -5,7 +5,7 @@
 
 FROM python:3.12-slim AS builder
 
-ARG UV_INDEX_URL=
+ARG UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
