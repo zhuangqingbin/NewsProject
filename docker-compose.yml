@@ -13,7 +13,8 @@ services:
     build:
       context: .
       args:
-        UV_INDEX_URL: ${UV_INDEX_URL:-}
+        # CN-friendly default — override with `export UV_INDEX_URL=...` for other regions.
+        UV_INDEX_URL: ${UV_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
     image: news-pipeline:latest
     container_name: news_pipeline
     restart: unless-stopped

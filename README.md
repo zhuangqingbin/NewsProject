@@ -102,6 +102,8 @@ docker compose up -d
 
 `docker compose up -d --build` 自带"内容没变就跳过"的层缓存，多 build 一次也不亏，只是多等几秒。**有疑问就 `--build`，不会错。**
 
+build 完成后（自动）：compose 比对 image 变了 → 停老容器 → 起新容器，秒级切换
+
 ### 命令速查
 
 | 你做的事 | 命令 |

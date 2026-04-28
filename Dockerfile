@@ -14,7 +14,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_HTTP_TIMEOUT=300
 
 # gcc needed for C-extension wheels (pyahocorasick) on platforms with no prebuilt wheel.
-RUN apt-get update \
+# Switch Debian apt sources to Aliyun mirror first — deb.debian.org is slow from CN.
+# bookworm (slim) uses deb822-format /etc/apt/sources.list.d/debian.sources.
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -43,7 +47,9 @@ RUN for i in 1 2 3 4 5; do \
 FROM python:3.12-slim AS runtime
 
 # CJK fonts so matplotlib charts render Chinese characters
-RUN apt-get update \
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
