@@ -146,6 +146,15 @@ class TelegramPusher:
 
     def _render(self, msg: CommonMessage) -> str:
         title = md2_escape_text(msg.title)
+        if msg.digest_items:
+            # Each line: • [source](url) summary
+            items = "\n".join(
+                f"• [{md2_escape_text(it.source_label)}]"
+                f"({md2_escape_link_url(str(it.url))}) "
+                f"{md2_escape_text(it.summary)}"
+                for it in msg.digest_items
+            )
+            return f"*{title}*\n\n{items}"
         summary = md2_escape_text(msg.summary)
         # Badge text is inside backticks — only ` and \\ need escaping
         badges = " ".join(f"`{md2_escape_code(b.text)}`" for b in msg.badges)

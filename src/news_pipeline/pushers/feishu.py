@@ -90,12 +90,17 @@ class FeishuPusher:
             msg.badges[0].color if msg.badges else "gray",
             "grey",
         )
-        body_text = (
-            f"**{msg.summary}**\n\n"
-            + " ".join(f"`{b.text}`" for b in msg.badges)
-            + "\n\n"
-            + " | ".join(f"[{d.label}]({d.url})" for d in msg.deeplinks)
-        )
+        if msg.digest_items:
+            body_text = "\n".join(
+                f"- [{it.source_label}]({it.url}) {it.summary}" for it in msg.digest_items
+            )
+        else:
+            body_text = (
+                f"**{msg.summary}**\n\n"
+                + " ".join(f"`{b.text}`" for b in msg.badges)
+                + "\n\n"
+                + " | ".join(f"[{d.label}]({d.url})" for d in msg.deeplinks)
+            )
         elements: list[dict] = [  # type: ignore[type-arg]
             {"tag": "div", "text": {"tag": "lark_md", "content": body_text}},
         ]

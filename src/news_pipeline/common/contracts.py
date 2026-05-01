@@ -80,6 +80,14 @@ class Deeplink(_Base):
     url: HttpUrl
 
 
+class DigestItem(_Base):
+    """One bullet inside a digest message — a clickable source label + summary."""
+
+    source_label: str
+    url: HttpUrl
+    summary: str
+
+
 class CommonMessage(_Base):
     title: str
     summary: str
@@ -91,6 +99,8 @@ class CommonMessage(_Base):
     chart_image: bytes | None = None
     deeplinks: list[Deeplink]
     market: Market
+    # Non-empty for digest messages: each item rendered as `[label](url) summary`.
+    digest_items: list[DigestItem] = Field(default_factory=list)
 
 
 class DispatchPlan(_Base):

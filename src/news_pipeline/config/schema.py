@@ -172,6 +172,20 @@ class WatchlistFile(_Base):
                 raise ValueError(f"rules.{market}: duplicate tickers {dups}")
         return self
 
+    def effective_us(self) -> list[str]:
+        """Tickers in scope for US. When rules.enable=True the rules section is
+        the single source of truth (llm.us is ignored, even if llm.enable=True);
+        otherwise fall back to llm.us."""
+        if self.rules.enable:
+            return [t.ticker for t in self.rules.us]
+        return list(self.llm.us)
+
+    def effective_cn(self) -> list[str]:
+        """Tickers in scope for CN. Same precedence rule as effective_us."""
+        if self.rules.enable:
+            return [t.ticker for t in self.rules.cn]
+        return list(self.llm.cn)
+
     @model_validator(mode="after")
     def sector_macro_refs_valid(self) -> "WatchlistFile":
         for market in ("us", "cn"):

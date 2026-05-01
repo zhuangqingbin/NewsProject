@@ -5,7 +5,6 @@ import os
 import signal
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
 
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.classifier.llm_judge import LLMJudge
@@ -40,7 +39,6 @@ from news_pipeline.scheduler.jobs import (
     alert_on_push_failures,
     process_pending,
     scrape_one_source,
-    send_digest,
 )
 from news_pipeline.scheduler.runner import SchedulerRunner
 from news_pipeline.scrapers.factory import build_registry
@@ -143,8 +141,8 @@ async def _amain() -> None:
         tier2,
         llm_router,
         cost,
-        watchlist_us=[w.ticker for w in snap.watchlist.rules.us] + snap.watchlist.llm.us,
-        watchlist_cn=[w.ticker for w in snap.watchlist.rules.cn] + snap.watchlist.llm.cn,
+        watchlist_us=snap.watchlist.effective_us(),
+        watchlist_cn=snap.watchlist.effective_cn(),
         first_party_sources={"sec_edgar", "juchao", "caixin_telegram"},
     )
 
@@ -180,10 +178,7 @@ async def _amain() -> None:
         rules=rules,
         judge=judge,
         gray_zone=tuple(snap.app.classifier.llm_fallback_when_score),  # type: ignore[arg-type]
-        watchlist_tickers=[w.ticker for w in snap.watchlist.rules.us]
-        + [w.ticker for w in snap.watchlist.rules.cn]
-        + snap.watchlist.llm.us
-        + snap.watchlist.llm.cn,
+        watchlist_tickers=snap.watchlist.effective_us() + snap.watchlist.effective_cn(),
         gray_zone_action=snap.watchlist.rules.gray_zone_action,
         llm_enabled=llm_enabled,
     )
@@ -310,7 +305,7 @@ async def _amain() -> None:
             hour=h,
             minute=m,
             coro_factory=lambda k=key, mkt=market, chs=channels: _digest_job_runner(  # type: ignore[misc]
-                k, mkt, chs, digest_dao, proc_dao, msg_builder, dispatcher
+                k, mkt, chs, digest_dao, proc_dao, raw_dao, msg_builder, dispatcher
             ),
         )
 
@@ -402,41 +397,67 @@ async def _probe_scrapers(reg: ScraperRegistry, bark: BarkAlerter | None) -> Non
                 )
 
 
+_DIGEST_TITLE = {"us": "美股星盘", "cn": "A股星盘"}
+
+
 async def _digest_job_runner(
     digest_key: str,
     market: str,
     channels: list[str],
     digest_dao: DigestBufferDAO,
     proc_dao: NewsProcessedDAO,
+    raw_dao: RawNewsDAO,
     msg_builder: MessageBuilder,
     dispatcher: PusherDispatcher,
 ) -> int:
-    class _DB:
-        def build_digest(self, *, items: list[Any], market: str, digest_key: str) -> object:
-            from news_pipeline.common.contracts import Badge, CommonMessage
-            from news_pipeline.common.enums import Market as _Market
-
-            lines = "\n".join(f"• {p.summary[:120]}" for p in items[:30])
-            return CommonMessage(
-                title=f"Digest {digest_key}",
-                summary=lines or "(no items)",
-                source_label="digest",
-                source_url="https://news-pipeline.local/",
-                badges=[Badge(text=digest_key, color="blue")],
-                chart_url=None,
-                deeplinks=[],
-                market=_Market(market),
-            )
-
-    return await send_digest(
-        digest_key=digest_key,
-        market=market,
-        channels=channels,
-        digest_dao=digest_dao,
-        proc_dao=proc_dao,
-        digest_builder=_DB(),
-        dispatcher=dispatcher,
+    from news_pipeline.common.contracts import (
+        Badge,
+        CommonMessage,
+        DigestItem,
     )
+    from news_pipeline.common.enums import Market as _Market
+
+    title = _DIGEST_TITLE.get(market, market)
+
+    pending = await digest_dao.list_pending(digest_key)
+    if not pending:
+        return 0
+    consumed_ids = [b.id for b in pending if b.id is not None]
+
+    digest_items: list[DigestItem] = []
+    for buf_row in pending[:30]:
+        proc = await proc_dao.get(buf_row.news_id)
+        if proc is None:
+            continue
+        raw = await raw_dao.get(proc.raw_id)
+        if raw is None:
+            continue
+        digest_items.append(
+            DigestItem(
+                source_label=msg_builder.label_for(raw.source),
+                url=raw.url,
+                summary=proc.summary[:120],
+            )
+        )
+
+    if not digest_items:
+        await digest_dao.mark_consumed(consumed_ids)
+        return 0
+
+    msg = CommonMessage(
+        title=title,
+        summary="",
+        source_label=title,
+        source_url="https://news-pipeline.local/",
+        badges=[Badge(text=digest_key, color="blue")],
+        chart_url=None,
+        deeplinks=[],
+        market=_Market(market),
+        digest_items=digest_items,
+    )
+    await dispatcher.dispatch(msg, channels=channels)
+    await digest_dao.mark_consumed(consumed_ids)
+    return len(digest_items)
 
 
 def main() -> None:

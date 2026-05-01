@@ -44,6 +44,11 @@ class WecomPusher:
         return SendResult(ok=ok, http_status=status, response_body=resp, retries=0)
 
     def _render(self, msg: CommonMessage) -> str:
+        if msg.digest_items:
+            items = "\n".join(
+                f"- [{it.source_label}]({it.url}) {it.summary}" for it in msg.digest_items
+            )
+            return f"**{msg.title}**\n\n{items}"
         badges = " ".join(f"`{b.text}`" for b in msg.badges)
         links = " | ".join(f"[{d.label}]({d.url})" for d in msg.deeplinks)
         return f"**{msg.title}**\n> {msg.source_label}\n\n{msg.summary}\n\n{badges}\n\n{links}"

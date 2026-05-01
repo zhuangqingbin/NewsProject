@@ -54,6 +54,10 @@ class RawNewsDAO:
         assert row.id is not None
         return row.id
 
+    async def get(self, raw_id: int) -> RawNews | None:
+        async with self._db.session() as s:
+            return await s.get(RawNews, raw_id)
+
     async def find_by_url_hash(self, url_hash: str) -> RawNews | None:
         async with self._db.session() as s:
             res = await s.execute(select(RawNews).where(RawNews.url_hash == url_hash))

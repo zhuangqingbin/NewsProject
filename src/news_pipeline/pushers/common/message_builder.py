@@ -20,6 +20,9 @@ class MessageBuilder:
     def __init__(self, *, source_labels: dict[str, str]) -> None:
         self._labels = source_labels
 
+    def label_for(self, source_id: str) -> str:
+        return self._labels.get(source_id, source_id)
+
     def build(
         self,
         art: RawArticle,
