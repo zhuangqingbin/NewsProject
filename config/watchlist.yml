@@ -7,13 +7,43 @@ rules:
     - ticker: NVDA
       name: NVIDIA
       aliases: [英伟达, 老黄家, Jensen Huang]
-      sectors: [semiconductor, ai]
+      sectors: [semiconductor, ai, chip, GPU]
       macro_links: [FOMC, CPI]
       alerts: [price_5pct, earnings, downgrade, sec_filing]
     - ticker: TSLA
       name: Tesla
       aliases: [特斯拉, 马斯克, Elon Musk, Musk]
-      sectors: [ev, ai, autonomous]
+      sectors: [ev, ai, autonomous, FSD, robotaxi]
+      macro_links: [FOMC, CPI]
+      alerts: [price_5pct, earnings, downgrade, sec_filing]
+    - ticker: AMD
+      name: AMD
+      aliases: [AMD, Advanced Micro Devices, Lisa Su, 苏妈]
+      sectors: [semiconductor, ai, chip, GPU]
+      macro_links: [FOMC, CPI]
+      alerts: [price_5pct, earnings, downgrade, sec_filing]
+    - ticker: TSM
+      name: TSMC
+      aliases: [TSM, TSMC, 台积电, Taiwan Semiconductor]
+      sectors: [semiconductor, chip]
+      macro_links: [FOMC, CPI]
+      alerts: [price_5pct, earnings, downgrade, sec_filing]
+    - ticker: AVGO
+      name: Broadcom
+      aliases: [AVGO, Broadcom, 博通]
+      sectors: [semiconductor, ai, chip]
+      macro_links: [FOMC, CPI]
+      alerts: [price_5pct, earnings, downgrade, sec_filing]
+    - ticker: META
+      name: Meta
+      aliases: [META, Facebook, Zuckerberg, 扎克伯格, Llama]
+      sectors: [ai, social, VR]
+      macro_links: [FOMC, CPI]
+      alerts: [price_5pct, earnings, downgrade, sec_filing]
+    - ticker: GOOGL
+      name: Alphabet
+      aliases: [GOOGL, Google, Alphabet, Sundar Pichai, Gemini]
+      sectors: [ai, cloud, search]
       macro_links: [FOMC, CPI]
       alerts: [price_5pct, earnings, downgrade, sec_filing]
 
@@ -60,6 +90,36 @@ rules:
       sectors: [半导体, MEMS]
       macro_links: [央行, MLF, LPR]
       alerts: [price_5pct, announcement]
+    - ticker: "688256"
+      name: 寒武纪
+      aliases: [寒武纪, Cambricon]
+      sectors: [半导体, AI, 芯片]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "002594"
+      name: 比亚迪
+      aliases: [比亚迪, BYD]
+      sectors: [新能源, 电动车, 汽车]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "300750"
+      name: 宁德时代
+      aliases: [宁德, 宁德时代, CATL]
+      sectors: [新能源, 锂电池, 储能]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "688981"
+      name: 中芯国际
+      aliases: [中芯, 中芯国际, SMIC]
+      sectors: [半导体, 晶圆, 代工]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "002371"
+      name: 北方华创
+      aliases: [北方华创]
+      sectors: [半导体, 设备]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
 
   # 通用关键词 — 命中即入库，不绑定个股。这是让 A股/美股星盘"有货"的主力杠杆
   keyword_list:
@@ -78,12 +138,14 @@ rules:
 
   # 板块词 — 同理通过 sectors 关联
   sector_keywords:
-    us: [semiconductor, ai, ev, autonomous, robotaxi, FSD, chip, GPU]
+    us: [semiconductor, ai, ev, autonomous, robotaxi, FSD, chip, GPU,
+         social, VR, cloud, search]
     cn:
       [新能源, 半导体, 白酒, 存储, 机器人, 液冷,
        通信, CPO, 共封装光学, 光模块, 光通信,
        CRO, 医药, 创新药, 仿制药, 生物制药,
-       MEMS, 晶圆, 封测, 设备, 材料]
+       MEMS, 晶圆, 封测, 设备, 材料, 代工,
+       AI, 芯片, 电动车, 汽车, 锂电池, 储能]
 
 llm:
   enable: false
