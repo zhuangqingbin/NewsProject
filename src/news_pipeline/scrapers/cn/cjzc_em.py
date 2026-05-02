@@ -7,16 +7,16 @@ from news_pipeline.common.enums import Market
 from news_pipeline.scrapers.common.akshare_global import AkshareGlobalScraper
 
 
-class EastmoneyGlobalScraper(AkshareGlobalScraper):
-    """东方财富全球财经快讯 — broad CN market wire, ~200 items per call."""
+class CjzcEmScraper(AkshareGlobalScraper):
+    """东财财经早餐 — once-daily morning recap."""
 
-    source_id = "eastmoney_global"
+    source_id = "cjzc_em"
     market = Market.CN
     body_col = "摘要"
 
     def __init__(
         self,
         *,
-        news_callable: Callable[[], pd.DataFrame] = ak.stock_info_global_em,
+        news_callable: Callable[[], pd.DataFrame] = ak.stock_info_cjzc_em,
     ) -> None:
         super().__init__(news_callable=news_callable)

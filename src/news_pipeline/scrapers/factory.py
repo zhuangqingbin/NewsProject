@@ -8,14 +8,21 @@ from news_pipeline.config.schema import (
 )
 from news_pipeline.scrapers.cn.akshare_news import AkshareNewsScraper
 from news_pipeline.scrapers.cn.caixin_telegram import CaixinTelegramScraper
+from news_pipeline.scrapers.cn.cctv_news import CctvNewsScraper
+from news_pipeline.scrapers.cn.cjzc_em import CjzcEmScraper
 from news_pipeline.scrapers.cn.eastmoney_global import EastmoneyGlobalScraper
 from news_pipeline.scrapers.cn.juchao import JuchaoScraper
+from news_pipeline.scrapers.cn.kr36 import Kr36Scraper
+from news_pipeline.scrapers.cn.sina_global import SinaGlobalScraper
 from news_pipeline.scrapers.cn.ths import ThsScraper
+from news_pipeline.scrapers.cn.ths_global import ThsGlobalScraper
 from news_pipeline.scrapers.cn.tushare_news import TushareNewsScraper
 from news_pipeline.scrapers.cn.xueqiu import XueqiuScraper
 from news_pipeline.scrapers.registry import ScraperRegistry
 from news_pipeline.scrapers.us.finnhub import FinnhubScraper
+from news_pipeline.scrapers.us.futu_global import FutuGlobalScraper
 from news_pipeline.scrapers.us.sec_edgar import SecEdgarScraper
+from news_pipeline.scrapers.us.wallstreetcn import WallStreetCnScraper
 from news_pipeline.scrapers.us.yfinance_news import YFinanceNewsScraper
 
 
@@ -44,6 +51,20 @@ def build_registry(
         reg.register(CaixinTelegramScraper())
     if "eastmoney_global" in enabled:
         reg.register(EastmoneyGlobalScraper())
+    if "ths_global" in enabled:
+        reg.register(ThsGlobalScraper())
+    if "sina_global" in enabled:
+        reg.register(SinaGlobalScraper())
+    if "cjzc_em" in enabled:
+        reg.register(CjzcEmScraper())
+    if "cctv_news" in enabled:
+        reg.register(CctvNewsScraper())
+    if "futu_global" in enabled:
+        reg.register(FutuGlobalScraper())
+    if "wallstreetcn" in enabled:
+        reg.register(WallStreetCnScraper())
+    if "kr36" in enabled:
+        reg.register(Kr36Scraper())
     if "akshare_news" in enabled and cn_tickers:
         reg.register(AkshareNewsScraper(tickers=cn_tickers))
     if "juchao" in enabled and cn_tickers:

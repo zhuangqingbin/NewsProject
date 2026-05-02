@@ -17,8 +17,8 @@ def _fake_em() -> pd.DataFrame:
                 "链接": "https://finance.eastmoney.com/a/abc.html",
             },
             {
-                "标题": "",  # missing title, must be skipped
-                "摘要": "...",
+                "标题": "",  # missing title AND empty body → skipped
+                "摘要": "",
                 "发布时间": "2026-04-28 11:30:00",
                 "链接": "https://finance.eastmoney.com/a/x.html",
             },
