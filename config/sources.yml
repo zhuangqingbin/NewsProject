@@ -1,27 +1,17 @@
 sources:
-  finnhub:        {enabled: true, interval_sec: 300}
-  sec_edgar:      {enabled: true, interval_sec: 120}
-  caixin_telegram: {enabled: true, interval_sec: 60}
-  eastmoney_global: {enabled: true, interval_sec: 180}
-  akshare_news:   {enabled: true, interval_sec: 180}
-  juchao:         {enabled: true, interval_sec: 120}
-  # New global wires (akshare-backed, no auth needed):
-  ths_global:     {enabled: true, interval_sec: 120}    # 同花顺财经直播
-  sina_global:    {enabled: true, interval_sec: 180}    # 新浪财经全球
-  cjzc_em:        {enabled: true, interval_sec: 3600}   # 东财财经早餐 (~1/day)
-  cctv_news:      {enabled: true, interval_sec: 21600}  # 新闻联播 (1/day, polled 4x for catch-up)
-  futu_global:    {enabled: true, interval_sec: 180}    # 富途快讯 (US/HK/A)
-  # Non-akshare:
-  wallstreetcn:   {enabled: true, interval_sec: 300}    # 华尔街见闻 (JSON API, channel=global)
-  kr36:           {enabled: true, interval_sec: 600}    # 36氪 RSS (tech/VC)
-  # Sources below are temporarily disabled — endpoints/API have shifted since
-  # the v0.1.0-mvp implementation and need real-world re-investigation:
-  #   - yfinance_news: yfinance lib changed news object schema (no providerPublishTime)
-  #   - xueqiu: /v4/statuses/stock_timeline.json now returns 404
-  #   - ths: news.10jqka.com.cn/<ticker>/list.shtml URL pattern changed
-  #   - tushare_news: requires higher 积分 tier (paid) for news API
-  # To re-enable any: change `enabled: true` AND fix the corresponding scraper module.
-  yfinance_news:  {enabled: false, interval_sec: 600}
-  xueqiu:         {enabled: false, interval_sec: 300}
-  ths:            {enabled: false, interval_sec: 300}
-  tushare_news:   {enabled: false, interval_sec: 600}
+  # US
+  finnhub:          {enabled: true, interval_sec: 300}
+  sec_edgar:        {enabled: true, interval_sec: 120}
+  futu_global:      {enabled: true, interval_sec: 180}    # 富途快讯 (US/HK/A)
+  wallstreetcn:     {enabled: true, interval_sec: 300}    # 华尔街见闻 (channel=global)
+  # CN — broad wires (no auth, akshare-backed)
+  caixin_telegram:  {enabled: true, interval_sec: 60}     # 财联社电报
+  eastmoney_global: {enabled: true, interval_sec: 180}    # 东财全球财经
+  ths_global:       {enabled: true, interval_sec: 120}    # 同花顺财经直播
+  sina_global:      {enabled: true, interval_sec: 180}    # 新浪财经全球
+  cjzc_em:          {enabled: true, interval_sec: 3600}   # 东财财经早餐 (~1/day)
+  cctv_news:        {enabled: true, interval_sec: 21600}  # 新闻联播 (1/day)
+  kr36:             {enabled: true, interval_sec: 600}    # 36氪 RSS (tech/VC)
+  # CN — per-ticker
+  akshare_news:     {enabled: true, interval_sec: 180}    # 东财个股新闻
+  juchao:           {enabled: true, interval_sec: 120}    # 巨潮官方公告
