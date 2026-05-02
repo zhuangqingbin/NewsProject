@@ -10,6 +10,12 @@ rules:
       sectors: [semiconductor, ai]
       macro_links: [FOMC, CPI]
       alerts: [price_5pct, earnings, downgrade, sec_filing]
+    - ticker: TSLA
+      name: Tesla
+      aliases: [特斯拉, 马斯克, Elon Musk, Musk]
+      sectors: [ev, ai, autonomous]
+      macro_links: [FOMC, CPI]
+      alerts: [price_5pct, earnings, downgrade, sec_filing]
 
   cn:
     - ticker: "688525"
@@ -26,26 +32,62 @@ rules:
       alerts: [price_5pct, announcement]
     - ticker: "300308"
       name: 中际旭创
-      aliases: [中际]
-      sectors: [通信, CPO, 共封装光学]
+      aliases: [中际, 中际旭创]
+      sectors: [通信, CPO, 共封装光学, 光模块]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "603259"
+      name: 药明康德
+      aliases: [药明, 药明康德]
+      sectors: [CRO, 医药, 创新药]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "300502"
+      name: 新易盛
+      aliases: [新易盛]
+      sectors: [通信, 光模块, CPO]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "300394"
+      name: 天孚通信
+      aliases: [天孚, 天孚通信]
+      sectors: [通信, 光模块]
+      macro_links: [央行, MLF, LPR]
+      alerts: [price_5pct, announcement]
+    - ticker: "300456"
+      name: 赛微电子
+      aliases: [赛微, 赛微电子]
+      sectors: [半导体, MEMS]
       macro_links: [央行, MLF, LPR]
       alerts: [price_5pct, announcement]
 
+  # 通用关键词 — 命中即入库，不绑定个股。这是让 A股/美股星盘"有货"的主力杠杆
   keyword_list:
-    us: [Powell, recession]
-    cn: [证监会, 国常会]
+    us:
+      [Powell, Fed, FOMC, recession, rate cut, rate hike, tariff, Trump,
+       layoffs, earnings beat, earnings miss, guidance, downgrade, upgrade]
+    cn:
+      [证监会, 国常会, 国务院, 财政部, 发改委, 北交所, 科创板, 创业板,
+       IPO, 减持, 回购, 分红, 重组, 并购, 业绩快报, 业绩预告,
+       降准, 降息, 公开市场操作, 外资, 北上资金, 南下资金]
 
+  # 宏观词 — 命中后通过 macro_links 关联到引用它的 ticker
   macro_keywords:
-    us: [FOMC, CPI, NFP]
-    cn: [央行, MLF, LPR]
+    us: [FOMC, CPI, NFP, PPI, PMI, GDP, rate, inflation]
+    cn: [央行, MLF, LPR, OMO, PMI, PPI, CPI, GDP, 社融, 国债收益率]
 
+  # 板块词 — 同理通过 sectors 关联
   sector_keywords:
-    us: [semiconductor, ai, ev]
-    cn: [新能源, 半导体, 白酒, 存储, 机器人, 液冷, 通信, CPO, 共封装光学]
+    us: [semiconductor, ai, ev, autonomous, robotaxi, FSD, chip, GPU]
+    cn:
+      [新能源, 半导体, 白酒, 存储, 机器人, 液冷,
+       通信, CPO, 共封装光学, 光模块, 光通信,
+       CRO, 医药, 创新药, 仿制药, 生物制药,
+       MEMS, 晶圆, 封测, 设备, 材料]
 
 llm:
   enable: false
-  us: [NVDA]
+  us: [NVDA, TSLA]
   cn: ["600519"]
   macro: [FOMC, CPI, NFP, 央行, MLF, LPR]
   sectors: [semiconductor, ai, ev, 新能源, 半导体, 白酒]
