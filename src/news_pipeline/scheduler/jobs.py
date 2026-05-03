@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
+import requests  # type: ignore[import-untyped]
 
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.common.contracts import EnrichedNews, RawArticle
@@ -33,6 +34,11 @@ log = get_logger(__name__)
 _TRANSIENT_EXC = (
     httpx.TimeoutException,
     httpx.ConnectError,
+    # akshare/feedparser sit on top of `requests` — same kind of transient
+    # network errors need the same treatment (retry next tick, no alert).
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+    requests.exceptions.ChunkedEncodingError,
 )
 
 
