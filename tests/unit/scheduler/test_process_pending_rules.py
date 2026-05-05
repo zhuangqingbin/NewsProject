@@ -95,14 +95,18 @@ def _setup_mocks():
     router = MagicMock()
     router.route = MagicMock(
         return_value=[
-            MagicMock(channels=["tg_us"], immediate=True, message=msg_builder.build.return_value),
+            MagicMock(
+                channels=["feishu_us"],
+                immediate=True,
+                message=msg_builder.build.return_value,
+            ),
         ]
     )
 
     dispatcher = MagicMock()
     dispatcher.dispatch = AsyncMock(
         return_value={
-            "tg_us": MagicMock(ok=True, http_status=200, response_body="", retries=0),
+            "feishu_us": MagicMock(ok=True, http_status=200, response_body="", retries=0),
         }
     )
 

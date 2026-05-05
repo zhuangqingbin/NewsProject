@@ -2,7 +2,6 @@
 from news_pipeline.config.schema import ChannelsFile, SecretsFile
 from news_pipeline.pushers.base import PusherProtocol
 from news_pipeline.pushers.feishu import FeishuPusher
-from news_pipeline.pushers.telegram import TelegramPusher
 from news_pipeline.pushers.wecom import WecomPusher
 
 
@@ -16,13 +15,7 @@ def build_pushers(
             continue
         opts = c.options
         s = secrets.push
-        if c.type == "telegram":
-            out[cid] = TelegramPusher(
-                channel_id=cid,
-                bot_token=s[opts["bot_token_key"]],
-                chat_id=s[opts["chat_id_key"]],
-            )
-        elif c.type == "feishu":
+        if c.type == "feishu":
             sign_key = opts.get("sign_key", "")
             out[cid] = FeishuPusher(
                 channel_id=cid,

@@ -131,5 +131,5 @@ def test_dispatch_plan():
         deeplinks=[],
         market=Market.CN,
     )
-    p = DispatchPlan(message=msg, channels=["tg_cn", "feishu_cn"], immediate=True)
-    assert "tg_cn" in p.channels
+    p = DispatchPlan(message=msg, channels=["wecom_cn", "feishu_cn"], immediate=True)
+    assert "wecom_cn" in p.channels

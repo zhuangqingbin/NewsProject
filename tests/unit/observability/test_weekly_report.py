@@ -12,7 +12,7 @@ async def test_report_includes_metrics() -> None:
     text = await build_weekly_report(
         metrics=metrics,
         sources=["finnhub", "caixin_telegram"],
-        channels=["tg_us", "feishu_us"],
+        channels=["wecom_us", "feishu_us"],
     )
     assert "周报" in text or "Weekly" in text
     assert "finnhub" in text
@@ -25,10 +25,10 @@ async def test_report_includes_all_sources_and_channels() -> None:
     text = await build_weekly_report(
         metrics=metrics,
         sources=["finnhub", "caixin_telegram"],
-        channels=["tg_us", "feishu_us"],
+        channels=["wecom_us", "feishu_us"],
     )
     assert "caixin_telegram" in text
-    assert "tg_us" in text
+    assert "wecom_us" in text
     assert "feishu_us" in text
 
 
@@ -54,6 +54,6 @@ async def test_report_handles_none_metrics() -> None:
     text = await build_weekly_report(
         metrics=metrics,
         sources=["finnhub"],
-        channels=["tg_us"],
+        channels=["wecom_us"],
     )
     assert "0" in text

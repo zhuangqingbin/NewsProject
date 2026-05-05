@@ -79,12 +79,12 @@ async def test_process_pending_routes_critical_immediately():
     router = MagicMock()
     router.route = MagicMock(
         return_value=[
-            MagicMock(channels=["tg_us"], immediate=True, message=builder.build.return_value)
+            MagicMock(channels=["feishu_us"], immediate=True, message=builder.build.return_value)
         ]
     )
     dispatcher = MagicMock()
     dispatcher.dispatch = AsyncMock(
-        return_value={"tg_us": MagicMock(ok=True, http_status=200, response_body="", retries=0)}
+        return_value={"feishu_us": MagicMock(ok=True, http_status=200, response_body="", retries=0)}
     )
     push_log = MagicMock()
     push_log.write = AsyncMock()

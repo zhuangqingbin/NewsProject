@@ -67,7 +67,7 @@ async def test_push_log_writes(daos):
         )
         await s.commit()
     await plog.write(
-        news_id=1, channel="tg_us", status="ok", http_status=200, response="", retries=0
+        news_id=1, channel="feishu_us", status="ok", http_status=200, response="", retries=0
     )
-    cnt = await plog.count_today_failures("tg_us")
+    cnt = await plog.count_today_failures("feishu_us")
     assert cnt == 0
