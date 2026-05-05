@@ -163,7 +163,7 @@ class WatchlistFile:
 
 ```python
 class ChannelDef:
-    type: Literal["telegram", "feishu", "wecom"]
+    type: Literal["feishu", "wecom"]
     enabled: bool = True
     market: Literal["us", "cn"]
     rate_limit: str = "30/min"

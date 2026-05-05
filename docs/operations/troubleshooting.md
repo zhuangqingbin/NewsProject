@@ -23,32 +23,6 @@ ssh -L 8001:localhost:8001 ubuntu@8.135.67.243
 
 ---
 
-## Telegram 推送失败 / 签名错
-
-**症状**：日志中 `push_failed`，response 含 `"Bad Request"` 或 `401 Unauthorized`。
-
-**排查**：
-
-```bash
-# 查最近推送失败详情
-sqlite3 /opt/news_pipeline/data/news.db "
-SELECT channel, http_status, response, sent_at
-FROM push_log
-WHERE status = 'failed'
-ORDER BY sent_at DESC LIMIT 5;"
-```
-
-**常见原因和修复**：
-
-| 错误信息 | 原因 | 修复 |
-|---|---|---|
-| `chat not found` | chat_id 错误或 bot 未加入 chat | 检查 `tg_chat_id_*`；确认 bot 在目标 chat 里 |
-| `Unauthorized` | bot_token 错误或已失效 | 到 BotFather 检查 token，必要时 revoke + 重新生成 |
-| `message is too long` | 消息超过 4096 字符 | 系统会截断，极少发生；查 pusher 代码 |
-| `Too Many Requests` | 速率超限 | 检查 `per_channel_rate` 配置 |
-
----
-
 ## 飞书 Webhook 签名错
 
 **症状**：飞书机器人推送返回 HTTP 400，响应含 `"sign check failed"` 或 `"verification failed"`。

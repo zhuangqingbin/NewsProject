@@ -144,8 +144,8 @@ async def build_dlq_summary(*, dlq: DeadLetterDAO) -> str:
 | `scrape_new` | `source=finnhub` | 新抓取文章数 |
 | `scrape_dup` | `source=finnhub` | 去重丢弃数 |
 | `llm_cost_cny` | — | 今日 LLM 花费（CNY） |
-| `push_ok` | `channel=tg_us` | 推送成功数 |
-| `push_failed` | `channel=tg_us` | 推送失败数 |
+| `push_ok` | `channel=feishu_us` | 推送成功数 |
+| `push_failed` | `channel=feishu_us` | 推送失败数 |
 
 查询示例：
 ```sql

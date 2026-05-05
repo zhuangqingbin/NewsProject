@@ -80,17 +80,14 @@ def render_kline(df: pd.DataFrame, *, ticker: str, news_markers=None) -> bytes:
 
 ---
 
-## TG inline 嵌图
+## 飞书图片推送（未实现）
+
+飞书推送**不包含图表**（v0.1.6 起）。飞书图片上传需要自建应用 + OAuth，而飞书自建应用集成已在 v0.1.6 完全移除。飞书卡片仍然包含摘要、badges 和链接，只是没有图片。
 
 ```python
-# pushers/telegram.py
-if msg.chart_image:
-    files = {"photo": ("chart.png", msg.chart_image, "image/png")}
-    data = {"chat_id": chat_id, "caption": text_caption}
-    resp = await client.post(f"{base}/sendPhoto", files=files, data=data)
+# pushers/feishu.py — chart_image 当前忽略
+# 飞书卡片会显示图片预览（如将来通过 image_key 上传实现）
 ```
-
-图片作为 multipart/form-data 直接上传，无需图床。Telegram 会在消息中显示图片预览。
 
 ---
 

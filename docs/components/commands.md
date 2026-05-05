@@ -79,23 +79,14 @@ class CommandDispatcher:
 
 ## Webhook 配置（未启用）
 
-`commands/server.py` 实现了接收 Telegram / 飞书 Webhook 的 FastAPI 应用：
+`commands/server.py` 实现了接收飞书 Webhook 的 FastAPI 应用：
 
 ```python
 # FastAPI endpoints（当前未启动）
-POST /webhook/tg/us     # Telegram US bot webhook
-POST /webhook/tg/cn     # Telegram CN bot webhook
-POST /webhook/feishu/us # 飞书 US webhook
-POST /webhook/feishu/cn # 飞书 CN webhook
+POST /feishu/event      # 飞书事件回调（接收命令）
 ```
 
 ### 安全验证
-
-**Telegram**：
-```python
-# 验证 X-Telegram-Bot-Api-Secret-Token header
-# 与 secrets.yml → push.tg_secret_token_us 对比
-```
 
 **飞书**：
 ```python
@@ -112,23 +103,13 @@ POST /webhook/feishu/cn # 飞书 CN webhook
 
 2. Nginx 反代（建议加 HTTPS）：
    ```nginx
-   location /webhook/ {
+   location /feishu/ {
        proxy_pass http://127.0.0.1:8080;
    }
    ```
 
-3. 注册 Telegram webhook：
-   ```bash
-   curl "https://api.telegram.org/bot<TOKEN>/setWebhook" \
-     -d "url=https://<domain>/webhook/tg/us" \
-     -d "secret_token=<tg_secret_token_us>"
-   ```
-
-4. 飞书自定义机器人暂不支持 webhook 回调（飞书机器人是单向推送）。
-
 !!! note "当前状态"
-    v0.1.7 中命令通过 Telegram Bot polling 或直接 API 调用处理，
-    webhook server 未在 systemd 中启动。
+    飞书自定义机器人是单向推送，webhook 回调为可选功能，当前未在 systemd 中启动。
 
 ---
 

@@ -11,9 +11,9 @@
 - **LLM 结构化提取**：四层管线 — 标题分类 → 普通摘要 → 深度实体/关系抽取（一手源直达深度层）
 - **重要性评分**：规则引擎 + LLM judge 灰区兜底，判定 `is_critical`
 - **分级推送**：
-  - 关键新闻：立即实时推送到 Telegram / 飞书
+  - 关键新闻：立即实时推送到飞书
   - 普通新闻：进入 Digest 缓冲区，早晚各一次汇总推送
-- **Bot 命令**：通过 Telegram / 飞书 发 `/watch NVDA`、`/cost`、`/chart NVDA 30d` 等 11 个命令
+- **Bot 命令**：通过飞书发 `/watch NVDA`、`/cost`、`/chart NVDA 30d` 等 11 个命令
 - **图表**：关键新闻自动附 K 线图（mplfinance 生成，TG sendPhoto inline 嵌图）
 - **告警**：Bark iOS 推送 — 反爬触发 / 成本超限 / 推送失败 / 日常心跳
 - **备份**：每日 SQLite → 阿里云 OSS，脚本保留 30 天
@@ -50,7 +50,7 @@
 | LLM | DashScope (DeepSeek-V3) / Anthropic (Claude) |
 | 存储 | SQLite + SQLModel + Alembic |
 | 调度 | APScheduler (AsyncIO 模式) |
-| 推送 | python-telegram-bot + httpx (飞书 webhook) |
+| 推送 | httpx (飞书 webhook) |
 | 图表 | mplfinance + matplotlib |
 | 监控 | structlog (JSON) + Bark |
 | 部署 | uv + systemd (生产) / Docker Compose (Datasette) |

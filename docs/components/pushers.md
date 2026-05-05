@@ -1,6 +1,6 @@
 # Pushers
 
-这一页描述 Telegram 和飞书两个推送通道：消息渲染格式、发送方式，以及 webhook 配置说明。
+这一页描述飞书推送通道（以及可选的 WeCom）：消息渲染格式、发送方式，以及 webhook 配置说明。
 
 ---
 
@@ -8,8 +8,6 @@
 
 | channel_id | 类型 | market | 配置方式 |
 |---|---|---|---|
-| `tg_us` | Telegram Bot | us | bot_token + chat_id |
-| `tg_cn` | Telegram Bot | cn | bot_token + chat_id |
 | `feishu_us` | 飞书自定义机器人 | us | webhook URL + sign secret |
 | `feishu_cn` | 飞书自定义机器人 | cn | webhook URL + sign secret |
 
@@ -27,50 +25,10 @@ class CommonMessage:
     source_url: HttpUrl           # 原文链接
     badges: list[Badge]           # 标签（sentiment、magnitude、event_type）
     chart_url: HttpUrl | None     # 已废弃，用 chart_image
-    chart_image: bytes | None     # PNG 字节，用于 TG sendPhoto
+    chart_image: bytes | None     # PNG 字节（飞书暂不支持图片推送）
     deeplinks: list[Deeplink]     # 相关链接
     market: Market                # us | cn
 ```
-
----
-
-## Telegram Pusher
-
-### 文字消息
-
-使用 `sendMessage` API，格式为 **MarkdownV2**：
-
-- 标题加粗：`*NVDA 财报超预期*`
-- 特殊字符（`.`、`(`、`)`、`-` 等）需要转义（`\.`）
-- Badges 用 Emoji 区分：`📈` bullish / `📉` bearish / `➡️` neutral
-- 末尾附原文链接
-
-```
-*NVDA 财报超预期*
-📈 bullish | HIGH | earnings
-
-英伟达 Q3 EPS $4.02，超预期 $3.65。数据中心营收同比+122%。
-
-[阅读原文](https://...)  |  [SEC Filing](https://...)
-来源：Finnhub  |  2026-04-25 09:30 ET
-```
-
-### 图表嵌图
-
-当 `CommonMessage.chart_image` 不为 None 时，使用 `sendPhoto`（multipart/form-data）：
-
-```python
-# TG sendPhoto 流程
-files = {"photo": ("chart.png", chart_bytes, "image/png")}
-data = {"chat_id": chat_id, "caption": text}
-await client.post(f"{BASE_URL}/sendPhoto", files=files, data=data)
-```
-
-图片直接嵌入消息，不需要 OSS 或其他图床。
-
-!!! note "v0.1.4 改动"
-    v0.1.4 前用阿里云 OSS 存图片 URL。v0.1.4 起改为 inline 嵌图（`chart_image: bytes`），
-    移除了 `oss2` 依赖，简化了配置。
 
 ---
 
@@ -158,22 +116,7 @@ push:
   per_channel_rate: "30/min"   # 每个 channel 每分钟最多 30 条
 ```
 
-由 `aiolimiter` 实现的令牌桶算法，防止触发 Telegram / 飞书 API 限流。
-
----
-
-## Bot 命令 Webhook（未启用）
-
-`commands/server.py` 实现了一个 FastAPI webhook server，支持接收 Telegram 和飞书的 Webhook 回调，处理 `/watch`、`/list` 等命令。
-
-当前**未在生产中启用**（webhook server 未被 systemd 拉起）。命令通过轮询（polling）或手动调用实现。
-
-配置 Telegram webhook（将来启用时）：
-```bash
-curl "https://api.telegram.org/bot<TOKEN>/setWebhook" \
-  -d "url=https://<server>/webhook/tg/us" \
-  -d "secret_token=<tg_secret_token_us>"
-```
+由 `aiolimiter` 实现的令牌桶算法，防止触发飞书 API 限流。
 
 ---
 

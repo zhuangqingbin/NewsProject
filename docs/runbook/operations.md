@@ -35,7 +35,6 @@ docker compose -f docker/compose.yml up -d
 | Bark alerts saying "scrape_recent_15min" | Check `select source, count(*) from raw_news where fetched_at > datetime('now','-30min') group by source;` |
 | Repeated 401 from xueqiu/ths | Cookie expired; refresh `secrets.yml` xueqiu_cookie/ths_cookie + restart |
 | Cost ceiling tripped daily | Check `daily_metrics` for which tier is over-spending; consider tier2 → tier1 demotion via prompt change |
-| Telegram "Bad Request: chat not found" | Ensure bot was added to the chat; verify chat_id |
 
 ## Smoke deploy to 阿里云轻量 (manual steps — Task 75)
 

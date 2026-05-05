@@ -1,6 +1,6 @@
 # News Pipeline
 
-财经新闻自动化流水线：抓取 → 去重 → 规则匹配 → 可选 LLM 摘要 → 推送到 Telegram / Feishu webhook。
+财经新闻自动化流水线：抓取 → 去重 → 规则匹配 → 可选 LLM 摘要 → 推送到飞书 webhook。
 
 数据源：Caixin / SEC EDGAR / Finnhub / Juchao / Akshare / 雪球 / 同花顺 …
 
@@ -14,7 +14,7 @@
 git clone https://github.com/<你>/NewsProject.git
 cd NewsProject
 
-# 1. 填密钥（Telegram bot token、DashScope API key 等）
+# 1. 填密钥（DashScope API key、飞书 webhook 等）
 cp config/secrets.yml.example config/secrets.yml
 $EDITOR config/secrets.yml
 
@@ -155,7 +155,6 @@ llm:
   dashscope_api_key: sk-xxx       # DeepSeek-V3 走 DashScope
   anthropic_api_key: ""           # 留空就降级到 Tier-1（DashScope）
 push:
-  tg_bot_token: "123:ABC"
   feishu_us_webhook: "https://open.feishu.cn/..."
   feishu_cn_webhook: "https://open.feishu.cn/..."
 sources:

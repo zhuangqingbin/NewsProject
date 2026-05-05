@@ -11,7 +11,7 @@ graph TB
     subgraph Sources["数据源层"]
         FH[Finnhub<br/>美股新闻]
         SE[SEC EDGAR<br/>美股公告]
-        CX[财联社 Telegram<br/>一手财经]
+        CX[财联社电报<br/>一手财经]
         AK[AkShare<br/>东财股票新闻]
         JC[巨潮<br/>A 股公告]
         D1[雪球 / 同花顺<br/>已暂停]
@@ -37,7 +37,6 @@ graph TB
         BS[BurstSuppressor<br/>防同 ticker 刷屏]
         DB[(digest_buffer)]
         PD[PusherDispatcher]
-        TG[Telegram]
         FS[飞书 Webhook]
     end
 
@@ -64,7 +63,6 @@ graph TB
     BS --> PD
     DR -->|digest| DB
     DB -->|cron 4x/day| PD
-    PD --> TG
     PD --> FS
     CT -.->|80% warn / 100% stop| BK
     NP -.-> DS
@@ -83,7 +81,7 @@ sequenceDiagram
     participant T2 as Tier-2 LLM
     participant IC as Classifier
     participant DR as DispatchRouter
-    participant TG as Telegram
+    participant FS as 飞书
 
     S->>D: RawArticle(url, title, body)
     D->>D: url_hash 精确匹配?
@@ -112,7 +110,7 @@ sequenceDiagram
             end
             DR->>DR: is_critical? → immediate<br/>否则 → digest
             alt immediate
-                DR->>TG: 实时推送
+                DR->>FS: 实时推送
             else digest
                 DR->>DR: 写入 digest_buffer<br/>等待早晚 cron
             end
@@ -131,7 +129,7 @@ sequenceDiagram
 | **LLM Pipeline** | `llm/` | Tier-0/1/2/3 四层 LLM，路由 + 提取 + 成本追踪 |
 | **Classifier** | `classifier/` | 规则引擎打分 + LLM judge 灰区兜底，输出 `ScoredNews` |
 | **DispatchRouter** | `router/` | 决定 immediate vs digest，按 market 分配 channel |
-| **Pushers** | `pushers/` | Telegram / 飞书 发送器，Burst 抑制，消息格式化 |
+| **Pushers** | `pushers/` | 飞书 / WeCom 发送器，Burst 抑制，消息格式化 |
 | **Storage** | `storage/` | SQLite 13 表，DAOs，Alembic 迁移 |
 
 ---

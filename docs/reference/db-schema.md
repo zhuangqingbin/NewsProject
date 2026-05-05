@@ -154,7 +154,7 @@ LLM 从新闻中抽取的实体词典，跨新闻复用。
 |---|---|---|
 | `id` | INTEGER PK | — |
 | `news_id` | INTEGER FK | → news_processed.id |
-| `channel` | TEXT | channel_id（如 `tg_us`） |
+| `channel` | TEXT | channel_id（如 `feishu_us`） |
 | `sent_at` | DATETIME | 发送时间 |
 | `status` | TEXT | `ok` / `failed` |
 | `http_status` | INTEGER | HTTP 状态码（可选） |

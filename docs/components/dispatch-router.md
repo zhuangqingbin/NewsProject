@@ -31,8 +31,8 @@ class DispatchRouter:
 ```
 
 Channel 按 market 分组（在 `main.py` 启动时按 `channels.yml` 构建）：
-- `us` → `[tg_us, feishu_us]`（均已启用时）
-- `cn` → `[tg_cn, feishu_cn]`
+- `us` → `[feishu_us]`
+- `cn` → `[feishu_cn]`
 
 ---
 

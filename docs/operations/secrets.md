@@ -25,19 +25,8 @@ chmod 600 config/secrets.yml  # 仅 owner 可读
 ```yaml
 llm:
   dashscope_api_key: sk-xxx...     # 阿里云 DashScope（DeepSeek-V3）
-  anthropic_api_key: REPLACE_ME    # Anthropic Claude（可选，空/REPLACE_ME → 自动 fallback）
 
 push:
-  # Telegram — 美股频道
-  tg_bot_token_us: 1234567890:ABC...  # BotFather 返回的 token
-  tg_chat_id_us: "123456789"          # 私聊 chat_id（正数）或群 chat_id（负数）
-  tg_secret_token_us: 32位随机字符串   # Telegram Webhook secret_token（暂未启用）
-
-  # Telegram — A 股频道
-  tg_bot_token_cn: ...
-  tg_chat_id_cn: ...
-  tg_secret_token_cn: ...
-
   # 飞书 — 美股频道（自定义机器人 webhook）
   feishu_hook_us: https://open.feishu.cn/open-apis/bot/v2/hook/xxx
   feishu_sign_us: sign_secret_key
@@ -46,14 +35,8 @@ push:
   feishu_hook_cn: https://open.feishu.cn/open-apis/bot/v2/hook/yyy
   feishu_sign_cn: sign_secret_key
 
-  # 飞书 Webhook 事件验证 token（暂未启用）
-  feishu_verification_token: REPLACE_ME
-
 sources:
   finnhub_token: REPLACE_ME    # Finnhub API token
-  tushare_token: REPLACE_ME    # Tushare Pro token（tushare_news 禁用时不需要）
-  xueqiu_cookie: REPLACE_ME    # 雪球 cookie（xueqiu 禁用时不需要）
-  ths_cookie: REPLACE_ME       # 同花顺 cookie（ths 禁用时不需要）
 
 alert:
   bark_url: https://api.day.app/<YOUR_BARK_KEY>  # Bark 推送 URL（可选）
@@ -84,18 +67,6 @@ alert:
 # AnthropicClient(api_key=..., base_url="https://api.302.ai/v1")
 ```
 
-### Telegram Bot
-
-1. Telegram 搜索 `@BotFather` → `/newbot`
-2. 给 bot 起名（username 必须以 `_bot` 结尾）
-3. BotFather 返回的 token 即 `tg_bot_token`
-4. 拿 chat_id：
-   ```bash
-   # 私聊 bot 发任意消息，然后：
-   curl "https://api.telegram.org/bot<TOKEN>/getUpdates"
-   # 找 "chat":{"id": 123456789}
-   ```
-
 ### 飞书自定义机器人
 
 1. 飞书 → 创建群 → 群设置 → 群机器人 → 添加自定义机器人
@@ -119,7 +90,7 @@ alert:
 2. 不要把 secrets.yml 上传到任何云服务（OSS、GitHub、飞书文档）
 3. 建议用 1Password 或 Bitwarden 备份一份
 4. 服务器 RAM dump 不太可能泄漏（文件只在启动时读取）
-5. 如果怀疑泄漏，立即 rotate 所有 key（DashScope / Anthropic / Telegram BotFather 都有 revoke 功能）
+5. 如果怀疑泄漏，立即 rotate 所有 key（DashScope / Anthropic / 飞书 都有 revoke 功能）
 
 ---
 
