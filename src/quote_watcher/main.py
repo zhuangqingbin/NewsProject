@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from news_pipeline.config.loader import ConfigLoader
 from quote_watcher.alerts.engine import AlertEngine
+from quote_watcher.emit.message import build_alert_message
 from quote_watcher.feeds.calendar import MarketCalendar
 from quote_watcher.feeds.sina import SinaFeed
 from quote_watcher.scheduler.jobs import evaluate_alerts, poll_quotes
@@ -47,7 +48,11 @@ async def _amain() -> None:
     ]
 
     tracker = StateTracker(dao=AlertStateDAO(db))
-    engine = AlertEngine(rules=snap.alerts.alerts, tracker=tracker)
+    engine = AlertEngine(
+        rules=snap.alerts.alerts,
+        tracker=tracker,
+        holdings=snap.holdings,
+    )
 
     feed = SinaFeed()
     calendar = MarketCalendar()
@@ -84,6 +89,14 @@ async def _amain() -> None:
                     snaps=snaps, engine=engine,
                     dispatcher=dispatcher, channels=cn_alert_channels,
                 )
+                # Portfolio-wide rules (using current snapshots map)
+                snaps_by_ticker = {s.ticker: s for s in snaps}
+                portfolio_verdicts = await engine.evaluate_portfolio(
+                    snaps_by_ticker=snaps_by_ticker
+                )
+                for v in portfolio_verdicts:
+                    msg = build_alert_message(v)
+                    await dispatcher.dispatch(msg, channels=cn_alert_channels)
         except Exception as e:
             log.warning("poll_iteration_failed", error=str(e))
         with contextlib.suppress(TimeoutError):
