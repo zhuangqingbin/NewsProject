@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
-import requests  # type: ignore[import-untyped]
+import requests
 
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.common.contracts import EnrichedNews, RawArticle

@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from news_pipeline.common.enums import Market  # NOTE: Market moves to shared in R4
+from shared.common.enums import Market
 
 
 class _Base(BaseModel):
