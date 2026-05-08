@@ -1,0 +1,16 @@
+# config/alerts.yml — sample threshold rules
+alerts:
+  - id: maotai_drop_3pct
+    kind: threshold
+    ticker: "600519"
+    name: 贵州茅台
+    expr: "pct_change_intraday <= -3.0"
+    cooldown_min: 30
+    severity: warning
+
+  - id: catl_volume_spike
+    kind: threshold
+    ticker: "300750"
+    name: 宁德时代
+    expr: "volume_ratio >= 2.0"
+    cooldown_min: 60

@@ -20,6 +20,7 @@ from news_pipeline.config.schema import (
     SourcesFile,
     WatchlistFile,
 )
+from quote_watcher.alerts.rule import AlertsFile
 from shared.observability.log import get_logger
 
 log = get_logger(__name__)
@@ -33,6 +34,7 @@ class ConfigSnapshot:
     sources: SourcesFile
     secrets: SecretsFile
     quote_watchlist: QuoteWatchlistFile
+    alerts: AlertsFile
 
 
 class _Handler(FileSystemEventHandler):
@@ -63,6 +65,14 @@ class ConfigLoader:
             if qw_path.exists()
             else QuoteWatchlistFile()
         )
+        alerts_path = self._dir / "alerts.yml"
+        alerts = (
+            AlertsFile.model_validate(
+                yaml.safe_load(alerts_path.read_text(encoding="utf-8")) or {}
+            )
+            if alerts_path.exists()
+            else AlertsFile()
+        )
         return ConfigSnapshot(
             app=AppConfig.model_validate(self._read("app.yml")),
             watchlist=WatchlistFile.model_validate(self._read("watchlist.yml")),
@@ -70,6 +80,7 @@ class ConfigLoader:
             sources=SourcesFile.model_validate(self._read("sources.yml")),
             secrets=SecretsFile.model_validate(self._read("secrets.yml")),
             quote_watchlist=quote_watchlist,
+            alerts=alerts,
         )
 
     def _read(self, name: str) -> dict[str, object]:
