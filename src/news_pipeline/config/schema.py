@@ -273,3 +273,30 @@ class QuoteWatchlistFile(_Base):
                     raise ValueError(f"duplicate ticker {e.ticker} in {market_attr}")
                 seen.add(e.ticker)
         return self
+
+
+# --- holdings.yml ---
+class HoldingEntry(_Base):
+    ticker: str
+    name: str | None = None
+    qty: int = Field(gt=0)
+    cost_per_share: float = Field(gt=0)
+
+
+class PortfolioCfg(_Base):
+    total_capital: float | None = None
+    base_currency: str = "CNY"
+
+
+class HoldingsFile(_Base):
+    holdings: list[HoldingEntry] = Field(default_factory=list)
+    portfolio: PortfolioCfg = Field(default_factory=PortfolioCfg)
+
+    @model_validator(mode="after")
+    def _unique_holdings(self) -> "HoldingsFile":
+        seen: set[str] = set()
+        for h in self.holdings:
+            if h.ticker in seen:
+                raise ValueError(f"duplicate holding: {h.ticker}")
+            seen.add(h.ticker)
+        return self

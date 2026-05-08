@@ -1,0 +1,14 @@
+# config/holdings.yml — sample portfolio
+holdings:
+  - ticker: "600519"
+    name: 贵州茅台
+    qty: 100
+    cost_per_share: 1850.0
+  - ticker: "300750"
+    name: 宁德时代
+    qty: 200
+    cost_per_share: 220.0
+
+portfolio:
+  total_capital: 200000
+  base_currency: CNY

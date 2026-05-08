@@ -4,7 +4,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,7 @@ from watchdog.observers import Observer
 from news_pipeline.config.schema import (
     AppConfig,
     ChannelsFile,
+    HoldingsFile,
     QuoteWatchlistFile,
     SecretsFile,
     SourcesFile,
@@ -35,6 +36,7 @@ class ConfigSnapshot:
     secrets: SecretsFile
     quote_watchlist: QuoteWatchlistFile
     alerts: AlertsFile
+    holdings: HoldingsFile = field(default_factory=HoldingsFile)
 
 
 class _Handler(FileSystemEventHandler):
@@ -73,6 +75,14 @@ class ConfigLoader:
             if alerts_path.exists()
             else AlertsFile()
         )
+        holdings_path = self._dir / "holdings.yml"
+        holdings = (
+            HoldingsFile.model_validate(
+                yaml.safe_load(holdings_path.read_text(encoding="utf-8")) or {}
+            )
+            if holdings_path.exists()
+            else HoldingsFile()
+        )
         return ConfigSnapshot(
             app=AppConfig.model_validate(self._read("app.yml")),
             watchlist=WatchlistFile.model_validate(self._read("watchlist.yml")),
@@ -81,6 +91,7 @@ class ConfigLoader:
             secrets=SecretsFile.model_validate(self._read("secrets.yml")),
             quote_watchlist=quote_watchlist,
             alerts=alerts,
+            holdings=holdings,
         )
 
     def _read(self, name: str) -> dict[str, object]:
