@@ -5,7 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from news_pipeline.observability.log import get_logger
+from shared.observability.log import get_logger
 
 log = get_logger(__name__)
 

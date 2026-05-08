@@ -242,3 +242,61 @@ class SecretsFile(_Base):
     oss: dict[str, str] = Field(default_factory=dict)
     sources: dict[str, str] = Field(default_factory=dict)
     alert: dict[str, str] = Field(default_factory=dict)
+
+
+# --- quote_watchlist.yml ---
+class QuoteTickerEntry(_Base):
+    ticker: str
+    name: str
+    market: Literal["SH", "SZ", "BJ"]
+
+
+class MarketScansCfg(_Base):
+    top_gainers_n: int = 50
+    top_losers_n: int = 50
+    top_volume_ratio_n: int = 50
+    push_top_n: int = 5
+    only_when_score_above: float = 8.0
+
+
+class QuoteWatchlistFile(_Base):
+    cn: list[QuoteTickerEntry] = Field(default_factory=list)
+    us: list[QuoteTickerEntry] = Field(default_factory=list)
+    market_scans: dict[str, MarketScansCfg] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _tickers_unique(self) -> "QuoteWatchlistFile":
+        for market_attr in ("cn", "us"):
+            seen: set[str] = set()
+            for e in getattr(self, market_attr):
+                if e.ticker in seen:
+                    raise ValueError(f"duplicate ticker {e.ticker} in {market_attr}")
+                seen.add(e.ticker)
+        return self
+
+
+# --- holdings.yml ---
+class HoldingEntry(_Base):
+    ticker: str
+    name: str | None = None
+    qty: int = Field(gt=0)
+    cost_per_share: float = Field(gt=0)
+
+
+class PortfolioCfg(_Base):
+    total_capital: float | None = None
+    base_currency: str = "CNY"
+
+
+class HoldingsFile(_Base):
+    holdings: list[HoldingEntry] = Field(default_factory=list)
+    portfolio: PortfolioCfg = Field(default_factory=PortfolioCfg)
+
+    @model_validator(mode="after")
+    def _unique_holdings(self) -> "HoldingsFile":
+        seen: set[str] = set()
+        for h in self.holdings:
+            if h.ticker in seen:
+                raise ValueError(f"duplicate holding: {h.ticker}")
+            seen.add(h.ticker)
+        return self

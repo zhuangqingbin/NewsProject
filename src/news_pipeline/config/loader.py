@@ -4,7 +4,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -15,11 +15,14 @@ from watchdog.observers import Observer
 from news_pipeline.config.schema import (
     AppConfig,
     ChannelsFile,
+    HoldingsFile,
+    QuoteWatchlistFile,
     SecretsFile,
     SourcesFile,
     WatchlistFile,
 )
-from news_pipeline.observability.log import get_logger
+from quote_watcher.alerts.rule import AlertsFile
+from shared.observability.log import get_logger
 
 log = get_logger(__name__)
 
@@ -31,6 +34,9 @@ class ConfigSnapshot:
     channels: ChannelsFile
     sources: SourcesFile
     secrets: SecretsFile
+    quote_watchlist: QuoteWatchlistFile
+    alerts: AlertsFile
+    holdings: HoldingsFile = field(default_factory=HoldingsFile)
 
 
 class _Handler(FileSystemEventHandler):
@@ -53,12 +59,39 @@ class ConfigLoader:
         self._callback: Callable[[ConfigSnapshot], None] | None = None
 
     def load(self) -> ConfigSnapshot:
+        qw_path = self._dir / "quote_watchlist.yml"
+        quote_watchlist = (
+            QuoteWatchlistFile.model_validate(
+                yaml.safe_load(qw_path.read_text(encoding="utf-8")) or {}
+            )
+            if qw_path.exists()
+            else QuoteWatchlistFile()
+        )
+        alerts_path = self._dir / "alerts.yml"
+        alerts = (
+            AlertsFile.model_validate(
+                yaml.safe_load(alerts_path.read_text(encoding="utf-8")) or {}
+            )
+            if alerts_path.exists()
+            else AlertsFile()
+        )
+        holdings_path = self._dir / "holdings.yml"
+        holdings = (
+            HoldingsFile.model_validate(
+                yaml.safe_load(holdings_path.read_text(encoding="utf-8")) or {}
+            )
+            if holdings_path.exists()
+            else HoldingsFile()
+        )
         return ConfigSnapshot(
             app=AppConfig.model_validate(self._read("app.yml")),
             watchlist=WatchlistFile.model_validate(self._read("watchlist.yml")),
             channels=ChannelsFile.model_validate(self._read("channels.yml")),
             sources=SourcesFile.model_validate(self._read("sources.yml")),
             secrets=SecretsFile.model_validate(self._read("secrets.yml")),
+            quote_watchlist=quote_watchlist,
+            alerts=alerts,
+            holdings=holdings,
         )
 
     def _read(self, name: str) -> dict[str, object]:

@@ -11,7 +11,7 @@ from news_pipeline.common.timeutil import utc_now
 from news_pipeline.llm.clients.base import TokenUsage
 
 if TYPE_CHECKING:
-    from news_pipeline.observability.alert import BarkAlerter
+    from shared.observability.alert import BarkAlerter
 
 
 @dataclass(frozen=True)
@@ -66,7 +66,7 @@ class CostTracker:
         - C-3: If cost >= ceiling → Bark urgent + raise CostCeilingExceeded
         - C-2: If cost >= 80% of ceiling → Bark warn (once per day)
         """
-        from news_pipeline.observability.alert import AlertLevel
+        from shared.observability.alert import AlertLevel
 
         today_cost = self.today_cost_cny()
         today_key = utc_now().date().isoformat()

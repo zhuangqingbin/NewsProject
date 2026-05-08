@@ -5,9 +5,6 @@ import pytest
 from pydantic import ValidationError
 
 from news_pipeline.common.contracts import (
-    Badge,
-    CommonMessage,
-    Deeplink,
     DispatchPlan,
     EnrichedNews,
     Entity,
@@ -23,6 +20,7 @@ from news_pipeline.common.enums import (
     Predicate,
     Sentiment,
 )
+from shared.common.contracts import Badge, CommonMessage, Deeplink
 
 
 def _now() -> datetime:

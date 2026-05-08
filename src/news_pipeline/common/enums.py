@@ -1,10 +1,22 @@
 # src/news_pipeline/common/enums.py
 from enum import StrEnum
 
+from shared.common.enums import Market  # re-exported for backwards compat (R4)
 
-class Market(StrEnum):
-    US = "us"
-    CN = "cn"
+__all__ = [
+    "EntityType",
+    "EventType",
+    "Magnitude",
+    "Market",
+    "Predicate",
+    "Sentiment",
+    "safe_entity_type",
+    "safe_event_type",
+    "safe_magnitude",
+    "safe_market",
+    "safe_predicate",
+    "safe_sentiment",
+]
 
 
 class Sentiment(StrEnum):
