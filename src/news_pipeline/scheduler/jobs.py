@@ -11,8 +11,6 @@ from news_pipeline.common.exceptions import AntiCrawlError
 from news_pipeline.common.timeutil import ensure_utc, to_market_local, utc_now
 from news_pipeline.dedup.dedup import Dedup
 from news_pipeline.llm.pipeline import LLMPipeline
-from news_pipeline.observability.alert import AlertLevel, BarkAlerter
-from news_pipeline.observability.log import get_logger
 from news_pipeline.router.routes import DispatchRouter
 from news_pipeline.rules.engine import RulesEngine
 from news_pipeline.rules.verdict import RulesVerdict
@@ -23,6 +21,8 @@ from news_pipeline.storage.dao.news_processed import NewsProcessedDAO
 from news_pipeline.storage.dao.push_log import PushLogDAO
 from news_pipeline.storage.dao.raw_news import RawNewsDAO
 from news_pipeline.storage.dao.source_state import SourceStateDAO
+from shared.observability.alert import AlertLevel, BarkAlerter
+from shared.observability.log import get_logger
 from shared.push.common.burst import BurstSuppressor
 from shared.push.common.message_builder import MessageBuilder
 from shared.push.dispatcher import PusherDispatcher

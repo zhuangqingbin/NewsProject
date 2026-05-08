@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 import httpx
 
-from news_pipeline.observability.log import get_logger
+from shared.observability.log import get_logger
 
 log = get_logger(__name__)
 

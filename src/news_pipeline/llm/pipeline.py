@@ -9,7 +9,7 @@ from news_pipeline.llm.extractors import (
     Tier2DeepExtractor,
 )
 from news_pipeline.llm.router import LLMRouter
-from news_pipeline.observability.log import get_logger
+from shared.observability.log import get_logger
 
 if TYPE_CHECKING:
     from news_pipeline.rules.verdict import RulesVerdict

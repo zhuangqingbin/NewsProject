@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from news_pipeline.observability.weekly_report import build_weekly_report
+from shared.observability.weekly_report import build_weekly_report
 
 
 @pytest.mark.asyncio

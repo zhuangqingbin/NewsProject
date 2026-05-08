@@ -172,7 +172,7 @@ async def test_structural_keyerror_triggers_bark_urgent():
     bark.send.assert_awaited_once()
     # Verify the alert level is URGENT
     call_kwargs = bark.send.call_args
-    from news_pipeline.observability.alert import AlertLevel
+    from shared.observability.alert import AlertLevel
 
     assert call_kwargs.kwargs.get("level") == AlertLevel.URGENT or (
         len(call_kwargs.args) >= 3 and call_kwargs.args[2] == AlertLevel.URGENT

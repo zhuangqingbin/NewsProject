@@ -1,7 +1,7 @@
 # tests/unit/observability/test_log.py
 import json
 
-from news_pipeline.observability.log import configure_logging, get_logger
+from shared.observability.log import configure_logging, get_logger
 
 
 def test_configure_logging_emits_json(capsys):

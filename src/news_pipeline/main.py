@@ -25,9 +25,6 @@ from news_pipeline.llm.extractors import (
 from news_pipeline.llm.pipeline import LLMPipeline
 from news_pipeline.llm.prompts.loader import PromptLoader
 from news_pipeline.llm.router import LLMRouter
-from news_pipeline.observability.alert import AlertLevel, BarkAlerter
-from news_pipeline.observability.log import configure_logging, get_logger
-from news_pipeline.observability.weekly_report import build_dlq_summary
 from news_pipeline.router.routes import DispatchRouter
 from news_pipeline.rules.engine import RulesEngine
 from news_pipeline.rules.matcher import build_matcher
@@ -48,6 +45,9 @@ from news_pipeline.storage.dao.push_log import PushLogDAO
 from news_pipeline.storage.dao.raw_news import RawNewsDAO
 from news_pipeline.storage.dao.source_state import SourceStateDAO
 from news_pipeline.storage.db import Database
+from shared.observability.alert import AlertLevel, BarkAlerter
+from shared.observability.log import configure_logging, get_logger
+from shared.observability.weekly_report import build_dlq_summary
 from shared.push.common.burst import BurstSuppressor
 from shared.push.common.message_builder import MessageBuilder
 from shared.push.dispatcher import PusherDispatcher

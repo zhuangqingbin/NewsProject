@@ -3,7 +3,7 @@ import pytest
 import respx
 from httpx import Response
 
-from news_pipeline.observability.alert import AlertLevel, BarkAlerter
+from shared.observability.alert import AlertLevel, BarkAlerter
 
 
 @pytest.mark.asyncio
@@ -30,7 +30,7 @@ async def test_throttle_blocks_repeated_alerts(monkeypatch):
         return v
 
     monkeypatch.setattr(
-        "news_pipeline.observability.alert.time.monotonic",
+        "shared.observability.alert.time.monotonic",
         _monotonic,
     )
     async with respx.mock() as mock:
