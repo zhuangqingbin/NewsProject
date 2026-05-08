@@ -1,4 +1,4 @@
-"""Quote watcher entry point. Phase 1 = poll-only (no alerts yet)."""
+"""Quote watcher entry point."""
 from __future__ import annotations
 
 import asyncio
@@ -10,12 +10,17 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from news_pipeline.config.loader import ConfigLoader
+from quote_watcher.alerts.engine import AlertEngine
 from quote_watcher.feeds.calendar import MarketCalendar
 from quote_watcher.feeds.sina import SinaFeed
-from quote_watcher.scheduler.jobs import poll_quotes
+from quote_watcher.scheduler.jobs import evaluate_alerts, poll_quotes
+from quote_watcher.state.tracker import StateTracker
+from quote_watcher.storage.dao.alert_state import AlertStateDAO
 from quote_watcher.storage.db import QuoteDatabase
 from quote_watcher.store.tick import TickRing
 from shared.observability.log import configure_logging, get_logger
+from shared.push.dispatcher import PusherDispatcher
+from shared.push.factory import build_pushers
 
 BJ = ZoneInfo("Asia/Shanghai")
 log = get_logger(__name__)
@@ -34,6 +39,16 @@ async def _amain() -> None:
     db = QuoteDatabase(f"sqlite+aiosqlite:///{db_path}")
     await db.initialize()
 
+    pushers = build_pushers(snap.channels, snap.secrets)
+    dispatcher = PusherDispatcher(pushers)
+    cn_alert_channels = [
+        c for c, ch in snap.channels.channels.items()
+        if ch.market == "cn" and ch.enabled
+    ]
+
+    tracker = StateTracker(dao=AlertStateDAO(db))
+    engine = AlertEngine(rules=snap.alerts.alerts, tracker=tracker)
+
     feed = SinaFeed()
     calendar = MarketCalendar()
     ring = TickRing(max_per_ticker=1000)
@@ -41,7 +56,13 @@ async def _amain() -> None:
     tickers: list[tuple[str, str]] = [
         (e.market, e.ticker) for e in snap.quote_watchlist.cn
     ]
-    log.info("quote_watcher_starting", tickers=len(tickers), poll_sec=poll_interval_sec)
+    log.info(
+        "quote_watcher_starting",
+        tickers=len(tickers),
+        poll_sec=poll_interval_sec,
+        alert_rules=len(snap.alerts.alerts),
+        cn_channels=cn_alert_channels,
+    )
 
     stop = asyncio.Event()
 
@@ -54,10 +75,15 @@ async def _amain() -> None:
 
     while not stop.is_set():
         try:
-            await poll_quotes(
+            snaps = await poll_quotes(
                 feed=feed, calendar=calendar, ring=ring, tickers=tickers,
                 now=datetime.now(BJ),
             )
+            if snaps:
+                await evaluate_alerts(
+                    snaps=snaps, engine=engine,
+                    dispatcher=dispatcher, channels=cn_alert_channels,
+                )
         except Exception as e:
             log.warning("poll_iteration_failed", error=str(e))
         with contextlib.suppress(TimeoutError):

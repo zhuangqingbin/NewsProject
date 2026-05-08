@@ -18,12 +18,12 @@ async def test_poll_quotes_skips_when_market_closed():
     cal = MarketCalendar()
     ring = TickRing()
     closed_dt = datetime(2026, 5, 9, 10, 0, tzinfo=BJ)  # Saturday
-    n = await poll_quotes(
+    snaps = await poll_quotes(
         feed=feed, calendar=cal, ring=ring,
         tickers=[("SH", "600519")],
         now=closed_dt,
     )
-    assert n == 0
+    assert len(snaps) == 0
     feed.fetch.assert_not_called()
 
 
@@ -41,12 +41,12 @@ async def test_poll_quotes_appends_to_ring():
     ring = TickRing()
 
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)  # Friday morning
-    n = await poll_quotes(
+    snaps = await poll_quotes(
         feed=feed, calendar=cal, ring=ring,
         tickers=[("SH", "600519")],
         now=open_dt,
     )
-    assert n == 1
+    assert len(snaps) == 1
     assert ring.latest("600519").price == 1789.5
     feed.fetch.assert_awaited_once_with([("SH", "600519")])
 
@@ -57,10 +57,10 @@ async def test_poll_quotes_handles_empty_response():
     feed.fetch.return_value = []
     cal = MarketCalendar()
     ring = TickRing()
-    n = await poll_quotes(
+    snaps = await poll_quotes(
         feed=feed, calendar=cal, ring=ring,
         tickers=[("SH", "600519")],
         now=datetime(2026, 5, 8, 10, 0, tzinfo=BJ),
     )
-    assert n == 0
+    assert len(snaps) == 0
     assert ring.size("600519") == 0
