@@ -2,8 +2,8 @@
 import httpx
 
 from news_pipeline.common.contracts import CommonMessage
-from news_pipeline.pushers.base import SendResult
-from news_pipeline.pushers.common.retry import async_retry
+from shared.push.base import SendResult
+from shared.push.common.retry import async_retry
 
 
 class WecomPusher:

@@ -11,7 +11,7 @@ from news_pipeline.common.contracts import (
     Deeplink,
 )
 from news_pipeline.common.enums import Market
-from news_pipeline.pushers.feishu import FeishuPusher
+from shared.push.feishu import FeishuPusher
 
 
 def _msg() -> CommonMessage:

@@ -1,7 +1,7 @@
 # tests/unit/pushers/test_retry.py
 import pytest
 
-from news_pipeline.pushers.common.retry import async_retry
+from shared.push.common.retry import async_retry
 
 
 @pytest.mark.asyncio

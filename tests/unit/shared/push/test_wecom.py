@@ -7,7 +7,7 @@ from httpx import Response
 
 from news_pipeline.common.contracts import Badge, CommonMessage, Deeplink
 from news_pipeline.common.enums import Market
-from news_pipeline.pushers.wecom import WecomPusher
+from shared.push.wecom import WecomPusher
 
 
 def _msg() -> CommonMessage:

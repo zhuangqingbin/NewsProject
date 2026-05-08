@@ -19,7 +19,7 @@ import hashlib
 import hmac
 from base64 import b64encode
 
-from news_pipeline.pushers.feishu import FeishuPusher
+from shared.push.feishu import FeishuPusher
 
 # Known test vector
 _TIMESTAMP = "1714012800"

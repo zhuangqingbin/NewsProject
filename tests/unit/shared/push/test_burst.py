@@ -1,7 +1,7 @@
 # tests/unit/pushers/test_burst.py
 import time
 
-from news_pipeline.pushers.common.burst import BurstSuppressor
+from shared.push.common.burst import BurstSuppressor
 
 
 def test_below_threshold_passes(monkeypatch):

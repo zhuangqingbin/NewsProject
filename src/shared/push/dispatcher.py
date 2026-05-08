@@ -2,7 +2,7 @@
 import asyncio
 
 from news_pipeline.common.contracts import CommonMessage
-from news_pipeline.pushers.base import PusherProtocol, SendResult
+from shared.push.base import PusherProtocol, SendResult
 
 
 class PusherDispatcher:

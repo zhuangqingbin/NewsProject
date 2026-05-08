@@ -5,8 +5,8 @@ import pytest
 
 from news_pipeline.common.contracts import CommonMessage
 from news_pipeline.common.enums import Market
-from news_pipeline.pushers.base import SendResult
-from news_pipeline.pushers.dispatcher import PusherDispatcher
+from shared.push.base import SendResult
+from shared.push.dispatcher import PusherDispatcher
 
 
 def _msg() -> CommonMessage:

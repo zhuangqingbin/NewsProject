@@ -28,10 +28,6 @@ from news_pipeline.llm.router import LLMRouter
 from news_pipeline.observability.alert import AlertLevel, BarkAlerter
 from news_pipeline.observability.log import configure_logging, get_logger
 from news_pipeline.observability.weekly_report import build_dlq_summary
-from news_pipeline.pushers.common.burst import BurstSuppressor
-from news_pipeline.pushers.common.message_builder import MessageBuilder
-from news_pipeline.pushers.dispatcher import PusherDispatcher
-from news_pipeline.pushers.factory import build_pushers
 from news_pipeline.router.routes import DispatchRouter
 from news_pipeline.rules.engine import RulesEngine
 from news_pipeline.rules.matcher import build_matcher
@@ -52,6 +48,10 @@ from news_pipeline.storage.dao.push_log import PushLogDAO
 from news_pipeline.storage.dao.raw_news import RawNewsDAO
 from news_pipeline.storage.dao.source_state import SourceStateDAO
 from news_pipeline.storage.db import Database
+from shared.push.common.burst import BurstSuppressor
+from shared.push.common.message_builder import MessageBuilder
+from shared.push.dispatcher import PusherDispatcher
+from shared.push.factory import build_pushers
 
 PRICING = {
     "deepseek-v3": ModelPricing(input_per_m_cny=0.5, output_per_m_cny=1.5),

@@ -1,8 +1,8 @@
 # src/news_pipeline/pushers/factory.py
 from news_pipeline.config.schema import ChannelsFile, SecretsFile
-from news_pipeline.pushers.base import PusherProtocol
-from news_pipeline.pushers.feishu import FeishuPusher
-from news_pipeline.pushers.wecom import WecomPusher
+from shared.push.base import PusherProtocol
+from shared.push.feishu import FeishuPusher
+from shared.push.wecom import WecomPusher
 
 
 def build_pushers(

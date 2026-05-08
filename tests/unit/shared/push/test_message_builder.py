@@ -3,7 +3,7 @@ from datetime import datetime
 
 from news_pipeline.common.contracts import EnrichedNews, RawArticle, ScoredNews
 from news_pipeline.common.enums import EventType, Magnitude, Market, Sentiment
-from news_pipeline.pushers.common.message_builder import MessageBuilder
+from shared.push.common.message_builder import MessageBuilder
 
 
 def _make() -> tuple[RawArticle, ScoredNews]:
