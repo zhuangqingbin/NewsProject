@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from news_pipeline.common.contracts import CommonMessage
 from news_pipeline.common.enums import Market
+from shared.common.contracts import CommonMessage
 from shared.push.base import SendResult
 from shared.push.dispatcher import PusherDispatcher
 

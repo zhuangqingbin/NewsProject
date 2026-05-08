@@ -5,8 +5,8 @@ import pytest
 import respx
 from httpx import Response
 
-from news_pipeline.common.contracts import Badge, CommonMessage, Deeplink
 from news_pipeline.common.enums import Market
+from shared.common.contracts import Badge, CommonMessage, Deeplink
 from shared.push.wecom import WecomPusher
 
 

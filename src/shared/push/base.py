@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from news_pipeline.common.contracts import CommonMessage
+from shared.common.contracts import CommonMessage
 
 
 @dataclass

@@ -1,7 +1,7 @@
 # src/news_pipeline/pushers/dispatcher.py
 import asyncio
 
-from news_pipeline.common.contracts import CommonMessage
+from shared.common.contracts import CommonMessage
 from shared.push.base import PusherProtocol, SendResult
 
 

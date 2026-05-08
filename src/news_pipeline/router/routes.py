@@ -1,5 +1,6 @@
 # src/news_pipeline/router/routes.py
-from news_pipeline.common.contracts import CommonMessage, DispatchPlan, ScoredNews
+from news_pipeline.common.contracts import DispatchPlan, ScoredNews
+from shared.common.contracts import CommonMessage
 
 
 class DispatchRouter:

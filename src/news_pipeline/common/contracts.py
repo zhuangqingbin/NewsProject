@@ -12,6 +12,7 @@ from news_pipeline.common.enums import (
     Predicate,
     Sentiment,
 )
+from shared.common.contracts import CommonMessage
 
 
 class _Base(BaseModel):
@@ -68,39 +69,6 @@ class ScoredNews(_Base):
     is_critical: bool
     rule_hits: list[str] = Field(default_factory=list)
     llm_reason: str | None = None
-
-
-class Badge(_Base):
-    text: str
-    color: str = "gray"  # gray|green|red|yellow|blue
-
-
-class Deeplink(_Base):
-    label: str
-    url: HttpUrl
-
-
-class DigestItem(_Base):
-    """One bullet inside a digest message — a clickable source label + summary."""
-
-    source_label: str
-    url: HttpUrl
-    summary: str
-
-
-class CommonMessage(_Base):
-    title: str
-    summary: str
-    source_label: str
-    source_url: HttpUrl
-    badges: list[Badge]
-    chart_url: HttpUrl | None  # deprecated: prefer chart_image
-    # PNG bytes for inline embedding (TG sendPhoto / Feishu img_key)
-    chart_image: bytes | None = None
-    deeplinks: list[Deeplink]
-    market: Market
-    # Non-empty for digest messages: each item rendered as `[label](url) summary`.
-    digest_items: list[DigestItem] = Field(default_factory=list)
 
 
 class DispatchPlan(_Base):

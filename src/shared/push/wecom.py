@@ -1,7 +1,7 @@
 # src/news_pipeline/pushers/wecom.py
 import httpx
 
-from news_pipeline.common.contracts import CommonMessage
+from shared.common.contracts import CommonMessage
 from shared.push.base import SendResult
 from shared.push.common.retry import async_retry
 

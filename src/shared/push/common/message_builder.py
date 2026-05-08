@@ -1,13 +1,8 @@
 # src/news_pipeline/pushers/common/message_builder.py
-from news_pipeline.common.contracts import (
-    Badge,
-    CommonMessage,
-    Deeplink,
-    RawArticle,
-    ScoredNews,
-)
+from news_pipeline.common.contracts import RawArticle, ScoredNews
 from news_pipeline.common.enums import Market, Sentiment
 from news_pipeline.rules.verdict import RulesVerdict
+from shared.common.contracts import Badge, CommonMessage, Deeplink
 
 _SENTIMENT_COLOR = {
     Sentiment.BULLISH: "green",

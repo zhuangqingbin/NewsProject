@@ -417,12 +417,8 @@ async def _digest_job_runner(
     msg_builder: MessageBuilder,
     dispatcher: PusherDispatcher,
 ) -> int:
-    from news_pipeline.common.contracts import (
-        Badge,
-        CommonMessage,
-        DigestItem,
-    )
     from news_pipeline.common.enums import Market as _Market
+    from shared.common.contracts import Badge, CommonMessage, DigestItem
 
     title = _DIGEST_TITLE.get(market, market)
 
