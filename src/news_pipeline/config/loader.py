@@ -15,6 +15,7 @@ from watchdog.observers import Observer
 from news_pipeline.config.schema import (
     AppConfig,
     ChannelsFile,
+    QuoteWatchlistFile,
     SecretsFile,
     SourcesFile,
     WatchlistFile,
@@ -31,6 +32,7 @@ class ConfigSnapshot:
     channels: ChannelsFile
     sources: SourcesFile
     secrets: SecretsFile
+    quote_watchlist: QuoteWatchlistFile
 
 
 class _Handler(FileSystemEventHandler):
@@ -53,12 +55,21 @@ class ConfigLoader:
         self._callback: Callable[[ConfigSnapshot], None] | None = None
 
     def load(self) -> ConfigSnapshot:
+        qw_path = self._dir / "quote_watchlist.yml"
+        quote_watchlist = (
+            QuoteWatchlistFile.model_validate(
+                yaml.safe_load(qw_path.read_text(encoding="utf-8")) or {}
+            )
+            if qw_path.exists()
+            else QuoteWatchlistFile()
+        )
         return ConfigSnapshot(
             app=AppConfig.model_validate(self._read("app.yml")),
             watchlist=WatchlistFile.model_validate(self._read("watchlist.yml")),
             channels=ChannelsFile.model_validate(self._read("channels.yml")),
             sources=SourcesFile.model_validate(self._read("sources.yml")),
             secrets=SecretsFile.model_validate(self._read("secrets.yml")),
+            quote_watchlist=quote_watchlist,
         )
 
     def _read(self, name: str) -> dict[str, object]:

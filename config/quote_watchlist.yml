@@ -1,0 +1,19 @@
+# config/quote_watchlist.yml
+cn:
+  - ticker: "600519"
+    name: 贵州茅台
+    market: SH
+  - ticker: "300750"
+    name: 宁德时代
+    market: SZ
+  - ticker: "002594"
+    name: 比亚迪
+    market: SZ
+us: []
+market_scans:
+  cn:
+    top_gainers_n: 50
+    top_losers_n: 50
+    top_volume_ratio_n: 50
+    push_top_n: 5
+    only_when_score_above: 8.0
