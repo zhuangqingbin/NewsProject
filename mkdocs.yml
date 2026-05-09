@@ -1,5 +1,5 @@
-site_name: "News Pipeline"
-site_description: "Financial news scraper → LLM pipeline → multi-platform pusher"
+site_name: "NewsProject"
+site_description: "Financial news scraper → LLM pipeline → multi-platform pusher; quote watcher & alert engine"
 site_author: "qingbin"
 docs_dir: docs
 site_dir: site
@@ -68,6 +68,13 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - 入门:
+    - 整体架构: architecture.md
+    - news_pipeline 子系统: subsystems/news_pipeline.md
+    - quote_watcher 子系统: subsystems/quote_watcher.md
+    - shared 共用层: subsystems/shared.md
+  - Quote Watcher:
+    - Getting Started: quote_watcher/getting_started.md
   - Getting Started:
     - Overview: getting-started/overview.md
     - Architecture: getting-started/architecture.md
