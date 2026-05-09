@@ -14,3 +14,16 @@ alerts:
     name: 宁德时代
     expr: "volume_ratio >= 2.0"
     cooldown_min: 60
+
+  # === Indicator rules (commented out — uncomment to enable; needs daily K data) ===
+  # - id: maotai_ma_breakout
+  #   kind: indicator
+  #   ticker: "600519"
+  #   expr: "ma5 > ma20"
+  #   cooldown_min: 1440
+  #
+  # - id: catl_rsi_oversold
+  #   kind: indicator
+  #   ticker: "300750"
+  #   expr: "rsi(14) < 25"
+  #   cooldown_min: 240
