@@ -10,11 +10,13 @@ from quote_watcher.alerts.context import (
     build_composite_holding_context,
     build_composite_portfolio_context,
     build_indicator_context,
+    build_sector_context,
     build_threshold_context,
 )
 from quote_watcher.alerts.rule import AlertKind, AlertRule
 from quote_watcher.alerts.verdict import AlertVerdict
 from quote_watcher.feeds.base import QuoteSnapshot
+from quote_watcher.feeds.sector import SectorSnapshot
 from quote_watcher.state.tracker import StateTracker
 from shared.observability.log import get_logger
 
@@ -150,6 +152,53 @@ class AlertEngine:
             )
             out.append(AlertVerdict(rule=rule, snapshot=any_snap, ctx_dump=dict(ctx)))
         return out
+
+    async def evaluate_sector(
+        self,
+        sector_snaps: dict[str, SectorSnapshot],
+    ) -> list[AlertVerdict]:
+        """Evaluate kind=EVENT + target_kind=sector rules."""
+        sector_rules = [
+            r for r in self._rules
+            if r.kind == AlertKind.EVENT
+            and r.target_kind == "sector"
+            and r.sector is not None
+        ]
+        if not sector_rules:
+            return []
+        out: list[AlertVerdict] = []
+        for rule in sector_rules:
+            assert rule.sector is not None  # safe: filtered above
+            sector_snap = sector_snaps.get(rule.sector)
+            if sector_snap is None:
+                continue
+            ctx = build_sector_context(rule.sector, sector_snap)
+            if not self._eval_expr(rule, ctx):
+                continue
+            cooldown_key = f"_sector:{rule.sector}"
+            if await self._tracker.is_in_cooldown(rule.id, cooldown_key, rule.cooldown_min):
+                await self._tracker.bump_count(rule.id, cooldown_key)
+                continue
+            await self._tracker.mark_triggered(
+                rule.id, cooldown_key, value=ctx.get("sector_pct_change"),
+            )
+            placeholder = self._sector_placeholder_snapshot(rule.sector, sector_snap)
+            out.append(AlertVerdict(rule=rule, snapshot=placeholder, ctx_dump=dict(ctx)))
+        return out
+
+    @staticmethod
+    def _sector_placeholder_snapshot(
+        sector: str, sector_snap: SectorSnapshot,
+    ) -> QuoteSnapshot:
+        """Synthetic snapshot for sector verdicts — emit code uses .ts and .name."""
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        return QuoteSnapshot(
+            ticker=f"sector:{sector}", market="SH", name=sector,
+            ts=datetime.now(ZoneInfo("Asia/Shanghai")),
+            price=0.0, open=0.0, high=0.0, low=0.0, prev_close=0.0,
+            volume=0, amount=0.0, bid1=0.0, ask1=0.0,
+        )
 
     async def _run_rules(
         self,
