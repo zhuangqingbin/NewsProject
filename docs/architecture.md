@@ -368,9 +368,9 @@ sqlite3 data/quotes.db "
 
 | 你想了解 | 读这里 |
 |---|---|
-| 新闻流水线完整配置 + 启动 + 排查 | [`src/news_pipeline/README.md`](../src/news_pipeline/README.md) |
-| 实时盯盘配置 + 4 类规则 + 排查 | [`src/quote_watcher/README.md`](../src/quote_watcher/README.md) |
-| 4 类规则详细字段参考 | [`docs/quote_watcher/getting_started.md`](quote_watcher/getting_started.md) |
-| 共用层(push/observability/common) | [`src/shared/README.md`](../src/shared/README.md) |
-| 系统设计决策(深入) | [`docs/superpowers/specs/`](superpowers/specs/) |
+| 新闻流水线完整配置 + 启动 + 排查 | [news_pipeline 子系统](subsystems/news_pipeline.md) |
+| 实时盯盘配置 + 4 类规则 + 排查 | [quote_watcher 子系统](subsystems/quote_watcher.md) |
+| 4 类规则详细字段参考 | [Quote Watcher Getting Started](quote_watcher/getting_started.md) |
+| 共用层(push/observability/common) | [shared 共用层](subsystems/shared.md) |
+| 系统设计决策(深入) | `docs/superpowers/specs/`(直接 git 树查看) |
 | 日常运维命令速查 | 顶层 `README.md` § 日常运维 |

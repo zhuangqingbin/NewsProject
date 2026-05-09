@@ -1,7 +1,7 @@
 # quote_watcher 子系统
 
 > 实时盯盘 + 规则告警：Sina 5s poll → AlertEngine → 飞书即时推送。
-> 架构全貌见 [`docs/architecture.md`](../../docs/architecture.md)。
+> 架构全貌见 `docs/architecture.md`(mkdocs 站内 nav 链 "整体架构")。
 
 ---
 
@@ -79,7 +79,7 @@ market_scans:
     only_when_score_above: 8.0  # 涨跌幅 ≥ 8% 或量比 ≥ 8 才推
 ```
 
-详细字段参考见 [`docs/quote_watcher/getting_started.md`](../../docs/quote_watcher/getting_started.md) § 1.1。
+详细字段参考见 `docs/quote_watcher/getting_started.md`(mkdocs 站内 nav 链 "Quote Watcher › Getting Started") § 1.1。
 
 ### 3.2 `config/alerts.yml`
 
@@ -98,7 +98,7 @@ alerts:
 
 **热加载**：直接编辑保存后，quote_watcher 自动检测并重载规则，无需重启。
 
-详细字段参考见 [`docs/quote_watcher/getting_started.md`](../../docs/quote_watcher/getting_started.md) § 1.2。
+详细字段参考见 `docs/quote_watcher/getting_started.md`(mkdocs 站内 nav 链 "Quote Watcher › Getting Started") § 1.2。
 
 ### 3.3 `config/holdings.yml`（可选）
 
@@ -116,7 +116,7 @@ portfolio:
   base_currency: CNY
 ```
 
-详细字段参考见 [`docs/quote_watcher/getting_started.md`](../../docs/quote_watcher/getting_started.md) § 1.3。
+详细字段参考见 `docs/quote_watcher/getting_started.md`(mkdocs 站内 nav 链 "Quote Watcher › Getting Started") § 1.3。
 
 ---
 
@@ -166,7 +166,7 @@ docker compose logs -f quote_watcher
 
 **indicator 额外变量**：`ma5/10/20/60/120` / `macd_dif/dea/hist` / `rsi(n)` / `cross_above(a,b)` / `highest_n_days(n)`
 
-完整变量列表见 [`docs/quote_watcher/getting_started.md`](../../docs/quote_watcher/getting_started.md) § 1.2。
+完整变量列表见 `docs/quote_watcher/getting_started.md`(mkdocs 站内 nav 链 "Quote Watcher › Getting Started") § 1.2。
 
 ---
 
@@ -204,7 +204,7 @@ docker compose exec quote_watcher uv run alembic -n quote upgrade head
 
 ## 7. 完整字段参考
 
-见 [`docs/quote_watcher/getting_started.md`](../../docs/quote_watcher/getting_started.md)，包含：
+见 `docs/quote_watcher/getting_started.md`(mkdocs 站内 nav 链 "Quote Watcher › Getting Started")，包含：
 - § 1 所有配置文件完整字段说明
 - § 2 启动详细步骤
 - § 3 preview_rules 调试说明

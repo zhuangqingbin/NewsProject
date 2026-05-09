@@ -1,7 +1,7 @@
 # news_pipeline 子系统
 
 > 财经新闻自动化流水线：抓取 → 去重 → 规则匹配 → LLM 分层摘要 → 推送到飞书。
-> 架构全貌见 [`docs/architecture.md`](../../docs/architecture.md)。
+> 架构全貌见 `docs/architecture.md`(mkdocs 站内 nav 链 "整体架构")。
 
 ---
 
