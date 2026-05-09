@@ -1,7 +1,7 @@
 """AlertEngine: evaluate alert rules against a QuoteSnapshot or portfolio."""
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import asteval
 
@@ -9,6 +9,7 @@ from news_pipeline.config.schema import HoldingsFile
 from quote_watcher.alerts.context import (
     build_composite_holding_context,
     build_composite_portfolio_context,
+    build_indicator_context,
     build_threshold_context,
 )
 from quote_watcher.alerts.rule import AlertKind, AlertRule
@@ -16,6 +17,9 @@ from quote_watcher.alerts.verdict import AlertVerdict
 from quote_watcher.feeds.base import QuoteSnapshot
 from quote_watcher.state.tracker import StateTracker
 from shared.observability.log import get_logger
+
+if TYPE_CHECKING:
+    from quote_watcher.store.kline import DailyKlineCache
 
 log = get_logger(__name__)
 
@@ -29,11 +33,13 @@ class AlertEngine:
         rules: list[AlertRule],
         tracker: StateTracker,
         holdings: HoldingsFile | None = None,
+        kline_cache: DailyKlineCache | None = None,
     ) -> None:
         self._rules = rules
         self._tracker = tracker
         self._holdings = holdings or HoldingsFile()
         self._holdings_by_ticker = {h.ticker: h for h in self._holdings.holdings}
+        self._kline_cache = kline_cache
 
     async def evaluate_for_snapshot(
         self,
@@ -76,6 +82,26 @@ class AlertEngine:
                     volume_avg5d=volume_avg5d, volume_avg20d=volume_avg20d,
                 )
                 out += await self._run_rules(composite_holding_rules, snap, ctx)
+
+        # 3) indicator rules for this ticker
+        indicator_rules = [
+            r for r in self._rules
+            if r.kind == AlertKind.INDICATOR and r.ticker == snap.ticker
+        ]
+        if indicator_rules:
+            if self._kline_cache is None:
+                log.warning(
+                    "indicator_rule_skipped_no_kline_cache",
+                    ticker=snap.ticker,
+                    rules=[r.id for r in indicator_rules],
+                )
+            else:
+                bars = await self._kline_cache.get_cached(snap.ticker, days=250)
+                ctx = build_indicator_context(
+                    snap, bars=bars,
+                    volume_avg5d=volume_avg5d, volume_avg20d=volume_avg20d,
+                )
+                out += await self._run_rules(indicator_rules, snap, ctx)
 
         return out
 
