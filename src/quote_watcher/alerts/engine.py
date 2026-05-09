@@ -103,6 +103,23 @@ class AlertEngine:
                 )
                 out += await self._run_rules(indicator_rules, snap, ctx)
 
+        # 4) event rules with target_kind=ticker (limit_up/down etc)
+        event_ticker_rules = [
+            r for r in self._rules
+            if r.kind == AlertKind.EVENT
+            and r.target_kind == "ticker"
+            and r.ticker == snap.ticker
+        ]
+        if event_ticker_rules:
+            ctx = build_threshold_context(
+                snap,
+                volume_avg5d=volume_avg5d,
+                volume_avg20d=volume_avg20d,
+                price_high_today_yday=price_high_today_yday,
+                price_low_today_yday=price_low_today_yday,
+            )
+            out += await self._run_rules(event_ticker_rules, snap, ctx)
+
         return out
 
     async def evaluate_portfolio(
