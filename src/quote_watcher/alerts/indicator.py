@@ -38,3 +38,26 @@ def lowest_n_days(closes: list[float], n: int) -> float | None:
     if n <= 0 or len(closes) < n:
         return None
     return min(closes[-n:])
+
+
+def rsi(closes: list[float], n: int = 14) -> float | None:
+    """Wilder's RSI(n). Returns None if not enough data."""
+    if n <= 0 or len(closes) < n + 1:
+        return None
+    gains: list[float] = []
+    losses: list[float] = []
+    for i in range(1, len(closes)):
+        diff = closes[i] - closes[i - 1]
+        gains.append(max(diff, 0.0))
+        losses.append(max(-diff, 0.0))
+    # Initial average over first n diffs
+    avg_gain = sum(gains[:n]) / n
+    avg_loss = sum(losses[:n]) / n
+    # Wilder smoothing for the rest
+    for i in range(n, len(gains)):
+        avg_gain = (avg_gain * (n - 1) + gains[i]) / n
+        avg_loss = (avg_loss * (n - 1) + losses[i]) / n
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100.0 - 100.0 / (1.0 + rs)
