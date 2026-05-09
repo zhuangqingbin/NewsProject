@@ -13,6 +13,7 @@ from quote_watcher.emit.scan_message import build_market_scan_message
 from quote_watcher.feeds.base import QuoteFeed, QuoteSnapshot
 from quote_watcher.feeds.calendar import MarketCalendar
 from quote_watcher.feeds.market_scan import MarketScanFeed
+from quote_watcher.feeds.sector import SectorFeed
 from quote_watcher.store.tick import TickRing
 from shared.observability.log import get_logger
 from shared.push.dispatcher import PusherDispatcher
@@ -95,3 +96,28 @@ async def scan_market(
     msg = build_market_scan_message(result, now=now_ts)
     await dispatcher.dispatch(msg, channels=channels)
     return 1
+
+
+async def evaluate_sector_alerts(
+    *,
+    feed: SectorFeed,
+    engine: AlertEngine,
+    calendar: MarketCalendar,
+    dispatcher: PusherDispatcher,
+    channels: list[str],
+    now: datetime | None = None,
+) -> int:
+    """Fetch sector data, evaluate sector EVENT rules, dispatch each verdict."""
+    if not channels:
+        return 0
+    now_ts = now or datetime.now(BJ)
+    if not calendar.is_open(now_ts):
+        return 0
+    sector_snaps = await feed.fetch_pct_changes()
+    if not sector_snaps:
+        return 0
+    verdicts = await engine.evaluate_sector(sector_snaps)
+    for v in verdicts:
+        msg = build_alert_message(v)
+        await dispatcher.dispatch(msg, channels=channels)
+    return len(verdicts)
