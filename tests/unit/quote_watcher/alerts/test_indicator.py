@@ -1,9 +1,11 @@
 from quote_watcher.alerts.indicator import (
+    MACDResult,
     cross_above,
     cross_below,
     highest_n_days,
     lowest_n_days,
     ma,
+    macd,
     rsi,
 )
 
@@ -96,3 +98,47 @@ def test_rsi_overbought_oversold_thresholds():
     val = rsi(closes, 14)
     assert val is not None
     assert 0.0 <= val <= 100.0
+
+
+def test_macd_insufficient_data():
+    assert macd([1.0] * 10) is None
+    assert macd([], 12, 26, 9) is None
+
+
+def test_macd_returns_dataclass():
+    closes = [100.0 + i * 0.5 for i in range(60)]  # gentle uptrend
+    result = macd(closes)
+    assert isinstance(result, MACDResult)
+    assert result.dif is not None
+    assert result.dea is not None
+    assert result.hist is not None
+
+
+def test_macd_uptrend_positive_dif():
+    """In a strong uptrend, dif (fast - slow) should be positive."""
+    closes = [100.0 + i * 1.0 for i in range(60)]
+    result = macd(closes)
+    assert result is not None
+    assert result.dif > 0
+
+
+def test_macd_downtrend_negative_dif():
+    closes = [100.0 - i * 1.0 for i in range(60)]
+    result = macd(closes)
+    assert result is not None
+    assert result.dif < 0
+
+
+def test_macd_hist_is_2x_dif_minus_dea():
+    closes = [100.0 + i * 0.5 for i in range(60)]
+    result = macd(closes)
+    assert result is not None
+    assert abs(result.hist - 2 * (result.dif - result.dea)) < 1e-9
+
+
+def test_macd_custom_periods():
+    closes = [100.0 + i * 0.3 for i in range(50)]
+    r1 = macd(closes, fast=5, slow=10, signal=3)
+    r2 = macd(closes, fast=12, slow=26, signal=9)
+    assert r1 is not None
+    assert r2 is not None

@@ -5,6 +5,8 @@ asteval as both pre-computed values (e.g. ma5) and callables (e.g. cross_above).
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 
 def ma(closes: list[float], n: int) -> float | None:
     """Simple moving average over last `n` closes."""
@@ -61,3 +63,40 @@ def rsi(closes: list[float], n: int = 14) -> float | None:
         return 100.0
     rs = avg_gain / avg_loss
     return 100.0 - 100.0 / (1.0 + rs)
+
+
+@dataclass(frozen=True)
+class MACDResult:
+    dif: float
+    dea: float
+    hist: float
+
+
+def _ema_series(values: list[float], n: int) -> list[float]:
+    """EMA series with alpha=2/(n+1), seeded at values[0]."""
+    if not values:
+        return []
+    alpha = 2.0 / (n + 1)
+    out = [values[0]]
+    for v in values[1:]:
+        out.append(alpha * v + (1 - alpha) * out[-1])
+    return out
+
+
+def macd(
+    closes: list[float],
+    fast: int = 12,
+    slow: int = 26,
+    signal: int = 9,
+) -> MACDResult | None:
+    """Standard MACD with Chinese-convention hist = 2 * (dif - dea)."""
+    if not closes or len(closes) < slow + signal:
+        return None
+    ema_fast = _ema_series(closes, fast)
+    ema_slow = _ema_series(closes, slow)
+    dif_series = [f - s for f, s in zip(ema_fast, ema_slow, strict=True)]
+    dea_series = _ema_series(dif_series, signal)
+    dif = dif_series[-1]
+    dea = dea_series[-1]
+    hist = 2.0 * (dif - dea)
+    return MACDResult(dif=dif, dea=dea, hist=hist)
