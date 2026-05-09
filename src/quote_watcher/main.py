@@ -15,8 +15,14 @@ from quote_watcher.alerts.engine import AlertEngine
 from quote_watcher.emit.message import build_alert_message
 from quote_watcher.feeds.calendar import MarketCalendar
 from quote_watcher.feeds.market_scan import MarketScanFeed
+from quote_watcher.feeds.sector import SectorFeed
 from quote_watcher.feeds.sina import SinaFeed
-from quote_watcher.scheduler.jobs import evaluate_alerts, poll_quotes, scan_market
+from quote_watcher.scheduler.jobs import (
+    evaluate_alerts,
+    evaluate_sector_alerts,
+    poll_quotes,
+    scan_market,
+)
 from quote_watcher.state.tracker import StateTracker
 from quote_watcher.storage.dao.alert_state import AlertStateDAO
 from quote_watcher.storage.db import QuoteDatabase
@@ -89,6 +95,29 @@ async def _market_scan_loop(
             await asyncio.wait_for(stop.wait(), timeout=interval_sec)
 
 
+async def _sector_alerts_loop(
+    stop: asyncio.Event,
+    interval_sec: float,
+    *,
+    sector_feed: SectorFeed,
+    engine: AlertEngine,
+    calendar: MarketCalendar,
+    dispatcher: PusherDispatcher,
+    cn_alert_channels: list[str],
+) -> None:
+    while not stop.is_set():
+        try:
+            await evaluate_sector_alerts(
+                feed=sector_feed, engine=engine, calendar=calendar,
+                dispatcher=dispatcher, channels=cn_alert_channels,
+                now=datetime.now(BJ),
+            )
+        except Exception as e:
+            log.warning("sector_loop_failed", error=str(e))
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), timeout=interval_sec)
+
+
 async def _amain() -> None:
     cfg_dir = Path(os.environ.get("QUOTE_WATCHER_CONFIG_DIR", "config"))
     db_path = os.environ.get("QUOTE_WATCHER_DB", "data/quotes.db")
@@ -139,6 +168,9 @@ async def _amain() -> None:
     scan_cfg = snap.quote_watchlist.market_scans.get("cn", MarketScansCfg())
     scan_interval_sec = float(os.environ.get("QUOTE_SCAN_INTERVAL_SEC", "60"))
 
+    sector_feed = SectorFeed()
+    sector_interval_sec = float(os.environ.get("QUOTE_SECTOR_INTERVAL_SEC", "60"))
+
     log.info(
         "quote_watcher_starting",
         tickers=len(tickers),
@@ -146,6 +178,7 @@ async def _amain() -> None:
         cn_channels=cn_alert_channels,
         poll_sec=poll_interval_sec,
         scan_sec=scan_interval_sec,
+        sector_sec=sector_interval_sec,
     )
 
     stop = asyncio.Event()
@@ -167,9 +200,14 @@ async def _amain() -> None:
         scan_feed=scan_feed, calendar=calendar, dispatcher=dispatcher,
         cn_alert_channels=cn_alert_channels, scan_cfg=scan_cfg,
     ))
+    sector_task = asyncio.create_task(_sector_alerts_loop(
+        stop, sector_interval_sec,
+        sector_feed=sector_feed, engine=engine, calendar=calendar,
+        dispatcher=dispatcher, cn_alert_channels=cn_alert_channels,
+    ))
 
     await stop.wait()
-    await asyncio.gather(ticker_task, scan_task, return_exceptions=True)
+    await asyncio.gather(ticker_task, scan_task, sector_task, return_exceptions=True)
 
     await db.close()
     log.info("quote_watcher_stopped")
