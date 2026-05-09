@@ -258,3 +258,39 @@ uv run mkdocs serve   # 开 http://localhost:8000
 - [故障排查](docs/operations/troubleshooting.md) — 已知问题
 - [配置](docs/operations/configuration.md) — 每个 yaml 字段
 
+---
+
+## Quote Watcher (实时盯盘)
+
+v0.4.0 新增的子系统,与 news_pipeline 平级运行,基于 Sina 行情 + akshare 全市场快照 + 板块数据,对 A 股做实时规则告警 → 推飞书.
+
+### 它能做什么
+
+- **watchlist 盯盘**:50 只内核心股 5 秒 poll Sina,涨跌幅/量比/突破点位/技术指标(MA/RSI/MACD)/涨跌停 触发立即推
+- **持仓风控**:`config/holdings.yml` 写持仓 + 成本,持仓个股浮亏告警 + 整组合浮亏告警
+- **全市场扫描**:60 秒一次扫描全 A 股快照,推涨跌幅榜 / 量比榜 digest
+- **板块异动**:60 秒一次,板块涨跌幅触发告警
+- **去重**:规则级 cooldown + 同股多规则合并 alert_burst
+
+### 核心配置
+
+| 文件 | 内容 |
+|---|---|
+| `config/quote_watchlist.yml` | 盯盘的 ticker 列表 + market_scans 配置 |
+| `config/alerts.yml` | 4 类规则定义(threshold/indicator/event/composite),asteval 表达式 |
+| `config/holdings.yml` | 持仓列表(可选,持仓风控用) |
+
+支持 `alerts.yml` 热加载——直接编辑文件,quote_watcher 自动重新加载规则,不用重启.
+
+### 启动
+
+```bash
+# Docker compose(news_pipeline + quote_watcher 两个 service)
+docker compose up -d quote_watcher
+
+# 或本地直接跑
+uv run python -m quote_watcher.main
+```
+
+详细配置 + 4 类规则示例 + 故障排查见 [docs/quote_watcher/getting_started.md](docs/quote_watcher/getting_started.md).
+

@@ -10,14 +10,24 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from news_pipeline.config.loader import ConfigLoader
+from news_pipeline.config.schema import MarketScansCfg
 from quote_watcher.alerts.engine import AlertEngine
+from quote_watcher.alerts.reloader import AlertsReloader
 from quote_watcher.emit.message import build_alert_message
 from quote_watcher.feeds.calendar import MarketCalendar
+from quote_watcher.feeds.market_scan import MarketScanFeed
+from quote_watcher.feeds.sector import SectorFeed
 from quote_watcher.feeds.sina import SinaFeed
-from quote_watcher.scheduler.jobs import evaluate_alerts, poll_quotes
+from quote_watcher.scheduler.jobs import (
+    evaluate_alerts,
+    evaluate_sector_alerts,
+    poll_quotes,
+    scan_market,
+)
 from quote_watcher.state.tracker import StateTracker
 from quote_watcher.storage.dao.alert_state import AlertStateDAO
 from quote_watcher.storage.db import QuoteDatabase
+from quote_watcher.store.kline import DailyKlineCache
 from quote_watcher.store.tick import TickRing
 from shared.observability.log import configure_logging, get_logger
 from shared.push.dispatcher import PusherDispatcher
@@ -25,6 +35,88 @@ from shared.push.factory import build_pushers
 
 BJ = ZoneInfo("Asia/Shanghai")
 log = get_logger(__name__)
+
+
+async def _ticker_poll_loop(
+    stop: asyncio.Event,
+    interval_sec: float,
+    *,
+    feed: SinaFeed,
+    calendar: MarketCalendar,
+    ring: TickRing,
+    tickers: list[tuple[str, str]],
+    engine: AlertEngine,
+    dispatcher: PusherDispatcher,
+    cn_alert_channels: list[str],
+) -> None:
+    while not stop.is_set():
+        try:
+            snaps = await poll_quotes(
+                feed=feed, calendar=calendar, ring=ring, tickers=tickers,
+                now=datetime.now(BJ),
+            )
+            if snaps:
+                await evaluate_alerts(
+                    snaps=snaps, engine=engine,
+                    dispatcher=dispatcher, channels=cn_alert_channels,
+                )
+                snaps_by_ticker = {s.ticker: s for s in snaps}
+                portfolio_verdicts = await engine.evaluate_portfolio(
+                    snaps_by_ticker=snaps_by_ticker
+                )
+                for v in portfolio_verdicts:
+                    msg = build_alert_message(v)
+                    await dispatcher.dispatch(msg, channels=cn_alert_channels)
+        except Exception as e:
+            log.warning("ticker_loop_failed", error=str(e))
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), timeout=interval_sec)
+
+
+async def _market_scan_loop(
+    stop: asyncio.Event,
+    interval_sec: float,
+    *,
+    scan_feed: MarketScanFeed,
+    calendar: MarketCalendar,
+    dispatcher: PusherDispatcher,
+    cn_alert_channels: list[str],
+    scan_cfg: MarketScansCfg,
+) -> None:
+    while not stop.is_set():
+        try:
+            await scan_market(
+                feed=scan_feed, calendar=calendar,
+                dispatcher=dispatcher, channels=cn_alert_channels,
+                cfg=scan_cfg, now=datetime.now(BJ),
+            )
+        except Exception as e:
+            log.warning("scan_loop_failed", error=str(e))
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), timeout=interval_sec)
+
+
+async def _sector_alerts_loop(
+    stop: asyncio.Event,
+    interval_sec: float,
+    *,
+    sector_feed: SectorFeed,
+    engine: AlertEngine,
+    calendar: MarketCalendar,
+    dispatcher: PusherDispatcher,
+    cn_alert_channels: list[str],
+) -> None:
+    while not stop.is_set():
+        try:
+            await evaluate_sector_alerts(
+                feed=sector_feed, engine=engine, calendar=calendar,
+                dispatcher=dispatcher, channels=cn_alert_channels,
+                now=datetime.now(BJ),
+            )
+        except Exception as e:
+            log.warning("sector_loop_failed", error=str(e))
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), timeout=interval_sec)
 
 
 async def _amain() -> None:
@@ -47,12 +139,28 @@ async def _amain() -> None:
         if ch.market == "cn" and ch.enabled
     ]
 
+    # === Daily K warmup for indicator rules ===
+    kline_cache = DailyKlineCache(db)
+    cn_tickers_codes = [e.ticker for e in snap.quote_watchlist.cn]
+    if cn_tickers_codes:
+        try:
+            await kline_cache.load_for(cn_tickers_codes, days=250)
+            log.info("kline_warmup_ok", tickers=len(cn_tickers_codes))
+        except Exception as e:
+            log.warning("kline_warmup_failed", error=str(e))
+
     tracker = StateTracker(dao=AlertStateDAO(db))
     engine = AlertEngine(
         rules=snap.alerts.alerts,
         tracker=tracker,
         holdings=snap.holdings,
+        kline_cache=kline_cache,
     )
+
+    reloader = AlertsReloader(
+        alerts_path=cfg_dir / "alerts.yml", engine=engine,
+    )
+    reloader.start()
 
     feed = SinaFeed()
     calendar = MarketCalendar()
@@ -61,12 +169,22 @@ async def _amain() -> None:
     tickers: list[tuple[str, str]] = [
         (e.market, e.ticker) for e in snap.quote_watchlist.cn
     ]
+
+    scan_feed = MarketScanFeed()
+    scan_cfg = snap.quote_watchlist.market_scans.get("cn", MarketScansCfg())
+    scan_interval_sec = float(os.environ.get("QUOTE_SCAN_INTERVAL_SEC", "60"))
+
+    sector_feed = SectorFeed()
+    sector_interval_sec = float(os.environ.get("QUOTE_SECTOR_INTERVAL_SEC", "60"))
+
     log.info(
         "quote_watcher_starting",
         tickers=len(tickers),
-        poll_sec=poll_interval_sec,
         alert_rules=len(snap.alerts.alerts),
         cn_channels=cn_alert_channels,
+        poll_sec=poll_interval_sec,
+        scan_sec=scan_interval_sec,
+        sector_sec=sector_interval_sec,
     )
 
     stop = asyncio.Event()
@@ -78,29 +196,25 @@ async def _amain() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         signal.signal(sig, _on_signal)
 
-    while not stop.is_set():
-        try:
-            snaps = await poll_quotes(
-                feed=feed, calendar=calendar, ring=ring, tickers=tickers,
-                now=datetime.now(BJ),
-            )
-            if snaps:
-                await evaluate_alerts(
-                    snaps=snaps, engine=engine,
-                    dispatcher=dispatcher, channels=cn_alert_channels,
-                )
-                # Portfolio-wide rules (using current snapshots map)
-                snaps_by_ticker = {s.ticker: s for s in snaps}
-                portfolio_verdicts = await engine.evaluate_portfolio(
-                    snaps_by_ticker=snaps_by_ticker
-                )
-                for v in portfolio_verdicts:
-                    msg = build_alert_message(v)
-                    await dispatcher.dispatch(msg, channels=cn_alert_channels)
-        except Exception as e:
-            log.warning("poll_iteration_failed", error=str(e))
-        with contextlib.suppress(TimeoutError):
-            await asyncio.wait_for(stop.wait(), timeout=poll_interval_sec)
+    ticker_task = asyncio.create_task(_ticker_poll_loop(
+        stop, poll_interval_sec,
+        feed=feed, calendar=calendar, ring=ring, tickers=tickers,
+        engine=engine, dispatcher=dispatcher, cn_alert_channels=cn_alert_channels,
+    ))
+    scan_task = asyncio.create_task(_market_scan_loop(
+        stop, scan_interval_sec,
+        scan_feed=scan_feed, calendar=calendar, dispatcher=dispatcher,
+        cn_alert_channels=cn_alert_channels, scan_cfg=scan_cfg,
+    ))
+    sector_task = asyncio.create_task(_sector_alerts_loop(
+        stop, sector_interval_sec,
+        sector_feed=sector_feed, engine=engine, calendar=calendar,
+        dispatcher=dispatcher, cn_alert_channels=cn_alert_channels,
+    ))
+
+    await stop.wait()
+    await asyncio.gather(ticker_task, scan_task, sector_task, return_exceptions=True)
+    reloader.stop()
 
     await db.close()
     log.info("quote_watcher_stopped")
