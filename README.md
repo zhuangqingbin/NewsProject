@@ -6,6 +6,17 @@
 
 ---
 
+## 🎯 第一次接触本项目？
+
+按这个顺序读：
+
+1. **整体架构 + 第一次启动**：[`docs/architecture.md`](docs/architecture.md)
+2. **新闻流水线**：[`src/news_pipeline/README.md`](src/news_pipeline/README.md)
+3. **实时盯盘**：[`src/quote_watcher/README.md`](src/quote_watcher/README.md)
+4. **共用层**：[`src/shared/README.md`](src/shared/README.md)
+
+---
+
 ## 一键部署（Docker）
 
 **前置要求**：Docker 24+ 带 Compose v2，约 2 GB 内存，Linux/macOS 主机。
