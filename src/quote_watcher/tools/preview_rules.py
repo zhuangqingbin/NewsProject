@@ -11,6 +11,7 @@ import asyncio
 import sys
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import asteval
@@ -21,12 +22,13 @@ from quote_watcher.alerts.rule import AlertKind
 from quote_watcher.feeds.base import QuoteSnapshot
 from quote_watcher.storage.dao.quote_bars import QuoteBarsDailyDAO
 from quote_watcher.storage.db import QuoteDatabase
+from quote_watcher.storage.models import QuoteBarDaily
 from quote_watcher.store.kline import DailyBar
 
 BJ = ZoneInfo("Asia/Shanghai")
 
 
-def _row_to_bar(ticker: str, row) -> DailyBar:
+def _row_to_bar(ticker: str, row: QuoteBarDaily) -> DailyBar:
     return DailyBar(
         ticker=ticker,
         trade_date=row.trade_date,
@@ -59,7 +61,7 @@ def _make_snap(ticker: str, bar: DailyBar) -> QuoteSnapshot:
     )
 
 
-def _eval_expr(expr: str, ctx: dict) -> bool:
+def _eval_expr(expr: str, ctx: dict[str, Any]) -> bool:
     interp = asteval.Interpreter(usersyms=ctx, no_print=True, no_assert=True)
     try:
         result = bool(interp(expr))

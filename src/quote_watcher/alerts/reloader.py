@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 from watchdog.events import FileModifiedEvent, FileSystemEventHandler
@@ -19,7 +19,7 @@ class AlertsReloader:
     def __init__(self, *, alerts_path: Path, engine: AlertEngine) -> None:
         self._path = alerts_path
         self._engine = engine
-        self._observer: Optional[Any] = None
+        self._observer: Any | None = None
 
     def reload_now(self) -> bool:
         """Read alerts file once, validate, swap engine rules. Returns True on success."""
