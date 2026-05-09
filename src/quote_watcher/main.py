@@ -20,6 +20,7 @@ from quote_watcher.scheduler.jobs import evaluate_alerts, poll_quotes, scan_mark
 from quote_watcher.state.tracker import StateTracker
 from quote_watcher.storage.dao.alert_state import AlertStateDAO
 from quote_watcher.storage.db import QuoteDatabase
+from quote_watcher.store.kline import DailyKlineCache
 from quote_watcher.store.tick import TickRing
 from shared.observability.log import configure_logging, get_logger
 from shared.push.dispatcher import PusherDispatcher
@@ -108,11 +109,22 @@ async def _amain() -> None:
         if ch.market == "cn" and ch.enabled
     ]
 
+    # === Daily K warmup for indicator rules ===
+    kline_cache = DailyKlineCache(db)
+    cn_tickers_codes = [e.ticker for e in snap.quote_watchlist.cn]
+    if cn_tickers_codes:
+        try:
+            await kline_cache.load_for(cn_tickers_codes, days=250)
+            log.info("kline_warmup_ok", tickers=len(cn_tickers_codes))
+        except Exception as e:
+            log.warning("kline_warmup_failed", error=str(e))
+
     tracker = StateTracker(dao=AlertStateDAO(db))
     engine = AlertEngine(
         rules=snap.alerts.alerts,
         tracker=tracker,
         holdings=snap.holdings,
+        kline_cache=kline_cache,
     )
 
     feed = SinaFeed()
