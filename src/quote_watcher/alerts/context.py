@@ -5,6 +5,7 @@ from typing import Any
 
 from news_pipeline.config.schema import HoldingEntry, HoldingsFile
 from quote_watcher.feeds.base import QuoteSnapshot
+from quote_watcher.feeds.sector import SectorSnapshot
 
 
 def build_threshold_context(
@@ -190,3 +191,16 @@ def build_indicator_context(
         "lowest_n_days": _lowest,
     })
     return base
+
+
+def build_sector_context(sector: str, sector_snap: SectorSnapshot) -> dict[str, Any]:
+    """Sector-level context for kind=event + target_kind=sector rules."""
+    return {
+        "sector_pct_change": sector_snap.pct_change,
+        "sector_volume_ratio": (
+            sector_snap.volume_ratio if sector_snap.volume_ratio is not None else 0.0
+        ),
+        "sector_turnover_rate": (
+            sector_snap.turnover_rate if sector_snap.turnover_rate is not None else 0.0
+        ),
+    }
