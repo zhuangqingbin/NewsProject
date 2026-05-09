@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from news_pipeline.config.loader import ConfigLoader
 from news_pipeline.config.schema import MarketScansCfg
 from quote_watcher.alerts.engine import AlertEngine
+from quote_watcher.alerts.reloader import AlertsReloader
 from quote_watcher.emit.message import build_alert_message
 from quote_watcher.feeds.calendar import MarketCalendar
 from quote_watcher.feeds.market_scan import MarketScanFeed
@@ -156,6 +157,11 @@ async def _amain() -> None:
         kline_cache=kline_cache,
     )
 
+    reloader = AlertsReloader(
+        alerts_path=cfg_dir / "alerts.yml", engine=engine,
+    )
+    reloader.start()
+
     feed = SinaFeed()
     calendar = MarketCalendar()
     ring = TickRing(max_per_ticker=1000)
@@ -208,6 +214,7 @@ async def _amain() -> None:
 
     await stop.wait()
     await asyncio.gather(ticker_task, scan_task, sector_task, return_exceptions=True)
+    reloader.stop()
 
     await db.close()
     log.info("quote_watcher_stopped")

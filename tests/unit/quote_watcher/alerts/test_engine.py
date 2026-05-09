@@ -120,3 +120,22 @@ async def test_eval_error_does_not_crash(tracker: StateTracker):
     snap = make_snap("600519", price=100, prev=100)
     verdicts = await engine.evaluate_for_snapshot(snap, volume_avg5d=50)
     assert verdicts == []
+
+
+@pytest.mark.asyncio
+async def test_engine_update_rules_swaps_atomically(tracker: StateTracker):
+    rule_old = AlertRule(
+        id="old", kind=AlertKind.THRESHOLD,
+        ticker="600519", expr="pct_change_intraday <= -3.0",
+    )
+    engine = AlertEngine(rules=[rule_old], tracker=tracker)
+    assert len(engine._rules) == 1
+
+    new_rules = [
+        AlertRule(id="new1", kind=AlertKind.THRESHOLD,
+                  ticker="600519", expr="pct_change_intraday <= -2.0"),
+        AlertRule(id="new2", kind=AlertKind.THRESHOLD,
+                  ticker="000001", expr="pct_change_intraday <= -2.0"),
+    ]
+    engine.update_rules(new_rules)
+    assert {r.id for r in engine._rules} == {"new1", "new2"}

@@ -221,6 +221,10 @@ class AlertEngine:
             out.append(AlertVerdict(rule=rule, snapshot=snap, ctx_dump=dict(ctx)))
         return out
 
+    def update_rules(self, new_rules: list[AlertRule]) -> None:
+        """Atomically swap the rule list (for hot-reload)."""
+        self._rules = list(new_rules)
+
     def _eval_expr(self, rule: AlertRule, ctx: dict[str, Any]) -> bool:
         interp = asteval.Interpreter(usersyms=ctx, no_print=True, no_assert=True)
         try:
