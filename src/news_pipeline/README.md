@@ -49,10 +49,11 @@ scrapers(14 源) ─▶ raw_news(DB) ─▶ Dedup ─▶ RulesEngine
 llm:
   dashscope_api_key: sk-xxx       # DeepSeek-V3 必填；anthropic_api_key 留空则 Tier-2/3 降级
 push:
-  feishu_hook_us: https://...     # 美股频道 webhook URL
-  feishu_sign_us: xxx             # 飞书签名(没开签名验证可留空)
-  feishu_hook_cn: https://...     # A 股频道
-  feishu_sign_cn: xxx
+  news_pipeline:
+    feishu_hook_us: https://...   # 美股频道 webhook URL
+    feishu_sign_us: xxx           # 飞书签名(没开签名验证可留空)
+    feishu_hook_cn: https://...   # A 股频道
+    feishu_sign_cn: xxx
 sources:
   finnhub_token: xxx              # 留空则 finnhub scraper 跳过
 alert:
@@ -157,15 +158,15 @@ channels:
   feishu_us:
     type: feishu
     market: us
-    options: {webhook_key: feishu_hook_us, sign_key: feishu_sign_us}
+    options: {webhook_key: news_pipeline.feishu_hook_us, sign_key: news_pipeline.feishu_sign_us}
   feishu_cn:
     type: feishu
     market: cn
-    options: {webhook_key: feishu_hook_cn, sign_key: feishu_sign_cn}
-  # feishu_cn_alert / feishu_us_alert 由 quote_watcher 使用，news_pipeline 不会路由到这两个频道
+    options: {webhook_key: news_pipeline.feishu_hook_cn, sign_key: news_pipeline.feishu_sign_cn}
+  # feishu_cn_alert 由 quote_watcher 使用，news_pipeline 不会路由到这个频道
 ```
 
-`webhook_key` / `sign_key` 对应 `secrets.yml` 里的字段名。
+`webhook_key` / `sign_key` 使用 dotted 路径 `subsystem.key`，对应 `secrets.yml push.news_pipeline.*`。
 
 ---
 

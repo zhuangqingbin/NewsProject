@@ -127,7 +127,7 @@ portfolio:
 ```bash
 uv sync
 cp config/secrets.yml.example config/secrets.yml && $EDITOR config/secrets.yml
-# 确保 feishu_hook_cn 已填
+# 确保 push.quote_watcher.feishu_hook_cn 已填
 uv run python -m quote_watcher.main
 ```
 

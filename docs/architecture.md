@@ -201,7 +201,7 @@ shared/
 |---|---|---|---|
 | `secrets.yml` | 两边都用 | ✅ | 飞书 webhook/sign、dashscope/anthropic key、finnhub token、Bark URL |
 | `app.yml` | news_pipeline | ✅ | 调度间隔、LLM 模型(tier0~3)、去重参数、推送速率、数据保留策略 |
-| `channels.yml` | 两边都用 | ✅ | 推送渠道定义(`feishu_us` / `feishu_cn` / `feishu_cn_alert` / `feishu_us_alert`)+ market 路由；news_pipeline 用非 `_alert` 频道，quote_watcher 用 `_alert` 频道 |
+| `channels.yml` | 两边都用 | ✅ | 推送渠道定义(`feishu_us` / `feishu_cn` / `feishu_cn_alert`)+ market 路由；news_pipeline 用非 `_alert` 频道，quote_watcher 用 `_alert` 频道；`webhook_key` 用 dotted 路径 `subsystem.key` |
 | `sources.yml` | news_pipeline | ✅ | 14 个新闻源的 `enabled` 开关和 `interval_sec` |
 | `watchlist.yml` | news_pipeline | ✅ | `rules` 段(AhoCorasick 关键词) + `llm` 段(LLM watchlist 股票) |
 | `quote_watchlist.yml` | quote_watcher | ✅ | 盯盘股列表(cn/us) + `market_scans` 全市场扫描参数 |
@@ -218,12 +218,14 @@ shared/
 llm:
   dashscope_api_key: sk-xxx        # DeepSeek-V3 走 DashScope
 push:
-  feishu_hook_us: https://...           # 对应 channels.yml feishu_us（美股新闻）
-  feishu_sign_us: xxx
-  feishu_hook_cn: https://...           # 对应 channels.yml feishu_cn（A 股新闻）
-  feishu_sign_cn: xxx
-  feishu_hook_cn_alert: https://...     # 对应 channels.yml feishu_cn_alert（A 股盯盘告警）
-  feishu_sign_cn_alert: xxx
+  news_pipeline:
+    feishu_hook_us: https://...    # 对应 channels.yml feishu_us（美股新闻）
+    feishu_sign_us: xxx
+    feishu_hook_cn: https://...    # 对应 channels.yml feishu_cn（A 股新闻）
+    feishu_sign_cn: xxx
+  quote_watcher:
+    feishu_hook_cn: https://...    # 对应 channels.yml feishu_cn_alert（A 股盯盘告警）
+    feishu_sign_cn: xxx
 alert:
   bark_url: https://api.day.app/<key>   # 运维告警(可选)
 ```
