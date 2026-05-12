@@ -30,9 +30,13 @@ class DispatchRouter:
         ]
 ```
 
-Channel 按 market 分组（在 `main.py` 启动时按 `channels.yml` 构建）：
+Channel 按 market 分组（在 `main.py` 启动时按 `channels.yml` 构建），news_pipeline 只使用不含 `_alert` 后缀的频道：
 - `us` → `[feishu_us]`
 - `cn` → `[feishu_cn]`
+
+quote_watcher 只使用含 `_alert` 后缀的频道：
+- `cn` → `[feishu_cn_alert]`
+- `us` → `[feishu_us_alert]`（Phase 1.x 预留，`enabled: false`）
 
 ---
 

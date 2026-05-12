@@ -213,10 +213,12 @@ async def _amain() -> None:
     dispatch_router = DispatchRouter(
         channels_by_market={
             "us": [
-                c for c, ch in snap.channels.channels.items() if ch.market == "us" and ch.enabled
+                c for c, ch in snap.channels.channels.items()
+                if ch.market == "us" and ch.enabled and not c.endswith("_alert")
             ],
             "cn": [
-                c for c, ch in snap.channels.channels.items() if ch.market == "cn" and ch.enabled
+                c for c, ch in snap.channels.channels.items()
+                if ch.market == "cn" and ch.enabled and not c.endswith("_alert")
             ],
         }
     )

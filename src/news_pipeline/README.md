@@ -150,6 +150,8 @@ runtime:
 
 ### 3.5 `config/channels.yml`
 
+news_pipeline 推送到不含 `_alert` 后缀的频道（`feishu_cn` / `feishu_us`）；含 `_alert` 后缀的频道由 quote_watcher 独占。
+
 ```yaml
 channels:
   feishu_us:
@@ -160,6 +162,7 @@ channels:
     type: feishu
     market: cn
     options: {webhook_key: feishu_hook_cn, sign_key: feishu_sign_cn}
+  # feishu_cn_alert / feishu_us_alert 由 quote_watcher 使用，news_pipeline 不会路由到这两个频道
 ```
 
 `webhook_key` / `sign_key` 对应 `secrets.yml` 里的字段名。
