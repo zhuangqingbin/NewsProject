@@ -59,7 +59,7 @@ class ConfigLoader:
         self._callback: Callable[[ConfigSnapshot], None] | None = None
 
     def load(self) -> ConfigSnapshot:
-        qw_path = self._dir / "quote_watchlist.yml"
+        qw_path = self._dir / "quote_watcher" / "quote_watchlist.yml"
         quote_watchlist = (
             QuoteWatchlistFile.model_validate(
                 yaml.safe_load(qw_path.read_text(encoding="utf-8")) or {}
@@ -67,7 +67,7 @@ class ConfigLoader:
             if qw_path.exists()
             else QuoteWatchlistFile()
         )
-        alerts_path = self._dir / "alerts.yml"
+        alerts_path = self._dir / "quote_watcher" / "alerts.yml"
         alerts = (
             AlertsFile.model_validate(
                 yaml.safe_load(alerts_path.read_text(encoding="utf-8")) or {}
@@ -75,7 +75,7 @@ class ConfigLoader:
             if alerts_path.exists()
             else AlertsFile()
         )
-        holdings_path = self._dir / "holdings.yml"
+        holdings_path = self._dir / "quote_watcher" / "holdings.yml"
         holdings = (
             HoldingsFile.model_validate(
                 yaml.safe_load(holdings_path.read_text(encoding="utf-8")) or {}
@@ -84,25 +84,25 @@ class ConfigLoader:
             else HoldingsFile()
         )
         return ConfigSnapshot(
-            app=AppConfig.model_validate(self._read("app.yml")),
-            watchlist=WatchlistFile.model_validate(self._read("watchlist.yml")),
-            channels=ChannelsFile.model_validate(self._read("channels.yml")),
-            sources=SourcesFile.model_validate(self._read("sources.yml")),
-            secrets=SecretsFile.model_validate(self._read("secrets.yml")),
+            app=AppConfig.model_validate(self._read("common", "app.yml")),
+            watchlist=WatchlistFile.model_validate(self._read("news_pipeline", "watchlist.yml")),
+            channels=ChannelsFile.model_validate(self._read("common", "channels.yml")),
+            sources=SourcesFile.model_validate(self._read("news_pipeline", "sources.yml")),
+            secrets=SecretsFile.model_validate(self._read("common", "secrets.yml")),
             quote_watchlist=quote_watchlist,
             alerts=alerts,
             holdings=holdings,
         )
 
-    def _read(self, name: str) -> dict[str, object]:
-        path = self._dir / name
+    def _read(self, subdir: str, name: str) -> dict[str, object]:
+        path = self._dir / subdir / name
         with path.open("r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
 
     def start_watching(self, callback: Callable[[ConfigSnapshot], None]) -> None:
         self._callback = callback
         self._observer = Observer()
-        self._observer.schedule(_Handler(self._on_event), str(self._dir), recursive=False)
+        self._observer.schedule(_Handler(self._on_event), str(self._dir), recursive=True)
         self._observer.start()
 
     def stop_watching(self) -> None:

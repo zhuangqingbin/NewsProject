@@ -158,7 +158,7 @@ async def _amain() -> None:
     )
 
     reloader = AlertsReloader(
-        alerts_path=cfg_dir / "alerts.yml", engine=engine,
+        alerts_path=cfg_dir / "quote_watcher" / "alerts.yml", engine=engine,
     )
     reloader.start()
 
