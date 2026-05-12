@@ -15,14 +15,20 @@ cp config/common/secrets.yml.example config/common/secrets.yml
 $EDITOR config/common/secrets.yml
 ```
 
+**关于飞书 webhook 拆分**(v0.4.1):新闻和盯盘告警分到 2 个不同的飞书机器人,避免互相吵.A 股新闻 → `feishu_hook_cn` 机器人,A 股盯盘告警 → `feishu_hook_cn_alert` 机器人.建群时分开建,或同一群多个机器人也行.
+
 ### 字段说明
 
 | 字段 | 必要程度 | 用途 | 怎么获取 |
 |---|---|---|---|
 | `push.feishu_hook_us` | ⭐ 必填 | 美股新闻推送的飞书机器人 webhook key | 飞书群 → 设置 → 群机器人 → 添加自定义机器人 → 复制 webhook URL 中 `v2/hook/` 后面的 key |
-| `push.feishu_sign_us` | 推荐 | 美股频道机器人签名校验密钥 | 添加机器人时勾选"签名校验"，复制密钥 |
-| `push.feishu_hook_cn` | ⭐ 必填 | A 股新闻 / quote_watcher 推送的飞书机器人 webhook key | 同上，推荐另开一个群分流告警 |
-| `push.feishu_sign_cn` | 推荐 | A 股频道机器人签名校验密钥 | 同上 |
+| `push.feishu_sign_us` | 推荐 | 美股新闻频道机器人签名校验密钥 | 添加机器人时勾选"签名校验"，复制密钥 |
+| `push.feishu_hook_cn` | ⭐ 必填 | A 股新闻推送的飞书机器人 webhook key | 同上，推荐另开一个群分流告警 |
+| `push.feishu_sign_cn` | 推荐 | A 股新闻频道机器人签名校验密钥 | 同上 |
+| `push.feishu_hook_us_alert` | 选填 | 美股盯盘告警飞书机器人 webhook key（Phase 1.x 预留，当前 US 盯盘未启用） | 同上 |
+| `push.feishu_sign_us_alert` | 选填 | 美股告警频道机器人签名校验密钥 | 同上 |
+| `push.feishu_hook_cn_alert` | ⭐ 必填 | A 股盯盘告警飞书机器人 webhook key | 同上，建议与新闻机器人分开 |
+| `push.feishu_sign_cn_alert` | 推荐 | A 股告警频道机器人签名校验密钥 | 同上 |
 | `llm.dashscope_api_key` | ⭐ 必填 | DeepSeek tier-0/tier-1 LLM（阿里云百炼） | https://dashscope.console.aliyun.com → API-KEY 管理 → 创建 API Key |
 | `llm.anthropic_api_key` | 推荐 | Claude Haiku tier-2 实体抽取；无此 key 时自动降级到 dashscope | https://console.anthropic.com → API Keys → Create Key |
 | `sources.finnhub_token` | 美股必填 | Finnhub 财经新闻 + 基本面数据 | https://finnhub.io 注册后首页直接显示免费 token |
@@ -34,13 +40,15 @@ $EDITOR config/common/secrets.yml
 
 ```yaml
 push:
-  feishu_hook_us: REPLACE_ME   # 美股飞书群机器人
-  feishu_hook_cn: REPLACE_ME   # A股飞书群机器人（也用于 quote_watcher 告警）
+  feishu_hook_cn: REPLACE_ME        # A股新闻飞书群机器人
+  feishu_hook_cn_alert: REPLACE_ME  # A股盯盘告警飞书群机器人
 llm:
   dashscope_api_key: REPLACE_ME
 sources:
   finnhub_token: REPLACE_ME
 ```
+
+> 最小可用集：`feishu_hook_cn` + `feishu_sign_cn` + `feishu_hook_cn_alert` + `feishu_sign_cn_alert` + `llm.dashscope_api_key` + `sources.finnhub_token`。
 
 ---
 
@@ -77,7 +85,18 @@ sources:
 
 推送频道路由。**默认配置已就绪，通常不需要改。**
 
-每个频道对应一条飞书机器人：
+v0.4.1 起共 4 个频道，按用途拆分：新闻频道和告警频道各自独立。
+
+| 频道 ID | market | 用途 | 使用者 |
+|---|---|---|---|
+| `feishu_us` | us | 美股新闻推送 | news_pipeline |
+| `feishu_cn` | cn | A 股新闻推送 | news_pipeline |
+| `feishu_us_alert` | us | 美股盯盘告警（Phase 1.x 预留，当前 `enabled: false`） | quote_watcher |
+| `feishu_cn_alert` | cn | A 股盯盘告警 | quote_watcher |
+
+路由规则：
+- `news_pipeline` 只使用**不含** `_alert` 后缀的频道（market 匹配 + `enabled: true`）
+- `quote_watcher` 只使用**含** `_alert` 后缀的频道（market 匹配 + `enabled: true`）
 
 ```yaml
 channels:
@@ -93,6 +112,19 @@ channels:
     options:
       webhook_key: feishu_hook_cn
       sign_key: feishu_sign_cn
+  feishu_us_alert:
+    type: feishu
+    market: us
+    enabled: false    # Phase 1.x 预留；US 盯盘接入后改为 true
+    options:
+      webhook_key: feishu_hook_us_alert
+      sign_key: feishu_sign_us_alert
+  feishu_cn_alert:
+    type: feishu
+    market: cn
+    options:
+      webhook_key: feishu_hook_cn_alert
+      sign_key: feishu_sign_cn_alert
 ```
 
 如需新增频道（例如再加一个测试群）：复制一段，改 ID + `webhook_key`，在 `secrets.yml` 对应加上 token 即可。

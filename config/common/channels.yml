@@ -7,3 +7,12 @@ channels:
     type: feishu
     market: cn
     options: {webhook_key: feishu_hook_cn, sign_key: feishu_sign_cn}
+  feishu_us_alert:
+    type: feishu
+    market: us
+    enabled: false        # CN-only Phase 1; flip to true once US watch added
+    options: {webhook_key: feishu_hook_us_alert, sign_key: feishu_sign_us_alert}
+  feishu_cn_alert:
+    type: feishu
+    market: cn
+    options: {webhook_key: feishu_hook_cn_alert, sign_key: feishu_sign_cn_alert}

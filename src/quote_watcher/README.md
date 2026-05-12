@@ -49,7 +49,7 @@
                              │
                              ▼
                 ┌─────────────────────────┐
-                │  Feishu Push            │ → 飞书 CN 频道
+                │  Feishu Push            │ → feishu_cn_alert 频道
                 └─────────────────────────┘
                        alert_history(DB)
 ```

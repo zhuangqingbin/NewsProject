@@ -6,10 +6,14 @@
 
 ## 推送通道一览
 
-| channel_id | 类型 | market | 配置方式 |
-|---|---|---|---|
-| `feishu_us` | 飞书自定义机器人 | us | webhook URL + sign secret |
-| `feishu_cn` | 飞书自定义机器人 | cn | webhook URL + sign secret |
+v0.4.1 起新闻和告警拆分到独立频道，避免互相干扰：
+
+| channel_id | 类型 | market | 用途 | 配置方式 |
+|---|---|---|---|---|
+| `feishu_us` | 飞书自定义机器人 | us | 美股新闻（news_pipeline） | webhook URL + sign secret |
+| `feishu_cn` | 飞书自定义机器人 | cn | A 股新闻（news_pipeline） | webhook URL + sign secret |
+| `feishu_cn_alert` | 飞书自定义机器人 | cn | A 股盯盘告警（quote_watcher） | webhook URL + sign secret |
+| `feishu_us_alert` | 飞书自定义机器人 | us | 美股盯盘告警（quote_watcher，Phase 1.x 预留，`enabled: false`） | webhook URL + sign secret |
 
 ---
 

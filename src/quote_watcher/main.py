@@ -136,7 +136,7 @@ async def _amain() -> None:
     dispatcher = PusherDispatcher(pushers)
     cn_alert_channels = [
         c for c, ch in snap.channels.channels.items()
-        if ch.market == "cn" and ch.enabled
+        if ch.market == "cn" and ch.enabled and c.endswith("_alert")
     ]
 
     # === Daily K warmup for indicator rules ===
