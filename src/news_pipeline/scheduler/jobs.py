@@ -3,6 +3,7 @@ from typing import Any
 
 import httpx
 import requests
+from curl_cffi.curl import CurlError
 
 from news_pipeline.classifier.importance import ImportanceClassifier
 from news_pipeline.common.contracts import EnrichedNews, RawArticle
@@ -39,6 +40,11 @@ _TRANSIENT_EXC = (
     requests.exceptions.ConnectionError,
     requests.exceptions.Timeout,
     requests.exceptions.ChunkedEncodingError,
+    # akshare's modern transport is curl_cffi (TLS fingerprint impersonation);
+    # raw curl-level failures like CURLE_OPERATION_TIMEDOUT (28) surface as
+    # CurlError("Failed to perform, curl: (28) Operation timed out...") and
+    # are network transients, not bugs.
+    CurlError,
 )
 
 

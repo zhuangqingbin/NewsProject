@@ -27,3 +27,16 @@ def test_httpx_connect_error_still_transient():
 
 def test_value_error_not_transient():
     assert _is_transient(ValueError("oops")) is False
+
+
+def test_curl_cffi_error_is_transient():
+    # akshare uses curl_cffi; CURLE_OPERATION_TIMEDOUT bubbles up as
+    # CurlError("Failed to perform, curl: (28) ...") and must NOT page Bark.
+    from curl_cffi.curl import CurlError
+
+    err = CurlError(
+        "Failed to perform, curl: (28) Operation timed out after 30001 milliseconds"
+        " with 0 bytes received.",
+        28,
+    )
+    assert _is_transient(err) is True
