@@ -99,7 +99,7 @@ async def _amain() -> None:
             fallback_model=snap.app.llm.tier1_model,
         )
 
-    prompts = PromptLoader(cfg_dir / "prompts")
+    prompts = PromptLoader(cfg_dir / "news_pipeline" / "prompts")
     p_versions = snap.app.llm.prompt_versions
     # CostTracker gets bark reference after bark is built (bark may be None if not configured)
     # bark is built later; we pass it after building. Use a placeholder and update below.

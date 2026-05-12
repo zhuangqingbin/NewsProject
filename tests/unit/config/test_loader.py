@@ -9,15 +9,22 @@ from news_pipeline.config.loader import ConfigLoader
 
 @pytest.fixture
 def cfg_dir(tmp_path: Path) -> Path:
-    (tmp_path / "app.yml").write_text(_minimal_app_yml())
-    (tmp_path / "watchlist.yml").write_text(
-        "rules:\n  enable: true\n  us: []\n  cn: []\nllm:\n  enable: false\n  us: []\n  cn: []\n  macro: []\n  sectors: []\n"
-    )
-    (tmp_path / "channels.yml").write_text("channels: {}\n")
-    (tmp_path / "sources.yml").write_text("sources: {}\n")
-    (tmp_path / "secrets.yml").write_text(
+    common = tmp_path / "common"
+    common.mkdir()
+    news = tmp_path / "news_pipeline"
+    news.mkdir()
+    qw = tmp_path / "quote_watcher"
+    qw.mkdir()
+
+    (common / "app.yml").write_text(_minimal_app_yml())
+    (common / "channels.yml").write_text("channels: {}\n")
+    (common / "secrets.yml").write_text(
         "llm: {}\npush: {}\nstorage: {}\noss: {}\nsources: {}\nalert: {}\n"
     )
+    (news / "watchlist.yml").write_text(
+        "rules:\n  enable: true\n  us: []\n  cn: []\nllm:\n  enable: false\n  us: []\n  cn: []\n  macro: []\n  sectors: []\n"
+    )
+    (news / "sources.yml").write_text("sources: {}\n")
     return tmp_path
 
 
@@ -71,7 +78,7 @@ async def test_loader_hot_reload_emits_event(cfg_dir: Path) -> None:
         new = _minimal_app_yml().replace(
             "daily_cost_ceiling_cny: 5.0", "daily_cost_ceiling_cny: 7.5"
         )
-        (cfg_dir / "app.yml").write_text(new)
+        (cfg_dir / "common" / "app.yml").write_text(new)
         for _ in range(20):
             await asyncio.sleep(0.1)
             if seen:
