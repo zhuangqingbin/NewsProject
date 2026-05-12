@@ -6,13 +6,14 @@
 FROM python:3.12-slim AS builder
 
 ARG UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ARG UV_CONCURRENT_DOWNLOADS=8
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/app/.venv \
     UV_INDEX_URL=${UV_INDEX_URL} \
     UV_HTTP_TIMEOUT=600 \
-    UV_CONCURRENT_DOWNLOADS=1
+    UV_CONCURRENT_DOWNLOADS=${UV_CONCURRENT_DOWNLOADS}
 
 # gcc needed for C-extension wheels (pyahocorasick) on platforms with no prebuilt wheel.
 # Switch Debian apt sources to Aliyun mirror first — deb.debian.org is slow from CN.
