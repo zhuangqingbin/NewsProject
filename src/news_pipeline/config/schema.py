@@ -236,8 +236,30 @@ class SourcesFile(_Base):
 
 # --- secrets.yml ---
 class SecretsFile(_Base):
+    """Secrets loaded from secrets.yml.
+
+    ``push`` accepts two layouts during the migration window:
+
+    *New (nested)*::
+
+        push:
+          news_pipeline:
+            feishu_hook_cn: xxx
+          quote_watcher:
+            feishu_hook_cn: yyy
+
+    *Legacy (flat)*::
+
+        push:
+          feishu_hook_cn: xxx
+          feishu_hook_cn_alert: yyy
+
+    Both are stored as ``dict[str, Any]``; the factory's ``_lookup_push``
+    handles dotted-path resolution for both shapes.
+    """
+
     llm: dict[str, str] = Field(default_factory=dict)
-    push: dict[str, str] = Field(default_factory=dict)
+    push: dict[str, str | dict[str, str]] = Field(default_factory=dict)
     storage: dict[str, str] = Field(default_factory=dict)
     oss: dict[str, str] = Field(default_factory=dict)
     sources: dict[str, str] = Field(default_factory=dict)
