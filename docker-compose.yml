@@ -43,7 +43,7 @@ services:
         UV_INDEX_URL: ${UV_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
     image: news-pipeline:latest
     container_name: quote_watcher
-    command: uv run python -m quote_watcher.main
+    command: python -m quote_watcher.main
     restart: unless-stopped
     volumes:
       - ./config:/app/config:ro
