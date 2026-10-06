@@ -1,4 +1,5 @@
 """DailyKlineCache: akshare daily K loader + persistent cache for indicator rules."""
+
 from __future__ import annotations
 
 import asyncio
@@ -53,10 +54,18 @@ def _ak_df_to_bars(ticker: str, df: pd.DataFrame) -> list[_BarTuple]:
     prev_closes = [closes[0], *closes[:-1]]
     for i, d in enumerate(dates):
         d_obj = d if isinstance(d, date) else pd.to_datetime(d).date()
-        rows.append((
-            d_obj, opens[i], highs[i], lows[i], closes[i], prev_closes[i],
-            volumes[i], amounts[i],
-        ))
+        rows.append(
+            (
+                d_obj,
+                opens[i],
+                highs[i],
+                lows[i],
+                closes[i],
+                prev_closes[i],
+                volumes[i],
+                amounts[i],
+            )
+        )
     return rows
 
 
@@ -65,7 +74,9 @@ class DailyKlineCache:
         self._dao = QuoteBarsDailyDAO(db)
 
     async def load_for(
-        self, tickers: list[str], days: int = 250,
+        self,
+        tickers: list[str],
+        days: int = 250,
     ) -> dict[str, list[DailyBar]]:
         out: dict[str, list[DailyBar]] = {}
         for ticker in tickers:

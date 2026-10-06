@@ -1,4 +1,5 @@
 """AlertsReloader: watch config/alerts.yml and hot-swap engine rules on change."""
+
 from __future__ import annotations
 
 from pathlib import Path

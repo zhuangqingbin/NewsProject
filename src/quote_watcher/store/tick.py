@@ -1,4 +1,5 @@
 """In-memory ring buffer for current-day ticks per ticker."""
+
 from __future__ import annotations
 
 from collections import deque

@@ -1,4 +1,5 @@
 """AlertRule + AlertKind + AlertsFile schema. Used by AlertEngine."""
+
 from __future__ import annotations
 
 from enum import StrEnum
@@ -41,17 +42,11 @@ class AlertRule(_Base):
                 raise ValueError(f"rule {self.id}: kind={self.kind.value} requires ticker")
         elif self.kind == AlertKind.EVENT:
             if self.target_kind == "ticker" and self.ticker is None:
-                raise ValueError(
-                    f"rule {self.id}: event with target_kind=ticker requires ticker"
-                )
+                raise ValueError(f"rule {self.id}: event with target_kind=ticker requires ticker")
             if self.target_kind == "sector" and not self.sector:
-                raise ValueError(
-                    f"rule {self.id}: event with target_kind=sector requires sector"
-                )
+                raise ValueError(f"rule {self.id}: event with target_kind=sector requires sector")
         elif self.kind == AlertKind.COMPOSITE and not self.holding and not self.portfolio:
-            raise ValueError(
-                f"rule {self.id}: composite requires holding or portfolio=true"
-            )
+            raise ValueError(f"rule {self.id}: composite requires holding or portfolio=true")
         return self
 
 

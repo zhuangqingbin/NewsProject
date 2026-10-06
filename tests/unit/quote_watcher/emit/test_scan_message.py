@@ -10,8 +10,13 @@ BJ = ZoneInfo("Asia/Shanghai")
 
 def _row(ticker: str, name: str, pct: float, vr: float | None = 1.0) -> MarketRow:
     return MarketRow(
-        ticker=ticker, name=name, market="SH",
-        price=10.0, pct_change=pct, volume=1000, amount=1.0,
+        ticker=ticker,
+        name=name,
+        market="SH",
+        price=10.0,
+        pct_change=pct,
+        volume=1000,
+        amount=1.0,
         volume_ratio=vr,
     )
 

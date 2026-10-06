@@ -1,4 +1,5 @@
 """QuoteDatabase: async SQLAlchemy wrapper for data/quotes.db."""
+
 from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import (

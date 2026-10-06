@@ -6,10 +6,19 @@ from quote_watcher.store.tick import TickRing
 
 def make_snap(ticker: str, price: float, ts: int = 0) -> QuoteSnapshot:
     return QuoteSnapshot(
-        ticker=ticker, market="SH", name="X",
+        ticker=ticker,
+        market="SH",
+        name="X",
         ts=datetime.fromtimestamp(ts, tz=UTC),
-        price=price, open=0, high=0, low=0, prev_close=price,
-        volume=0, amount=0.0, bid1=0, ask1=0,
+        price=price,
+        open=0,
+        high=0,
+        low=0,
+        prev_close=price,
+        volume=0,
+        amount=0.0,
+        bid1=0,
+        ask1=0,
     )
 
 

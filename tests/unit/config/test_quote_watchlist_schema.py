@@ -9,9 +9,11 @@ from news_pipeline.config.schema import (
 
 
 def test_minimal_quote_watchlist():
-    f = QuoteWatchlistFile(cn=[
-        QuoteTickerEntry(ticker="600519", name="贵州茅台", market="SH"),
-    ])
+    f = QuoteWatchlistFile(
+        cn=[
+            QuoteTickerEntry(ticker="600519", name="贵州茅台", market="SH"),
+        ]
+    )
     assert f.cn[0].ticker == "600519"
     assert f.us == []
     assert f.market_scans == {}
@@ -19,10 +21,12 @@ def test_minimal_quote_watchlist():
 
 def test_duplicate_ticker_rejected():
     with pytest.raises(ValidationError, match="duplicate"):
-        QuoteWatchlistFile(cn=[
-            QuoteTickerEntry(ticker="600519", name="X", market="SH"),
-            QuoteTickerEntry(ticker="600519", name="Y", market="SH"),
-        ])
+        QuoteWatchlistFile(
+            cn=[
+                QuoteTickerEntry(ticker="600519", name="X", market="SH"),
+                QuoteTickerEntry(ticker="600519", name="Y", market="SH"),
+            ]
+        )
 
 
 def test_market_scans_defaults():

@@ -65,7 +65,7 @@ def test_rsi_returns_none_when_insufficient():
 
 def test_rsi_all_gains_returns_100():
     # Strictly increasing series → no losses → RSI saturates at 100
-    closes = [float(i) for i in range(20)]   # 0,1,2,...,19
+    closes = [float(i) for i in range(20)]  # 0,1,2,...,19
     val = rsi(closes, 14)
     assert val == 100.0
 
@@ -81,8 +81,26 @@ def test_rsi_known_value():
     (Welles Wilder, "New Concepts in Technical Trading Systems"):
     """
     closes = [
-        44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08,
-        45.89, 46.03, 45.61, 46.28, 46.28, 46.00, 46.03, 46.41, 46.22, 45.64,
+        44.34,
+        44.09,
+        44.15,
+        43.61,
+        44.33,
+        44.83,
+        45.10,
+        45.42,
+        45.84,
+        46.08,
+        45.89,
+        46.03,
+        45.61,
+        46.28,
+        46.28,
+        46.00,
+        46.03,
+        46.41,
+        46.22,
+        45.64,
     ]
     val = rsi(closes, 14)
     # Reference value computed via Wilder smoothing (~57.9)
@@ -93,6 +111,7 @@ def test_rsi_known_value():
 def test_rsi_overbought_oversold_thresholds():
     """RSI is bounded in [0, 100] for any input."""
     import random
+
     rng = random.Random(42)
     closes = [100.0 + rng.uniform(-2, 2) for _ in range(50)]
     val = rsi(closes, 14)

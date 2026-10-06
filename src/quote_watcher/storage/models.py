@@ -1,4 +1,5 @@
 """SQLAlchemy models for data/quotes.db."""
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -51,9 +52,7 @@ class QuoteBarDaily(Base):
     prev_close: Mapped[float] = mapped_column(Float, nullable=False)
     volume: Mapped[int] = mapped_column(BigInteger, nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
-    __table_args__ = (
-        UniqueConstraint("ticker", "trade_date", name="uq_bardaily_ticker_date"),
-    )
+    __table_args__ = (UniqueConstraint("ticker", "trade_date", name="uq_bardaily_ticker_date"),)
 
 
 class AlertState(Base):

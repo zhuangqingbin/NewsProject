@@ -5,8 +5,13 @@ from quote_watcher.feeds.market_scan import MarketRow
 
 def _row(ticker: str, pct: float, vr: float | None = 1.0) -> MarketRow:
     return MarketRow(
-        ticker=ticker, name=ticker, market="SH",
-        price=10.0, pct_change=pct, volume=1000, amount=1.0,
+        ticker=ticker,
+        name=ticker,
+        market="SH",
+        price=10.0,
+        pct_change=pct,
+        volume=1000,
+        amount=1.0,
         volume_ratio=vr,
     )
 
@@ -45,7 +50,7 @@ def test_score_above_filters_movers():
 
 def test_score_above_filters_volume_ratio_separately():
     rows = [
-        _row("HOT", 0.5, 9.0),   # below pct threshold but big vol_ratio
+        _row("HOT", 0.5, 9.0),  # below pct threshold but big vol_ratio
         _row("COLD", 0.5, 1.0),
     ]
     cfg = MarketScansCfg(push_top_n=5, only_when_score_above=8.0)

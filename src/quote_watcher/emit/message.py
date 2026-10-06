@@ -1,4 +1,5 @@
 """Build CommonMessage from AlertVerdict — single rule and burst (multi-rule same ticker)."""
+
 from __future__ import annotations
 
 from quote_watcher.alerts.verdict import AlertVerdict

@@ -19,7 +19,9 @@ async def test_poll_quotes_skips_when_market_closed():
     ring = TickRing()
     closed_dt = datetime(2026, 5, 9, 10, 0, tzinfo=BJ)  # Saturday
     snaps = await poll_quotes(
-        feed=feed, calendar=cal, ring=ring,
+        feed=feed,
+        calendar=cal,
+        ring=ring,
         tickers=[("SH", "600519")],
         now=closed_dt,
     )
@@ -30,10 +32,19 @@ async def test_poll_quotes_skips_when_market_closed():
 @pytest.mark.asyncio
 async def test_poll_quotes_appends_to_ring():
     snap = QuoteSnapshot(
-        ticker="600519", market="SH", name="X",
+        ticker="600519",
+        market="SH",
+        name="X",
         ts=datetime(2026, 5, 8, 10, 0, tzinfo=BJ),
-        price=1789.5, open=1820, high=1825, low=1788, prev_close=1815.5,
-        volume=100, amount=1.0, bid1=1789.5, ask1=1789.6,
+        price=1789.5,
+        open=1820,
+        high=1825,
+        low=1788,
+        prev_close=1815.5,
+        volume=100,
+        amount=1.0,
+        bid1=1789.5,
+        ask1=1789.6,
     )
     feed = AsyncMock()
     feed.fetch.return_value = [snap]
@@ -42,7 +53,9 @@ async def test_poll_quotes_appends_to_ring():
 
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)  # Friday morning
     snaps = await poll_quotes(
-        feed=feed, calendar=cal, ring=ring,
+        feed=feed,
+        calendar=cal,
+        ring=ring,
         tickers=[("SH", "600519")],
         now=open_dt,
     )
@@ -58,7 +71,9 @@ async def test_poll_quotes_handles_empty_response():
     cal = MarketCalendar()
     ring = TickRing()
     snaps = await poll_quotes(
-        feed=feed, calendar=cal, ring=ring,
+        feed=feed,
+        calendar=cal,
+        ring=ring,
         tickers=[("SH", "600519")],
         now=datetime(2026, 5, 8, 10, 0, tzinfo=BJ),
     )

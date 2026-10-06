@@ -12,17 +12,27 @@ BJ = ZoneInfo("Asia/Shanghai")
 def _v(rule_id: str, expr: str, ctx: dict) -> AlertVerdict:
     rule = AlertRule(id=rule_id, kind=AlertKind.THRESHOLD, ticker="600519", expr=expr)
     snap = QuoteSnapshot(
-        ticker="600519", market="SH", name="贵州茅台",
+        ticker="600519",
+        market="SH",
+        name="贵州茅台",
         ts=datetime(2026, 5, 8, 14, 30, 25, tzinfo=BJ),
-        price=1789.5, open=1820, high=1825, low=1788, prev_close=1845.36,
-        volume=2823100, amount=5.04e9, bid1=1789.5, ask1=1789.51,
+        price=1789.5,
+        open=1820,
+        high=1825,
+        low=1788,
+        prev_close=1845.36,
+        volume=2823100,
+        amount=5.04e9,
+        bid1=1789.5,
+        ask1=1789.51,
     )
     return AlertVerdict(rule=rule, snapshot=snap, ctx_dump=ctx)
 
 
 def test_single_alert_message_drop():
     v = _v(
-        "maotai_drop_3pct", "pct_change_intraday <= -3.0",
+        "maotai_drop_3pct",
+        "pct_change_intraday <= -3.0",
         {"price_now": 1789.5, "pct_change_intraday": -3.03, "volume_ratio": 2.1},
     )
     msg = build_alert_message(v)
@@ -38,15 +48,26 @@ def test_single_alert_message_drop():
 
 def test_single_alert_message_up():
     v = _v(
-        "x_jump", "pct_change_intraday >= 3.0",
+        "x_jump",
+        "pct_change_intraday >= 3.0",
         {"price_now": 1900, "pct_change_intraday": 3.0},
     )
     snap = v.snapshot
     # patch snap to be positive — easiest: re-create
     new_snap = QuoteSnapshot(
-        ticker=snap.ticker, market=snap.market, name=snap.name,
-        ts=snap.ts, price=1900, open=1850, high=1900, low=1850, prev_close=1845.36,
-        volume=snap.volume, amount=snap.amount, bid1=1900, ask1=1900.01,
+        ticker=snap.ticker,
+        market=snap.market,
+        name=snap.name,
+        ts=snap.ts,
+        price=1900,
+        open=1850,
+        high=1900,
+        low=1850,
+        prev_close=1845.36,
+        volume=snap.volume,
+        amount=snap.amount,
+        bid1=1900,
+        ask1=1900.01,
     )
     v = AlertVerdict(rule=v.rule, snapshot=new_snap, ctx_dump=v.ctx_dump)
     msg = build_alert_message(v)
@@ -67,6 +88,7 @@ def test_burst_merge_combines_verdicts():
 
 def test_burst_message_empty_raises():
     import pytest
+
     with pytest.raises(AssertionError):
         build_burst_message([])
 

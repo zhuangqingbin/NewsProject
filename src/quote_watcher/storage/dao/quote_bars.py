@@ -1,4 +1,5 @@
 """DAO for quote_bars_daily / quote_bars_1min."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -45,11 +46,19 @@ class QuoteBarsDailyDAO:
                     )
                 ).scalar_one_or_none()
                 if existing is None:
-                    sess.add(QuoteBarDaily(
-                        ticker=ticker, trade_date=d,
-                        open=o, high=h, low=low, close=c, prev_close=pc,
-                        volume=vol, amount=amt,
-                    ))
+                    sess.add(
+                        QuoteBarDaily(
+                            ticker=ticker,
+                            trade_date=d,
+                            open=o,
+                            high=h,
+                            low=low,
+                            close=c,
+                            prev_close=pc,
+                            volume=vol,
+                            amount=amt,
+                        )
+                    )
                 else:
                     existing.open = o
                     existing.high = h

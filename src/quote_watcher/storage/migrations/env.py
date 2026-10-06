@@ -1,4 +1,5 @@
 """Alembic env for quote_watcher / quotes.db."""
+
 from __future__ import annotations
 
 from logging.config import fileConfig

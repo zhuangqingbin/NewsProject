@@ -5,19 +5,23 @@ from news_pipeline.config.schema import HoldingEntry, HoldingsFile, PortfolioCfg
 
 
 def test_minimal_holdings():
-    h = HoldingsFile(holdings=[
-        HoldingEntry(ticker="600519", qty=100, cost_per_share=1850.0),
-    ])
+    h = HoldingsFile(
+        holdings=[
+            HoldingEntry(ticker="600519", qty=100, cost_per_share=1850.0),
+        ]
+    )
     assert h.holdings[0].ticker == "600519"
     assert h.portfolio.base_currency == "CNY"
 
 
 def test_duplicate_holding_rejected():
     with pytest.raises(ValidationError, match="duplicate"):
-        HoldingsFile(holdings=[
-            HoldingEntry(ticker="600519", qty=100, cost_per_share=1850.0),
-            HoldingEntry(ticker="600519", qty=200, cost_per_share=1900.0),
-        ])
+        HoldingsFile(
+            holdings=[
+                HoldingEntry(ticker="600519", qty=100, cost_per_share=1850.0),
+                HoldingEntry(ticker="600519", qty=200, cost_per_share=1900.0),
+            ]
+        )
 
 
 def test_negative_qty_rejected():

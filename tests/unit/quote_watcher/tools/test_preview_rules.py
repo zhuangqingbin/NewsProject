@@ -1,4 +1,5 @@
 """Smoke test for preview_rules CLI argparse — actual replay tested manually."""
+
 from __future__ import annotations
 
 from datetime import date

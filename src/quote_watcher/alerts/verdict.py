@@ -1,4 +1,5 @@
 """AlertVerdict — what AlertEngine emits when a rule fires."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

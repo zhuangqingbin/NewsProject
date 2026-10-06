@@ -1,4 +1,5 @@
 """DAO for the alert_state table (cooldown tracking)."""
+
 from __future__ import annotations
 
 from sqlalchemy import select
@@ -39,12 +40,15 @@ class AlertStateDAO:
                 )
             ).scalar_one_or_none()
             if existing is None:
-                sess.add(AlertState(
-                    rule_id=rule_id, ticker=ticker,
-                    last_triggered_at=last_triggered_at,
-                    last_value=last_value,
-                    trigger_count_today=1,
-                ))
+                sess.add(
+                    AlertState(
+                        rule_id=rule_id,
+                        ticker=ticker,
+                        last_triggered_at=last_triggered_at,
+                        last_value=last_value,
+                        trigger_count_today=1,
+                    )
+                )
             else:
                 existing.last_triggered_at = last_triggered_at
                 existing.last_value = last_value

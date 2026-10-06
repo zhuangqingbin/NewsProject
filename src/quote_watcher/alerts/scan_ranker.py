@@ -1,4 +1,5 @@
 """Rank market spot rows for digest message."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

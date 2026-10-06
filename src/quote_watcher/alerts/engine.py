@@ -1,4 +1,5 @@
 """AlertEngine: evaluate alert rules against a QuoteSnapshot or portfolio."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -56,8 +57,7 @@ class AlertEngine:
 
         # 1) threshold rules for this ticker
         threshold_rules = [
-            r for r in self._rules
-            if r.kind == AlertKind.THRESHOLD and r.ticker == snap.ticker
+            r for r in self._rules if r.kind == AlertKind.THRESHOLD and r.ticker == snap.ticker
         ]
         if threshold_rules:
             ctx = build_threshold_context(
@@ -71,8 +71,7 @@ class AlertEngine:
 
         # 2) composite holding rules for this ticker
         composite_holding_rules = [
-            r for r in self._rules
-            if r.kind == AlertKind.COMPOSITE and r.holding == snap.ticker
+            r for r in self._rules if r.kind == AlertKind.COMPOSITE and r.holding == snap.ticker
         ]
         if composite_holding_rules:
             holding = self._holdings_by_ticker.get(snap.ticker)
@@ -80,15 +79,16 @@ class AlertEngine:
                 log.warning("composite_rule_holding_missing", ticker=snap.ticker)
             else:
                 ctx = build_composite_holding_context(
-                    snap, holding,
-                    volume_avg5d=volume_avg5d, volume_avg20d=volume_avg20d,
+                    snap,
+                    holding,
+                    volume_avg5d=volume_avg5d,
+                    volume_avg20d=volume_avg20d,
                 )
                 out += await self._run_rules(composite_holding_rules, snap, ctx)
 
         # 3) indicator rules for this ticker
         indicator_rules = [
-            r for r in self._rules
-            if r.kind == AlertKind.INDICATOR and r.ticker == snap.ticker
+            r for r in self._rules if r.kind == AlertKind.INDICATOR and r.ticker == snap.ticker
         ]
         if indicator_rules:
             if self._kline_cache is None:
@@ -100,17 +100,18 @@ class AlertEngine:
             else:
                 bars = await self._kline_cache.get_cached(snap.ticker, days=250)
                 ctx = build_indicator_context(
-                    snap, bars=bars,
-                    volume_avg5d=volume_avg5d, volume_avg20d=volume_avg20d,
+                    snap,
+                    bars=bars,
+                    volume_avg5d=volume_avg5d,
+                    volume_avg20d=volume_avg20d,
                 )
                 out += await self._run_rules(indicator_rules, snap, ctx)
 
         # 4) event rules with target_kind=ticker (limit_up/down etc)
         event_ticker_rules = [
-            r for r in self._rules
-            if r.kind == AlertKind.EVENT
-            and r.target_kind == "ticker"
-            and r.ticker == snap.ticker
+            r
+            for r in self._rules
+            if r.kind == AlertKind.EVENT and r.target_kind == "ticker" and r.ticker == snap.ticker
         ]
         if event_ticker_rules:
             ctx = build_threshold_context(
@@ -125,12 +126,11 @@ class AlertEngine:
         return out
 
     async def evaluate_portfolio(
-        self, *, snaps_by_ticker: dict[str, QuoteSnapshot],
+        self,
+        *,
+        snaps_by_ticker: dict[str, QuoteSnapshot],
     ) -> list[AlertVerdict]:
-        portfolio_rules = [
-            r for r in self._rules
-            if r.kind == AlertKind.COMPOSITE and r.portfolio
-        ]
+        portfolio_rules = [r for r in self._rules if r.kind == AlertKind.COMPOSITE and r.portfolio]
         if not portfolio_rules:
             return []
         any_snap = next(iter(snaps_by_ticker.values()), None)
@@ -147,7 +147,8 @@ class AlertEngine:
                 await self._tracker.bump_count(rule.id, _PORTFOLIO_TICKER_KEY)
                 continue
             await self._tracker.mark_triggered(
-                rule.id, _PORTFOLIO_TICKER_KEY,
+                rule.id,
+                _PORTFOLIO_TICKER_KEY,
                 value=ctx.get("total_unrealized_pnl_pct"),
             )
             out.append(AlertVerdict(rule=rule, snapshot=any_snap, ctx_dump=dict(ctx)))
@@ -159,10 +160,9 @@ class AlertEngine:
     ) -> list[AlertVerdict]:
         """Evaluate kind=EVENT + target_kind=sector rules."""
         sector_rules = [
-            r for r in self._rules
-            if r.kind == AlertKind.EVENT
-            and r.target_kind == "sector"
-            and r.sector is not None
+            r
+            for r in self._rules
+            if r.kind == AlertKind.EVENT and r.target_kind == "sector" and r.sector is not None
         ]
         if not sector_rules:
             return []
@@ -180,7 +180,9 @@ class AlertEngine:
                 await self._tracker.bump_count(rule.id, cooldown_key)
                 continue
             await self._tracker.mark_triggered(
-                rule.id, cooldown_key, value=ctx.get("sector_pct_change"),
+                rule.id,
+                cooldown_key,
+                value=ctx.get("sector_pct_change"),
             )
             placeholder = self._sector_placeholder_snapshot(rule.sector, sector_snap)
             out.append(AlertVerdict(rule=rule, snapshot=placeholder, ctx_dump=dict(ctx)))
@@ -188,16 +190,27 @@ class AlertEngine:
 
     @staticmethod
     def _sector_placeholder_snapshot(
-        sector: str, sector_snap: SectorSnapshot,
+        sector: str,
+        sector_snap: SectorSnapshot,
     ) -> QuoteSnapshot:
         """Synthetic snapshot for sector verdicts — emit code uses .ts and .name."""
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         return QuoteSnapshot(
-            ticker=f"sector:{sector}", market="SH", name=sector,
+            ticker=f"sector:{sector}",
+            market="SH",
+            name=sector,
             ts=datetime.now(ZoneInfo("Asia/Shanghai")),
-            price=0.0, open=0.0, high=0.0, low=0.0, prev_close=0.0,
-            volume=0, amount=0.0, bid1=0.0, ask1=0.0,
+            price=0.0,
+            open=0.0,
+            high=0.0,
+            low=0.0,
+            prev_close=0.0,
+            volume=0,
+            amount=0.0,
+            bid1=0.0,
+            ask1=0.0,
         )
 
     async def _run_rules(
@@ -210,13 +223,13 @@ class AlertEngine:
         for rule in rules:
             if not self._eval_expr(rule, ctx):
                 continue
-            if await self._tracker.is_in_cooldown(
-                rule.id, snap.ticker, rule.cooldown_min
-            ):
+            if await self._tracker.is_in_cooldown(rule.id, snap.ticker, rule.cooldown_min):
                 await self._tracker.bump_count(rule.id, snap.ticker)
                 continue
             await self._tracker.mark_triggered(
-                rule.id, snap.ticker, value=ctx.get("price_now"),
+                rule.id,
+                snap.ticker,
+                value=ctx.get("price_now"),
             )
             out.append(AlertVerdict(rule=rule, snapshot=snap, ctx_dump=dict(ctx)))
         return out

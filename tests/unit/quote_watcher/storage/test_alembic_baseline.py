@@ -1,4 +1,5 @@
 """Verify the alembic baseline migration produces the same schema as Base.metadata.create_all."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -25,9 +26,7 @@ async def test_alembic_upgrade_creates_all_tables(tmp_path: Path) -> None:
     engine = create_engine(sync_url)
     insp = inspect(engine)
     tables = set(insp.get_table_names())
-    assert {"quote_bars_1min", "quote_bars_daily", "alert_state", "alert_history"}.issubset(
-        tables
-    )
+    assert {"quote_bars_1min", "quote_bars_daily", "alert_state", "alert_history"}.issubset(tables)
     engine.dispose()
 
 

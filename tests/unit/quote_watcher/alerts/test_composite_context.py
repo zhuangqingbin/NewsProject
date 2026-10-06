@@ -13,10 +13,19 @@ BJ = ZoneInfo("Asia/Shanghai")
 
 def make_snap(ticker: str, price: float) -> QuoteSnapshot:
     return QuoteSnapshot(
-        ticker=ticker, market="SH", name="X",
+        ticker=ticker,
+        market="SH",
+        name="X",
         ts=datetime(2026, 5, 8, 10, 0, tzinfo=BJ),
-        price=price, open=price, high=price, low=price,
-        prev_close=price, volume=100, amount=1.0, bid1=price, ask1=price + 0.01,
+        price=price,
+        open=price,
+        high=price,
+        low=price,
+        prev_close=price,
+        volume=100,
+        amount=1.0,
+        bid1=price,
+        ask1=price + 0.01,
     )
 
 
@@ -59,7 +68,7 @@ def test_portfolio_context_total_pnl():
     )
     snaps = {
         "600519": make_snap("600519", 1700.0),  # -150 x 100 = -15000
-        "300750": make_snap("300750", 200.0),   # -20 x 200 = -4000
+        "300750": make_snap("300750", 200.0),  # -20 x 200 = -4000
     }
     ctx = build_composite_portfolio_context(holdings, snaps)
     assert ctx["total_unrealized_pnl"] == -15000 + -4000

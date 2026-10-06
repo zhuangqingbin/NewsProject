@@ -3,6 +3,7 @@
 Pure functions — no I/O. Used by `build_indicator_context` to inject into
 asteval as both pre-computed values (e.g. ma5) and callables (e.g. cross_above).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,14 +18,20 @@ def ma(closes: list[float], n: int) -> float | None:
 
 
 def cross_above(
-    today_a: float, today_b: float, yday_a: float, yday_b: float,
+    today_a: float,
+    today_b: float,
+    yday_a: float,
+    yday_b: float,
 ) -> bool:
     """True iff `a` crossed above `b` between yesterday and today."""
     return today_a > today_b and yday_a <= yday_b
 
 
 def cross_below(
-    today_a: float, today_b: float, yday_a: float, yday_b: float,
+    today_a: float,
+    today_b: float,
+    yday_a: float,
+    yday_b: float,
 ) -> bool:
     """True iff `a` crossed below `b` between yesterday and today."""
     return today_a < today_b and yday_a >= yday_b

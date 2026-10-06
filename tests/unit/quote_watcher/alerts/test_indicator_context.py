@@ -11,18 +11,33 @@ BJ = ZoneInfo("Asia/Shanghai")
 
 def _bar(d: date, close: float) -> DailyBar:
     return DailyBar(
-        ticker="600519", trade_date=d,
-        open=close, high=close, low=close, close=close, prev_close=close,
-        volume=1000, amount=10000.0,
+        ticker="600519",
+        trade_date=d,
+        open=close,
+        high=close,
+        low=close,
+        close=close,
+        prev_close=close,
+        volume=1000,
+        amount=10000.0,
     )
 
 
 def make_snap(price: float) -> QuoteSnapshot:
     return QuoteSnapshot(
-        ticker="600519", market="SH", name="X",
+        ticker="600519",
+        market="SH",
+        name="X",
         ts=datetime(2026, 5, 8, 10, 0, tzinfo=BJ),
-        price=price, open=price, high=price, low=price,
-        prev_close=price, volume=100, amount=1.0, bid1=price, ask1=price,
+        price=price,
+        open=price,
+        high=price,
+        low=price,
+        prev_close=price,
+        volume=100,
+        amount=1.0,
+        bid1=price,
+        ask1=price,
     )
 
 

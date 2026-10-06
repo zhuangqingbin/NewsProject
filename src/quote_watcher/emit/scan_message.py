@@ -1,4 +1,5 @@
 """Build market_scan digest CommonMessage from ScanResult."""
+
 from __future__ import annotations
 
 from datetime import datetime

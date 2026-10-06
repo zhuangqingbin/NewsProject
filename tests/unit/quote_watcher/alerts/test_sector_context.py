@@ -4,7 +4,9 @@ from quote_watcher.feeds.sector import SectorSnapshot
 
 def test_basic_sector_ctx():
     snap = SectorSnapshot(
-        name="半导体", pct_change=3.5, turnover_rate=5.2,
+        name="半导体",
+        pct_change=3.5,
+        turnover_rate=5.2,
     )
     ctx = build_sector_context("半导体", snap)
     assert ctx["sector_pct_change"] == 3.5
@@ -14,7 +16,9 @@ def test_basic_sector_ctx():
 
 def test_sector_ctx_none_volume_ratio():
     snap = SectorSnapshot(
-        name="新能源", pct_change=-2.0, volume_ratio=None,
+        name="新能源",
+        pct_change=-2.0,
+        volume_ratio=None,
     )
     ctx = build_sector_context("新能源", snap)
     assert ctx["sector_volume_ratio"] == 0.0
@@ -23,7 +27,10 @@ def test_sector_ctx_none_volume_ratio():
 
 def test_sector_ctx_with_volume_ratio():
     snap = SectorSnapshot(
-        name="半导体", pct_change=4.0, volume_ratio=1.8, turnover_rate=6.0,
+        name="半导体",
+        pct_change=4.0,
+        volume_ratio=1.8,
+        turnover_rate=6.0,
     )
     ctx = build_sector_context("半导体", snap)
     assert ctx["sector_volume_ratio"] == 1.8

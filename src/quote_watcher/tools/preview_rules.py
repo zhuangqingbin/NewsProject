@@ -4,6 +4,7 @@ Usage:
     uv run python -m quote_watcher.tools.preview_rules \\
         --tickers 600519,300750 --since 2026-04-01 --until 2026-05-08
 """
+
 from __future__ import annotations
 
 import argparse
@@ -86,10 +87,7 @@ async def preview(
     await db.initialize()
     dao = QuoteBarsDailyDAO(db)
 
-    indicator_rules = [
-        r for r in cfg.alerts.alerts
-        if r.kind == AlertKind.INDICATOR
-    ]
+    indicator_rules = [r for r in cfg.alerts.alerts if r.kind == AlertKind.INDICATOR]
     if not indicator_rules:
         print("No INDICATOR rules configured. Add some to config/alerts.yml first.")
         await db.close()
@@ -102,10 +100,7 @@ async def preview(
         all_bars_rows = await dao.list_recent(ticker, days=500)
         all_bars = [_row_to_bar(ticker, r) for r in all_bars_rows]
         if not all_bars:
-            print(
-                f"[{ticker}] No daily K data found in DB. "
-                "Run main.py first to warm cache."
-            )
+            print(f"[{ticker}] No daily K data found in DB. Run main.py first to warm cache.")
             continue
 
         ticker_rules = [r for r in indicator_rules if r.ticker == ticker]

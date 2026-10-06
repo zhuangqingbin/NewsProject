@@ -15,8 +15,13 @@ BJ = ZoneInfo("Asia/Shanghai")
 
 def _row(ticker: str, pct: float, vr: float | None = 1.0) -> MarketRow:
     return MarketRow(
-        ticker=ticker, name=ticker, market="SH",
-        price=10.0, pct_change=pct, volume=1000, amount=1.0,
+        ticker=ticker,
+        name=ticker,
+        market="SH",
+        price=10.0,
+        pct_change=pct,
+        volume=1000,
+        amount=1.0,
         volume_ratio=vr,
     )
 
@@ -32,8 +37,12 @@ async def test_scan_market_skips_when_market_closed():
     # Saturday
     closed = datetime(2026, 5, 9, 10, 0, tzinfo=BJ)
     n = await scan_market(
-        feed=feed, calendar=cal, dispatcher=dispatcher, channels=["feishu_cn"],
-        cfg=cfg, now=closed,
+        feed=feed,
+        calendar=cal,
+        dispatcher=dispatcher,
+        channels=["feishu_cn"],
+        cfg=cfg,
+        now=closed,
     )
     assert n == 0
     feed.fetch.assert_not_called()
@@ -51,8 +60,12 @@ async def test_scan_market_dispatches_when_anomalies():
 
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)  # Friday open
     n = await scan_market(
-        feed=feed, calendar=cal, dispatcher=dispatcher, channels=["feishu_cn"],
-        cfg=cfg, now=open_dt,
+        feed=feed,
+        calendar=cal,
+        dispatcher=dispatcher,
+        channels=["feishu_cn"],
+        cfg=cfg,
+        now=open_dt,
     )
     assert n == 1
     feed.fetch.assert_awaited_once()
@@ -70,8 +83,12 @@ async def test_scan_market_no_dispatch_when_all_under_threshold():
 
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)
     n = await scan_market(
-        feed=feed, calendar=cal, dispatcher=dispatcher, channels=["feishu_cn"],
-        cfg=cfg, now=open_dt,
+        feed=feed,
+        calendar=cal,
+        dispatcher=dispatcher,
+        channels=["feishu_cn"],
+        cfg=cfg,
+        now=open_dt,
     )
     assert n == 0
     dispatcher.dispatch.assert_not_called()
@@ -86,8 +103,12 @@ async def test_scan_market_no_channels_no_op():
     cfg = MarketScansCfg()
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)
     n = await scan_market(
-        feed=feed, calendar=cal, dispatcher=dispatcher, channels=[],
-        cfg=cfg, now=open_dt,
+        feed=feed,
+        calendar=cal,
+        dispatcher=dispatcher,
+        channels=[],
+        cfg=cfg,
+        now=open_dt,
     )
     assert n == 0
     feed.fetch.assert_not_called()  # short-circuits before fetch
