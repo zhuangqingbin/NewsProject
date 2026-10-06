@@ -1,5 +1,6 @@
 # src/shared/common/contracts.py
 """Push-layer data contracts shared between news_pipeline and quote_watcher."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -30,6 +31,8 @@ class DigestItem(_Base):
     url: HttpUrl
     summary: str
 
+    section: str = ""
+
 
 class CommonMessage(_Base):
     title: str
@@ -45,3 +48,4 @@ class CommonMessage(_Base):
     # Non-empty for digest messages: each item rendered as `[label](url) summary`.
     digest_items: list[DigestItem] = Field(default_factory=list)
     kind: Literal["news", "alert", "alert_burst", "market_scan", "digest"] = "news"
+    omitted_count: int = Field(default=0, ge=0)

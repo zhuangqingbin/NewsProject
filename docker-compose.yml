@@ -23,6 +23,8 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
     environment:
+      RUN_MIGRATIONS: "1"
+      SEC_USER_AGENT: ${SEC_USER_AGENT:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       TZ: ${TZ:-Asia/Shanghai}
     healthcheck:
@@ -51,12 +53,19 @@ services:
       - ./logs:/app/logs
     environment:
       QUOTE_WATCHER_DB: /app/data/quotes.db
+      QUOTE_FEED: ${QUOTE_FEED:-tencent}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       TZ: ${TZ:-Asia/Shanghai}
     deploy:
       resources:
         limits:
           memory: 512M
+    healthcheck:
+      test: ["CMD", "python", "-m", "news_pipeline.healthcheck", "--subsystem", "quote_watcher"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   datasette:
     image: datasetteproject/datasette:latest

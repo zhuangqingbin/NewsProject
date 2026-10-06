@@ -2,6 +2,7 @@
 
 SinaFeed → AlertEngine → mock dispatcher.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
@@ -24,30 +25,30 @@ from quote_watcher.storage.db import QuoteDatabase
 # If cost was 1850 then pct_change_from_cost is also -8.1%.
 SINA_AT_LOSS = (
     'var hq_str_sh600519="贵州茅台,1850.000,1850.000,1700.000,'
-    '1850.000,1700.000,1700.000,1700.010,2823100,5043500000.00,'
-    '200,1700.000,500,1699.500,300,1699.000,400,1698.500,500,1698.000,'
-    '100,1700.010,200,1700.020,300,1700.030,400,1700.040,500,1700.050,'
+    "1850.000,1700.000,1700.000,1700.010,2823100,5043500000.00,"
+    "200,1700.000,500,1699.500,300,1699.000,400,1698.500,500,1698.000,"
+    "100,1700.010,200,1700.020,300,1700.030,400,1700.040,500,1700.050,"
     '2026-05-08,10:00:25,00";\n'
 )
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_e2e_composite_holding_loss_pushes():
+async def test_e2e_composite_holding_loss_pushes(quote_db: QuoteDatabase):
     respx.get("https://hq.sinajs.cn/list=sh600519").mock(
         return_value=httpx.Response(200, content=SINA_AT_LOSS.encode("gbk"))
     )
 
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     holdings = HoldingsFile(
         holdings=[HoldingEntry(ticker="600519", qty=100, cost_per_share=1850.0)],
         portfolio=PortfolioCfg(total_capital=200000),
     )
     rule = AlertRule(
-        id="maotai_pos_alert", kind=AlertKind.COMPOSITE,
-        holding="600519", expr="pct_change_from_cost <= -8.0",
+        id="maotai_pos_alert",
+        kind=AlertKind.COMPOSITE,
+        holding="600519",
+        expr="pct_change_from_cost <= -8.0",
     )
     engine = AlertEngine(rules=[rule], tracker=tracker, holdings=holdings)
     dispatcher = AsyncMock()
@@ -56,7 +57,10 @@ async def test_e2e_composite_holding_loss_pushes():
     feed = SinaFeed()
     snaps = await feed.fetch([("SH", "600519")])
     pushed = await evaluate_alerts(
-        snaps=snaps, engine=engine, dispatcher=dispatcher, channels=["feishu_cn"],
+        snaps=snaps,
+        engine=engine,
+        dispatcher=dispatcher,
+        channels=["feishu_cn"],
     )
     assert pushed == 1
     msg = dispatcher.dispatch.call_args.args[0]
@@ -66,14 +70,12 @@ async def test_e2e_composite_holding_loss_pushes():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_e2e_portfolio_total_loss_pushes():
+async def test_e2e_portfolio_total_loss_pushes(quote_db: QuoteDatabase):
     respx.get("https://hq.sinajs.cn/list=sh600519").mock(
         return_value=httpx.Response(200, content=SINA_AT_LOSS.encode("gbk"))
     )
 
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     # 600519 cost 1850 x 100 shares = 185000 capital invested
     # current 1700 -> -150 x 100 = -15000 PnL
     # total_capital 200000 -> pnl_pct = -15000/200000 = -7.5%
@@ -82,8 +84,10 @@ async def test_e2e_portfolio_total_loss_pushes():
         portfolio=PortfolioCfg(total_capital=200000),
     )
     rule = AlertRule(
-        id="port_alert", kind=AlertKind.COMPOSITE,
-        portfolio=True, expr="total_unrealized_pnl_pct <= -3.0",
+        id="port_alert",
+        kind=AlertKind.COMPOSITE,
+        portfolio=True,
+        expr="total_unrealized_pnl_pct <= -3.0",
     )
     engine = AlertEngine(rules=[rule], tracker=tracker, holdings=holdings)
     dispatcher = AsyncMock()

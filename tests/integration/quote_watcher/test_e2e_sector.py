@@ -1,12 +1,14 @@
-"""S6 acceptance: fake akshare 板块 → SectorFeed → AlertEngine → mock dispatcher."""
+"""S6 acceptance: fake Eastmoney 板块 → SectorFeed → AlertEngine → mock dispatcher."""
+
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
+import respx
 
 from quote_watcher.alerts.engine import AlertEngine
 from quote_watcher.alerts.rule import AlertKind, AlertRule
@@ -21,17 +23,19 @@ BJ = ZoneInfo("Asia/Shanghai")
 
 
 @pytest.mark.asyncio
-async def test_e2e_sector_surge_pushes():
-    df = pd.DataFrame([
-        {"板块名称": "半导体", "涨跌幅": 3.5, "换手率": 5.2},
-        {"板块名称": "新能源", "涨跌幅": -1.0, "换手率": 2.0},
-    ])
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+async def test_e2e_sector_surge_pushes(quote_db: QuoteDatabase):
+    df = pd.DataFrame(
+        [
+            {"板块名称": "半导体", "涨跌幅": 3.5, "换手率": 5.2},
+            {"板块名称": "新能源", "涨跌幅": -1.0, "换手率": 2.0},
+        ]
+    )
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     rule = AlertRule(
-        id="semi_surge", kind=AlertKind.EVENT,
-        target_kind="sector", sector="半导体",
+        id="semi_surge",
+        kind=AlertKind.EVENT,
+        target_kind="sector",
+        sector="半导体",
         expr="sector_pct_change >= 3.0",
     )
     engine = AlertEngine(rules=[rule], tracker=tracker)
@@ -40,14 +44,22 @@ async def test_e2e_sector_surge_pushes():
     dispatcher.dispatch.return_value = {}
 
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)
-    with patch(
-        "quote_watcher.feeds.sector.ak.stock_board_industry_name_em",
-        return_value=df,
-    ):
+    with respx.mock() as mock:
+        rows = [
+            {"f14": r["板块名称"], "f3": r["涨跌幅"], "f8": r["换手率"], "f10": "-"}
+            for r in df.to_dict("records")
+        ]
+        mock.get("https://push2.eastmoney.com/api/qt/clist/get").respond(
+            200, json={"data": {"diff": rows, "total": len(rows)}}
+        )
         feed = SectorFeed()
         n = await evaluate_sector_alerts(
-            feed=feed, engine=engine, calendar=cal,
-            dispatcher=dispatcher, channels=["feishu_cn"], now=open_dt,
+            feed=feed,
+            engine=engine,
+            calendar=cal,
+            dispatcher=dispatcher,
+            channels=["feishu_cn"],
+            now=open_dt,
         )
     assert n == 1
     msg = dispatcher.dispatch.call_args.args[0]
@@ -55,31 +67,41 @@ async def test_e2e_sector_surge_pushes():
 
 
 @pytest.mark.asyncio
-async def test_e2e_sector_no_trigger_when_calm():
-    df = pd.DataFrame([
-        {"板块名称": "半导体", "涨跌幅": 1.0, "换手率": 5.2},
-        {"板块名称": "新能源", "涨跌幅": -0.5, "换手率": 2.0},
-    ])
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+async def test_e2e_sector_no_trigger_when_calm(quote_db: QuoteDatabase):
+    df = pd.DataFrame(
+        [
+            {"板块名称": "半导体", "涨跌幅": 1.0, "换手率": 5.2},
+            {"板块名称": "新能源", "涨跌幅": -0.5, "换手率": 2.0},
+        ]
+    )
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     rule = AlertRule(
-        id="r1", kind=AlertKind.EVENT,
-        target_kind="sector", sector="半导体",
+        id="r1",
+        kind=AlertKind.EVENT,
+        target_kind="sector",
+        sector="半导体",
         expr="sector_pct_change >= 3.0",
     )
     engine = AlertEngine(rules=[rule], tracker=tracker)
     cal = MarketCalendar()
     dispatcher = AsyncMock()
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)
-    with patch(
-        "quote_watcher.feeds.sector.ak.stock_board_industry_name_em",
-        return_value=df,
-    ):
+    with respx.mock() as mock:
+        rows = [
+            {"f14": r["板块名称"], "f3": r["涨跌幅"], "f8": r["换手率"], "f10": "-"}
+            for r in df.to_dict("records")
+        ]
+        mock.get("https://push2.eastmoney.com/api/qt/clist/get").respond(
+            200, json={"data": {"diff": rows, "total": len(rows)}}
+        )
         feed = SectorFeed()
         n = await evaluate_sector_alerts(
-            feed=feed, engine=engine, calendar=cal,
-            dispatcher=dispatcher, channels=["feishu_cn"], now=open_dt,
+            feed=feed,
+            engine=engine,
+            calendar=cal,
+            dispatcher=dispatcher,
+            channels=["feishu_cn"],
+            now=open_dt,
         )
     assert n == 0
     dispatcher.dispatch.assert_not_called()

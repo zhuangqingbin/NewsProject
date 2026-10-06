@@ -44,9 +44,15 @@ async def test_fts_search(tmp_path):
                     80, 1, 'haiku', '2026-04-25', 'pending')
         """)
         )
+        await s.execute(
+            text("""INSERT INTO events(first_seen_at,last_seen_at,headline,summary,
+            key_numbers,subject_tickers,tagged_tickers,markets,sources,rule_decision,rule_reason)
+            VALUES('2026-10-06','2026-10-06','NVDA latest event','NVDA exports halted',
+                   '[]','[]','[]','[]','[]','push','event')""")
+        )
         await s.commit()
         rows = (
-            await s.execute(text("SELECT rowid FROM news_fts WHERE news_fts MATCH 'exports'"))
+            await s.execute(text("SELECT rowid FROM events_fts WHERE events_fts MATCH 'exports'"))
         ).all()
         assert len(rows) == 1
     await db.close()

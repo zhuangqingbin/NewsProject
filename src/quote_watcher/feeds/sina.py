@@ -1,4 +1,5 @@
 """Sina HQ feed parser and HTTP client."""
+
 from __future__ import annotations
 
 import asyncio
@@ -15,9 +16,7 @@ from shared.observability.log import get_logger
 log = get_logger(__name__)
 
 BJ = ZoneInfo("Asia/Shanghai")
-_LINE_RE = re.compile(
-    r'var hq_str_(?P<mkt>sh|sz|bj)(?P<code>\d{6})="(?P<payload>[^"]*)";'
-)
+_LINE_RE = re.compile(r'var hq_str_(?P<mkt>sh|sz|bj)(?P<code>\d{6})="(?P<payload>[^"]*)";')
 
 
 def parse_sina_response(text: str) -> list[QuoteSnapshot]:
@@ -62,7 +61,7 @@ def _parse_ts(date_str: str, time_str: str) -> datetime:
 class SinaFeed:
     source_id = "sina_hq"
 
-    def __init__(self, *, timeout_sec: float = 5.0, max_retries: int = 1) -> None:
+    def __init__(self, *, timeout_sec: float = 8.0, max_retries: int = 1) -> None:
         self._timeout = timeout_sec
         self._max_retries = max_retries
 
@@ -93,7 +92,8 @@ class SinaFeed:
                 if attempt < self._max_retries:
                     await asyncio.sleep(0)
                     continue
-                log.warning("sina_fetch_failed", error=str(e), tickers=len(tickers))
+                log.warning("sina_fetch_failed", error=repr(e), tickers=len(tickers))
         if last_exc is not None:
-            log.warning("sina_fetch_exhausted", error=str(last_exc))
-        return []
+            log.warning("sina_fetch_exhausted", error=repr(last_exc))
+            raise last_exc
+        raise ValueError("max_retries must be nonnegative")

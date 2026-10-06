@@ -62,6 +62,7 @@ async def test_process_pending_routes_critical_immediately():
         )
     )
     proc_dao = MagicMock()
+    proc_dao.mark_push_status = AsyncMock()
     proc_dao.insert = AsyncMock(return_value=99)
     builder = MagicMock()
     builder.build = MagicMock(
@@ -138,6 +139,7 @@ async def test_send_digest_consumes_buffer():
         return_value={"feishu_us": MagicMock(ok=True, http_status=200, response_body="", retries=0)}
     )
     proc_dao = MagicMock()
+    proc_dao.mark_push_status = AsyncMock()
     proc_dao.get = AsyncMock(side_effect=lambda i: MagicMock(id=i))
 
     n = await send_digest(

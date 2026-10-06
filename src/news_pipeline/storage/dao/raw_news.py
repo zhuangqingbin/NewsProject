@@ -1,17 +1,63 @@
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.timeutil import utc_now
 from news_pipeline.storage.db import Database
 from news_pipeline.storage.models import RawNews
+from shared.common.timeutil import ensure_utc
 
 
 class RawNewsDAO:
     def __init__(self, db: Database) -> None:
         self._db = db
+
+    async def existing_url_hashes(self, hashes: Sequence[str]) -> set[str]:
+        known: set[str] = set()
+        async with self._db.session() as session:
+            for offset in range(0, len(hashes), 500):
+                result = await session.execute(
+                    select(RawNews.url_hash).where(
+                        RawNews.url_hash.in_(hashes[offset : offset + 500])
+                    )
+                )
+                known.update(result.scalars())
+        return known
+
+    async def insert_article(
+        self,
+        article: RawArticle,
+        *,
+        status: str = "pending",
+        extra_meta: dict[str, Any] | None = None,
+    ) -> int:
+        return await self.insert(
+            source=article.source,
+            market=article.market.value,
+            url=str(article.url),
+            url_hash=article.url_hash,
+            title=article.title,
+            title_simhash=article.title_simhash,
+            body=article.body,
+            raw_meta={**article.raw_meta, **(extra_meta or {})},
+            fetched_at_iso=ensure_utc(article.fetched_at).replace(tzinfo=None).isoformat(),
+            published_at_iso=ensure_utc(article.published_at).replace(tzinfo=None).isoformat(),
+            status=status,
+        )
+
+    async def list_v2_pending(self, limit: int = 200) -> list[RawNews]:
+        async with self._db.session() as session:
+            result = await session.execute(
+                select(RawNews)
+                .where(RawNews.v2_state.is_(None), RawNews.status != "seeded")
+                .order_by(RawNews.id)
+                .limit(limit)
+            )
+            return list(result.scalars())
 
     async def insert(
         self,

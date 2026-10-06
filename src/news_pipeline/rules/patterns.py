@@ -7,6 +7,7 @@ from news_pipeline.common.enums import Market
 class PatternKind(StrEnum):
     TICKER = "ticker"
     ALIAS = "alias"
+    PERSON = "person"
     SECTOR = "sector"
     MACRO = "macro"
     GENERIC = "generic"

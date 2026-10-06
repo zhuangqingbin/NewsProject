@@ -86,6 +86,7 @@ def _setup_mocks():
     )
 
     proc_dao = MagicMock()
+    proc_dao.mark_push_status = AsyncMock()
     proc_dao.insert = AsyncMock(return_value=42)
 
     msg_builder = MagicMock()

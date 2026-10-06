@@ -32,6 +32,14 @@ class ImportanceClassifier:
         source: str,
         verdict: RulesVerdict | None = None,
     ) -> ScoredNews:
+        if not self._llm_enabled and verdict is not None and verdict.reason:
+            return ScoredNews(
+                enriched=e,
+                score=min(100, verdict.rank_score),
+                is_critical=verdict.decision == "push",
+                rule_hits=[verdict.reason],
+                llm_reason="rules-v2",
+            )
         rule_hits = self._rules.evaluate(e, source=source)
         score = float(self._rules.score(rule_hits))
         rule_names = [h.name for h in rule_hits]

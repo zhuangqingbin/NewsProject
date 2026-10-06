@@ -1,11 +1,12 @@
 # src/news_pipeline/config/schema.py
+import re
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class _Base(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", validate_default=True)
 
 
 # --- app.yml ---
@@ -17,48 +18,103 @@ class RuntimeCfg(_Base):
     )
 
 
+class PipelineCfg(_Base):
+    mode: Literal["legacy", "shadow", "v2"] = "legacy"
+
+
 class ScrapeIntervalsCfg(_Base):
-    market_hours_interval_sec: int
-    off_hours_interval_sec: int
-    caixin_interval_sec: int
+    # Deprecated: retained until the v2 stability gate permits removing legacy mode.
+    market_hours_interval_sec: int = 180
+    off_hours_interval_sec: int = 1800
+    caixin_interval_sec: int = 60
 
 
 class LLMIntervalCfg(_Base):
-    process_interval_sec: int
+    process_interval_sec: int = 120
+
+
+class DigestSchedule(_Base):
+    at: str
+    tz: str
 
 
 class DigestTimesCfg(_Base):
-    morning_cn: str
-    evening_cn: str
-    morning_us: str
-    evening_us: str
+    cn: list[DigestSchedule] = Field(
+        default_factory=lambda: [
+            DigestSchedule(at="08:27", tz="Asia/Shanghai"),
+            DigestSchedule(at="20:57", tz="Asia/Shanghai"),
+        ]
+    )
+    us: list[DigestSchedule] = Field(
+        default_factory=lambda: [
+            DigestSchedule(at="08:27", tz="America/New_York"),
+            DigestSchedule(at="16:27", tz="America/New_York"),
+        ]
+    )
+    morning_cn: str = "08:30"
+    evening_cn: str = "21:00"
+    morning_us: str = "21:00"
+    evening_us: str = "04:30"
 
 
 class SchedulerCfg(_Base):
-    scrape: ScrapeIntervalsCfg
-    llm: LLMIntervalCfg
-    digest: DigestTimesCfg
+    scrape: ScrapeIntervalsCfg = Field(default_factory=ScrapeIntervalsCfg)
+    llm: LLMIntervalCfg = Field(default_factory=LLMIntervalCfg)
+    digest: DigestTimesCfg = Field(default_factory=DigestTimesCfg)
+
+
+class LLMTaskCfg(_Base):
+    model: str = "qwen-plus"
+    max_tokens: int = Field(default=400, gt=0)
+    prompt_version: str = "assess_v1"
+
+
+class ModelPricing(_Base):
+    input: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    output: float = Field(default=0.0, ge=0, allow_inf_nan=False)
 
 
 class LLMCfg(_Base):
-    tier0_model: str
-    tier1_model: str
-    tier2_model: str
-    tier3_model: str
-    prompt_versions: dict[str, str]
-    enable_prompt_cache: bool
-    enable_batch: bool
+    enabled: bool = False
+    base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    assess: LLMTaskCfg = Field(default_factory=LLMTaskCfg)
+    digest: LLMTaskCfg = Field(
+        default_factory=lambda: LLMTaskCfg(max_tokens=1500, prompt_version="digest_v1")
+    )
+    daily_cost_ceiling_cny: float = Field(default=5.0, gt=0, allow_inf_nan=False)
+    pricing: dict[str, ModelPricing] = Field(default_factory=dict)
+    # Deprecated tier settings support the legacy and shadow rollout paths.
+    tier0_model: str = "deepseek-v3"
+    tier1_model: str = "deepseek-v3"
+    tier2_model: str = "claude-haiku-4-5-20251001"
+    tier3_model: str = "claude-sonnet-4-6"
+    prompt_versions: dict[str, str] = Field(default_factory=dict)
+    enable_prompt_cache: bool = True
+    enable_batch: bool = True
+
+    @model_validator(mode="after")
+    def enabled_models_have_prices(self) -> "LLMCfg":
+        if self.enabled:
+            for model in {self.assess.model, self.digest.model}:
+                price = self.pricing.get(model)
+                if price is None or price.input <= 0 or price.output <= 0:
+                    raise ValueError(
+                        f"llm.pricing: enabled model {model!r} needs positive input/output prices"
+                    )
+        return self
 
 
 class ClassifierRulesCfg(_Base):
-    price_move_critical_pct: float
-    sources_always_critical: list[str]
-    sentiment_high_magnitude_critical: bool
+    price_move_critical_pct: float = 5.0
+    sources_always_critical: list[str] = Field(default_factory=list)
+    sentiment_high_magnitude_critical: bool = True
 
 
 class ClassifierCfg(_Base):
     rules: ClassifierRulesCfg | None = None
-    llm_fallback_when_score: Annotated[list[float], Field(min_length=2, max_length=2)]
+    llm_fallback_when_score: Annotated[list[float], Field(min_length=2, max_length=2)] = Field(
+        default_factory=lambda: [40.0, 70.0]
+    )
 
 
 class DedupCfg(_Base):
@@ -67,21 +123,54 @@ class DedupCfg(_Base):
 
 
 class ChartsCfg(_Base):
-    auto_on_critical: bool
-    auto_on_earnings: bool
-    cache_ttl_days: int
+    auto_on_critical: bool = True
+    auto_on_earnings: bool = True
+    cache_ttl_days: int = 30
+
+
+class QuietHoursCfg(_Base):
+    enabled: bool = False
+    start: str = "00:30"
+    end: str = "07:30"
+    tz: str = "Asia/Shanghai"
+    allow_reasons: list[str] = Field(default_factory=lambda: ["big_move", "tier:high"])
 
 
 class PushCfg(_Base):
-    per_channel_rate: str
-    same_ticker_burst_window_min: int
-    same_ticker_burst_threshold: int
-    digest_max_items_per_section: int
+    max_age_min: int = Field(default=90, gt=0)
+    dedup_window_hours: int = Field(default=6, gt=0)
+    quiet_hours: QuietHoursCfg = Field(default_factory=QuietHoursCfg)
+    color_scheme: Literal["us", "cn"] = "us"
+    push_min_materiality: int = Field(default=4, ge=1, le=5)
+    push_min_materiality_macro: int = Field(default=5, ge=1, le=5)
+    digest_min_materiality: int = Field(default=3, ge=1, le=5)
+    min_confidence: float = Field(default=0.5, ge=0, le=1)
+    quiet_min_materiality: int = Field(default=5, ge=1, le=5)
+    first_party_floor: dict[str, int] = Field(
+        default_factory=lambda: {
+            "tier:high": 4,
+            "tier:normal": 3,
+        }
+    )
+    per_channel_rate: str = "30/min"
+    same_ticker_burst_window_min: int = Field(default=5, gt=0)
+    same_ticker_burst_threshold: int = Field(default=3, gt=0)
+    digest_max_items_per_section: int = 30
+
+
+class DigestCfg(_Base):
+    max_items: int = Field(default=20, gt=0)
+    max_age_hours: int = Field(default=24, gt=0)
+
+
+class OpsCfg(_Base):
+    report_at: str = "08:20"
+    report_channel: str = "feishu_cn"
 
 
 class DeadLetterCfg(_Base):
-    auto_retry_kinds: list[str]
-    notify_only_kinds: list[str]
+    auto_retry_kinds: list[str] = Field(default_factory=list)
+    notify_only_kinds: list[str] = Field(default_factory=list)
     weekly_summary_day: Literal[
         "monday",
         "tuesday",
@@ -90,25 +179,28 @@ class DeadLetterCfg(_Base):
         "friday",
         "saturday",
         "sunday",
-    ]
+    ] = "monday"
 
 
 class RetentionCfg(_Base):
-    raw_news_hot_days: int
-    news_processed_hot_days: int
-    push_log_days: int
+    raw_news_hot_days: int = 30
+    news_processed_hot_days: int = 365
+    push_log_days: int = 90
 
 
 class AppConfig(_Base):
     runtime: RuntimeCfg = Field(default_factory=RuntimeCfg)
-    scheduler: SchedulerCfg
-    llm: LLMCfg
-    classifier: ClassifierCfg
+    pipeline: PipelineCfg = Field(default_factory=PipelineCfg)
+    scheduler: SchedulerCfg = Field(default_factory=SchedulerCfg)
+    llm: LLMCfg = Field(default_factory=LLMCfg)
+    classifier: ClassifierCfg = Field(default_factory=ClassifierCfg)
     dedup: DedupCfg = Field(default_factory=DedupCfg)
-    charts: ChartsCfg
-    push: PushCfg
-    dead_letter: DeadLetterCfg
-    retention: RetentionCfg
+    charts: ChartsCfg = Field(default_factory=ChartsCfg)
+    push: PushCfg = Field(default_factory=PushCfg)
+    digest: DigestCfg = Field(default_factory=DigestCfg)
+    ops: OpsCfg = Field(default_factory=OpsCfg)
+    dead_letter: DeadLetterCfg = Field(default_factory=DeadLetterCfg)
+    retention: RetentionCfg = Field(default_factory=RetentionCfg)
 
 
 # --- watchlist.yml ---
@@ -118,9 +210,16 @@ class TickerEntry(_Base):
     ticker: str
     name: str
     aliases: list[str] = Field(default_factory=list)
+    people: list[str] = Field(default_factory=list)
+    exclude: list[str] = Field(default_factory=list)
     sectors: list[str] = Field(default_factory=list)
     macro_links: list[str] = Field(default_factory=list)
     alerts: list[str] = Field(default_factory=list)  # legacy, LLM-only
+
+    @field_validator("aliases", "people", "exclude", mode="after")
+    @classmethod
+    def lowercase_aliases(cls, values: list[str]) -> list[str]:
+        return [value.lower() for value in values]
 
 
 class MarketKeywords(_Base):
@@ -133,6 +232,7 @@ class MarketKeywords(_Base):
 class RulesSection(_Base):
     enable: bool = True
     gray_zone_action: Literal["skip", "digest", "push"] = "digest"
+    short_alias_allow: list[str] = Field(default_factory=list)
     matcher: str = "aho_corasick"
     matcher_options: dict[str, Any] = Field(default_factory=dict)
     us: list[TickerEntry] = Field(default_factory=list)
@@ -172,6 +272,26 @@ class WatchlistFile(_Base):
                 raise ValueError(f"rules.{market}: duplicate tickers {dups}")
         return self
 
+    @model_validator(mode="after")
+    def aliases_valid(self) -> "WatchlistFile":
+        owners: dict[str, str] = {}
+        allow = {alias.lower() for alias in self.rules.short_alias_allow}
+        for entry in [*self.rules.us, *self.rules.cn]:
+            strong = {entry.ticker.lower(), entry.name.lower(), *entry.aliases}
+            for alias in strong:
+                if re.fullmatch(r"[\u4e00-\u9fff]{1,2}", alias) and alias not in allow:
+                    raise ValueError(f"alias {alias!r}: add to rules.short_alias_allow")
+            for alias in strong | set(entry.people):
+                owner = owners.setdefault(alias, entry.ticker)
+                if owner != entry.ticker:
+                    raise ValueError(
+                        f"alias {alias!r} belongs to two tickers: {owner}, {entry.ticker}"
+                    )
+            for excluded in entry.exclude:
+                if not any(alias in excluded for alias in strong):
+                    raise ValueError(f"{entry.ticker}: exclude {excluded!r} must contain own alias")
+        return self
+
     def effective_us(self) -> list[str]:
         """Tickers in scope for US. When rules.enable=True the rules section is
         the single source of truth (llm.us is ignored, even if llm.enable=True);
@@ -194,19 +314,354 @@ class WatchlistFile(_Base):
             for entry in getattr(self.rules, market):
                 bad_sectors = set(entry.sectors) - sectors_set
                 bad_macros = set(entry.macro_links) - macros_set
-                if bad_sectors:
+                if "sector_keywords" in self.rules.model_fields_set and bad_sectors:
                     raise ValueError(
                         f"{market} ticker {entry.ticker}: "
                         f"sectors {sorted(bad_sectors)} not in "
                         f"sector_keywords.{market}"
                     )
-                if bad_macros:
+                if "macro_keywords" in self.rules.model_fields_set and bad_macros:
                     raise ValueError(
                         f"{market} ticker {entry.ticker}: "
                         f"macro_links {sorted(bad_macros)} not in "
                         f"macro_keywords.{market}"
                     )
         return self
+
+
+# --- scoring.yml / first_party.yml ---
+class ScoringKeywords(_Base):
+    macro: list[str] = Field(
+        default_factory=lambda: [
+            "美联储",
+            "鲍威尔",
+            "FOMC",
+            "降息",
+            "加息",
+            "非农",
+            "CPI",
+            "PCE",
+            "PPI",
+            "PMI",
+            "GDP",
+            "降准",
+            "LPR",
+            "MLF",
+            "逆回购",
+            "社融",
+            "国债收益率",
+            "中国央行",
+            "人民银行",
+            "re:(?<![一-龥])央行",
+        ]
+    )
+    policy: list[str] = Field(
+        default_factory=lambda: [
+            "证监会",
+            "国常会",
+            "财政部",
+            "发改委",
+            "工信部",
+            "商务部",
+            "关税",
+            "出口管制",
+            "制裁",
+            "re:(?<![一-龥])国务院",
+        ]
+    )
+    sector: list[str] = Field(
+        default_factory=lambda: [
+            "半导体",
+            "芯片",
+            "存储",
+            "光模块",
+            "CPO",
+            "光通信",
+            "晶圆",
+            "封测",
+            "人工智能",
+            "算力",
+            "数据中心",
+            "大模型",
+            "机器人",
+            "液冷",
+            "创新药",
+            "CRO",
+            "锂电池",
+            "储能",
+            "新能源车",
+            "电动车",
+            "自动驾驶",
+        ]
+    )
+    en: list[str] = Field(
+        default_factory=lambda: [
+            "Fed",
+            "Powell",
+            "FOMC",
+            "tariff",
+            "rate cut",
+            "rate hike",
+            "export control",
+            "sanction",
+            "semiconductor",
+            "chip",
+        ]
+    )
+
+    @field_validator("macro", "policy", "sector", "en", mode="after")
+    @classmethod
+    def lowercase_keywords(cls, values: list[str]) -> list[str]:
+        out = [value.lower() for value in values]
+        for word in out:
+            if word.startswith("re:"):
+                try:
+                    re.compile(word[3:])
+                except re.error as error:
+                    raise ValueError(
+                        f"invalid keyword regular expression {word!r}: {error}"
+                    ) from error
+        return out
+
+
+class ScoringConfig(_Base):
+    big_move_pct: float = Field(default=5.0, gt=0)
+    lead_window_chars: int = Field(default=12, gt=0)
+    strong_events: list[str] = Field(
+        default_factory=lambda: [
+            "回购",
+            "增持",
+            "减持",
+            "目标价",
+            "评级",
+            "首次覆盖",
+            "财报",
+            "业绩",
+            "营收",
+            "净利",
+            "指引",
+            "预增",
+            "预减",
+            "预亏",
+            "扭亏",
+            "快报",
+            "预告",
+            "收购",
+            "并购",
+            "重组",
+            "分拆",
+            "要约",
+            "私有化",
+            "定增",
+            "配股",
+            "可转债",
+            "中标",
+            "召回",
+            "调查",
+            "处罚",
+            "罚款",
+            "诉讼",
+            "起诉",
+            "禁令",
+            "制裁",
+            "出口管制",
+            "停牌",
+            "复牌",
+            "涨停",
+            "跌停",
+            "辞职",
+            "离职",
+            "裁员",
+            "问询",
+            "立案",
+            "解禁",
+            "质押",
+            "分红",
+            "派息",
+            "拆股",
+            "历史新高",
+            "上调",
+            "下调",
+            "涨价",
+            "降价",
+            "提价",
+        ]
+    )
+    lead_events: list[str] = Field(
+        default_factory=lambda: [
+            "订单",
+            "大单",
+            "合同",
+            "协议",
+            "入股",
+            "建厂",
+            "扩产",
+            "投产",
+            "量产",
+            "交付",
+            "获批",
+            "批准",
+            "许可",
+            "任命",
+            "接任",
+        ]
+    )
+    amount_events: list[str] = Field(default_factory=lambda: ["投资", "融资", "发债", "发行"])
+    roundup_words: list[str] = Field(
+        default_factory=lambda: [
+            "要闻",
+            "一览",
+            "速递",
+            "早知道",
+            "早报",
+            "晚报",
+            "收评",
+            "午评",
+            "开盘",
+            "收盘",
+            "盘中",
+            "异动",
+            "概念",
+            "板块",
+            "普涨",
+            "普跌",
+            "跟涨",
+            "跟跌",
+            "领涨",
+            "领跌",
+            "etf",
+            "净申购",
+            "资金流",
+            "龙虎榜",
+            "多头持仓",
+            "空头持仓",
+            "持仓比例",
+            "持股比例",
+            "成交额",
+            "涨幅榜",
+            "跌幅榜",
+            "周报",
+            "日报",
+            "提醒",
+            "日历",
+            "盘前",
+            "盘后",
+            "夜盘",
+            "期指",
+            "指数",
+            "三大股指",
+            "热门股",
+            "科技股",
+            "中概股",
+            "七姐妹",
+            "金股",
+            "融资买入",
+            "融资融券",
+            "融资余额",
+            "居首",
+            "主力资金",
+            "北向资金",
+            "南向资金",
+            "获买入",
+            "暗盘",
+        ]
+    )
+    keywords: ScoringKeywords = Field(default_factory=ScoringKeywords)
+
+    @field_validator("strong_events", "lead_events", "amount_events", "roundup_words", mode="after")
+    @classmethod
+    def lowercase_words(cls, values: list[str]) -> list[str]:
+        return [value.lower() for value in values]
+
+
+class JuchaoTiers(_Base):
+    low: list[str] = Field(
+        default_factory=lambda: [
+            "法律意见书|核查意见|独立财务顾问|自查表|合规性说明",
+            "管理办法|实施细则|工作细则|议事规则|工作制度|章程",
+            "会议资料|H股公告|港股公告|翌日披露报表|月报表|证券变动",
+        ]
+    )
+    high: list[str] = Field(
+        default_factory=lambda: [
+            "业绩预告|业绩快报|季度报告|半年度报告|年度报告",
+            "回购|增持|减持|权益分派|利润分配|分红",
+            "重大合同|中标|收购|出售|重组|对外投资|签订.*协议|受让|转让",
+            "诉讼|仲裁|处罚|立案|问询函|关注函|监管函",
+            "停牌|复牌|异常波动|澄清|更正|终止",
+            "股权激励.*草案|限制性股票.*草案|员工持股计划.*草案",
+            "质押|解除质押|实际控制人|控股股东.*变更",
+            "辞职|聘任|选举.*董事长",
+        ]
+    )
+    merge_window_min: int = Field(default=10, gt=0)
+    merge_max_items: int = Field(default=5, gt=0)
+
+
+class SECHighTier(_Base):
+    forms: list[str] = Field(
+        default_factory=lambda: [
+            "10-Q",
+            "10-K",
+            "20-F",
+            "SC 13D",
+            "SCHEDULE 13D",
+            "S-1",
+            "424B1",
+            "424B2",
+            "424B3",
+            "424B4",
+            "424B5",
+        ]
+    )
+    items_8k: list[str] = Field(
+        default_factory=lambda: [
+            "1.01",
+            "1.02",
+            "2.01",
+            "2.02",
+            "2.05",
+            "2.06",
+            "3.01",
+            "4.01",
+            "4.02",
+            "5.02",
+        ]
+    )
+    doc_name_6k: list[str] = Field(default_factory=lambda: ["revenue"])
+
+
+class SECLowTier(_Base):
+    forms: list[str] = Field(default_factory=lambda: ["3", "4", "5", "144", "13F-HR"])
+
+
+class SECTiers(_Base):
+    high: SECHighTier = Field(default_factory=SECHighTier)
+    low: SECLowTier = Field(default_factory=SECLowTier)
+    item_labels: dict[str, str] = Field(
+        default_factory=lambda: {
+            "1.01": "签订重大协议",
+            "1.02": "终止重大协议",
+            "2.01": "完成资产收购或处置",
+            "2.02": "经营业绩与财务状况",
+            "2.03": "新增重大债务",
+            "2.05": "重组或裁撤相关成本",
+            "2.06": "重大减值",
+            "3.01": "退市或不符合上市标准的通知",
+            "4.01": "更换审计机构",
+            "4.02": "此前财报不可依赖",
+            "5.02": "董事或高管变动",
+            "5.07": "股东大会表决结果",
+            "7.01": "Reg FD 披露",
+            "8.01": "其他事项",
+            "9.01": "财务报表及附件",
+        }
+    )
+
+
+class FirstPartyConfig(_Base):
+    juchao: JuchaoTiers = Field(default_factory=JuchaoTiers)
+    sec: SECTiers = Field(default_factory=SECTiers)
 
 
 # --- channels.yml ---
@@ -227,6 +682,10 @@ class ChannelsFile(_Base):
 class SourceDef(_Base):
     enabled: bool = True
     interval_sec: int | None = None
+    lookback_min: int = Field(default=360, gt=0)
+    fetch_timeout_sec: int = Field(default=45, gt=0)
+    max_silence_min: int | None = Field(default=None, gt=0)
+    max_silence_off_min: int | None = Field(default=None, gt=0)
     options: dict[str, str] = Field(default_factory=dict)
 
 

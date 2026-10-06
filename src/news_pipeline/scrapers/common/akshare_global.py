@@ -15,6 +15,7 @@ from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
 from news_pipeline.common.hashing import title_simhash, url_hash
 from news_pipeline.common.timeutil import ensure_utc, utc_now
+from news_pipeline.scrapers.common.contract import require_columns
 
 
 class AkshareGlobalScraper:
@@ -30,6 +31,7 @@ class AkshareGlobalScraper:
 
     def _fetch_sync(self, since: datetime) -> list[RawArticle]:
         df = self._news_callable()
+        require_columns(df, ["标题", self.body_col, "发布时间", "链接"], source=self.source_id)
         out: list[RawArticle] = []
         now = utc_now()
         for _, row in df.iterrows():

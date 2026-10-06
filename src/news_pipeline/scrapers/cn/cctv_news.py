@@ -16,6 +16,7 @@ from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
 from news_pipeline.common.hashing import title_simhash, url_hash
 from news_pipeline.common.timeutil import ensure_utc, utc_now
+from news_pipeline.scrapers.common.contract import require_columns
 
 
 class CctvNewsScraper:
@@ -39,6 +40,7 @@ class CctvNewsScraper:
         beijing_yesterday = (utc_now() + timedelta(hours=8) - timedelta(days=1)).date()
         date_str = beijing_yesterday.strftime("%Y%m%d")
         df = self._news_callable(date_str)
+        require_columns(df, ["date", "title", "content"], source=self.source_id)
         out: list[RawArticle] = []
         now = utc_now()
         # Treat the broadcast as published at 19:30 Beijing on `date_str`.

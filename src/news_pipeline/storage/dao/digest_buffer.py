@@ -37,6 +37,15 @@ class DigestBufferDAO:
             )
             return list(res.scalars())
 
+    async def list_pending_market(self, market: str) -> list[DigestBuffer]:
+        async with self._db.session() as session:
+            result = await session.execute(
+                select(DigestBuffer)
+                .where(DigestBuffer.market == market, DigestBuffer.consumed_at.is_(None))
+                .order_by(DigestBuffer.added_at)
+            )
+            return list(result.scalars())
+
     async def mark_consumed(self, ids: Sequence[int]) -> None:
         async with self._db.session() as s:
             for i in ids:

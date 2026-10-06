@@ -1,8 +1,10 @@
 # src/news_pipeline/observability/log.py
 import logging
 import sys
+from typing import cast
 
 import structlog
+from structlog.types import Processor
 
 
 def configure_logging(level: str = "INFO", json_output: bool = True) -> None:
@@ -11,7 +13,9 @@ def configure_logging(level: str = "INFO", json_output: bool = True) -> None:
         stream=sys.stdout,
         format="%(message)s",
     )
-    processors = [
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
@@ -30,4 +34,4 @@ def configure_logging(level: str = "INFO", json_output: bool = True) -> None:
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
-    return structlog.get_logger(name)
+    return cast(structlog.stdlib.BoundLogger, structlog.get_logger(name))

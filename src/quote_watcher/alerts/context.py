@@ -1,4 +1,5 @@
 """Context builder for AlertEngine — produces variable map injected into asteval."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -16,12 +17,22 @@ def build_threshold_context(
     price_high_today_yday: float = 0.0,
     price_low_today_yday: float = 0.0,
 ) -> dict[str, Any]:
-    volume_ratio = (snap.volume / volume_avg5d) if volume_avg5d > 0 else 0.0
+    volume_ratio = (
+        snap.volume_ratio
+        if snap.volume_ratio is not None
+        else (snap.volume / volume_avg5d)
+        if volume_avg5d > 0
+        else 0.0
+    )
     is_limit_up = (
-        snap.ask1 == 0 and snap.bid1 > 0 and snap.price > snap.prev_close * 1.099
+        snap.price >= snap.limit_up - 0.005
+        if snap.limit_up is not None
+        else snap.ask1 == 0 and snap.bid1 > 0 and snap.price > snap.prev_close * 1.099
     )
     is_limit_down = (
-        snap.bid1 == 0 and snap.ask1 > 0 and snap.price < snap.prev_close * 0.901
+        snap.price <= snap.limit_down + 0.005
+        if snap.limit_down is not None
+        else snap.bid1 == 0 and snap.ask1 > 0 and snap.price < snap.prev_close * 0.901
     )
     bj = snap.ts
     return {
@@ -55,7 +66,9 @@ def build_composite_holding_context(
 ) -> dict[str, Any]:
     """Composite context for a single holding — threshold context plus cost/qty/pnl."""
     base = build_threshold_context(
-        snap, volume_avg5d=volume_avg5d, volume_avg20d=volume_avg20d,
+        snap,
+        volume_avg5d=volume_avg5d,
+        volume_avg20d=volume_avg20d,
     )
     pct_from_cost = (
         (snap.price - holding.cost_per_share) / holding.cost_per_share * 100
@@ -68,13 +81,15 @@ def build_composite_holding_context(
         if holding.cost_per_share > 0 and holding.qty > 0
         else 0.0
     )
-    base.update({
-        "cost_per_share": holding.cost_per_share,
-        "qty": holding.qty,
-        "pct_change_from_cost": pct_from_cost,
-        "unrealized_pnl": pnl,
-        "unrealized_pnl_pct": pnl_pct,
-    })
+    base.update(
+        {
+            "cost_per_share": holding.cost_per_share,
+            "qty": holding.qty,
+            "pct_change_from_cost": pct_from_cost,
+            "unrealized_pnl": pnl,
+            "unrealized_pnl_pct": pnl_pct,
+        }
+    )
     return base
 
 
@@ -118,7 +133,9 @@ def build_indicator_context(
     from quote_watcher.store.kline import DailyBar  # noqa: F401 — type reference
 
     base = build_threshold_context(
-        snap, volume_avg5d=volume_avg5d, volume_avg20d=volume_avg20d,
+        snap,
+        volume_avg5d=volume_avg5d,
+        volume_avg20d=volume_avg20d,
     )
     prior_closes: list[float] = [b.close for b in bars]
     closes_today: list[float] = [*prior_closes, snap.price]
@@ -167,29 +184,31 @@ def build_indicator_context(
     def _lowest(n: int) -> float | None:
         return ind.lowest_n_days(closes_today, n)
 
-    base.update({
-        # Pre-computed MA values (today + yesterday for cross detection convenience)
-        "ma5": _ma(5),
-        "ma10": _ma(10),
-        "ma20": _ma(20),
-        "ma60": _ma(60),
-        "ma120": _ma(120),
-        "ma5_yday": _ma_yday(5),
-        "ma10_yday": _ma_yday(10),
-        "ma20_yday": _ma_yday(20),
-        "ma60_yday": _ma_yday(60),
-        "ma120_yday": _ma_yday(120),
-        # MACD pre-computed
-        "macd_dif": macd_dif,
-        "macd_dea": macd_dea,
-        "macd_hist": macd_hist,
-        # Callables
-        "rsi": _rsi,
-        "cross_above": _cross_above,
-        "cross_below": _cross_below,
-        "highest_n_days": _highest,
-        "lowest_n_days": _lowest,
-    })
+    base.update(
+        {
+            # Pre-computed MA values (today + yesterday for cross detection convenience)
+            "ma5": _ma(5),
+            "ma10": _ma(10),
+            "ma20": _ma(20),
+            "ma60": _ma(60),
+            "ma120": _ma(120),
+            "ma5_yday": _ma_yday(5),
+            "ma10_yday": _ma_yday(10),
+            "ma20_yday": _ma_yday(20),
+            "ma60_yday": _ma_yday(60),
+            "ma120_yday": _ma_yday(120),
+            # MACD pre-computed
+            "macd_dif": macd_dif,
+            "macd_dea": macd_dea,
+            "macd_hist": macd_hist,
+            # Callables
+            "rsi": _rsi,
+            "cross_above": _cross_above,
+            "cross_below": _cross_below,
+            "highest_n_days": _highest,
+            "lowest_n_days": _lowest,
+        }
+    )
     return base
 
 

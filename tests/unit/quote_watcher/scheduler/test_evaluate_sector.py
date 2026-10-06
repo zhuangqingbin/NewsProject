@@ -18,13 +18,13 @@ BJ = ZoneInfo("Asia/Shanghai")
 
 
 @pytest.mark.asyncio
-async def test_sector_alerts_dispatches_when_triggered():
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+async def test_sector_alerts_dispatches_when_triggered(quote_db: QuoteDatabase):
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     rule = AlertRule(
-        id="semi_surge", kind=AlertKind.EVENT,
-        target_kind="sector", sector="半导体",
+        id="semi_surge",
+        kind=AlertKind.EVENT,
+        target_kind="sector",
+        sector="半导体",
         expr="sector_pct_change >= 3.0",
     )
     engine = AlertEngine(rules=[rule], tracker=tracker)
@@ -38,8 +38,12 @@ async def test_sector_alerts_dispatches_when_triggered():
 
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)
     n = await evaluate_sector_alerts(
-        feed=feed, engine=engine, calendar=cal,
-        dispatcher=dispatcher, channels=["feishu_cn"], now=open_dt,
+        feed=feed,
+        engine=engine,
+        calendar=cal,
+        dispatcher=dispatcher,
+        channels=["feishu_cn"],
+        now=open_dt,
     )
     assert n == 1
     feed.fetch_pct_changes.assert_awaited_once()
@@ -48,32 +52,34 @@ async def test_sector_alerts_dispatches_when_triggered():
 
 
 @pytest.mark.asyncio
-async def test_sector_alerts_skips_when_market_closed():
+async def test_sector_alerts_skips_when_market_closed(quote_db: QuoteDatabase):
     feed = AsyncMock()
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     engine = AlertEngine(rules=[], tracker=tracker)
     cal = MarketCalendar()
     dispatcher = AsyncMock()
 
     closed = datetime(2026, 5, 9, 10, 0, tzinfo=BJ)  # Saturday
     n = await evaluate_sector_alerts(
-        feed=feed, engine=engine, calendar=cal,
-        dispatcher=dispatcher, channels=["feishu_cn"], now=closed,
+        feed=feed,
+        engine=engine,
+        calendar=cal,
+        dispatcher=dispatcher,
+        channels=["feishu_cn"],
+        now=closed,
     )
     assert n == 0
     feed.fetch_pct_changes.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_sector_alerts_no_trigger_no_dispatch():
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+async def test_sector_alerts_no_trigger_no_dispatch(quote_db: QuoteDatabase):
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     rule = AlertRule(
-        id="r1", kind=AlertKind.EVENT,
-        target_kind="sector", sector="半导体",
+        id="r1",
+        kind=AlertKind.EVENT,
+        target_kind="sector",
+        sector="半导体",
         expr="sector_pct_change >= 3.0",
     )
     engine = AlertEngine(rules=[rule], tracker=tracker)
@@ -86,26 +92,32 @@ async def test_sector_alerts_no_trigger_no_dispatch():
 
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)
     n = await evaluate_sector_alerts(
-        feed=feed, engine=engine, calendar=cal,
-        dispatcher=dispatcher, channels=["feishu_cn"], now=open_dt,
+        feed=feed,
+        engine=engine,
+        calendar=cal,
+        dispatcher=dispatcher,
+        channels=["feishu_cn"],
+        now=open_dt,
     )
     assert n == 0
     dispatcher.dispatch.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_sector_alerts_no_channels_no_op():
+async def test_sector_alerts_no_channels_no_op(quote_db: QuoteDatabase):
     feed = AsyncMock()
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     engine = AlertEngine(rules=[], tracker=tracker)
     cal = MarketCalendar()
     dispatcher = AsyncMock()
     open_dt = datetime(2026, 5, 8, 10, 0, tzinfo=BJ)
     n = await evaluate_sector_alerts(
-        feed=feed, engine=engine, calendar=cal,
-        dispatcher=dispatcher, channels=[], now=open_dt,
+        feed=feed,
+        engine=engine,
+        calendar=cal,
+        dispatcher=dispatcher,
+        channels=[],
+        now=open_dt,
     )
     assert n == 0
     feed.fetch_pct_changes.assert_not_called()

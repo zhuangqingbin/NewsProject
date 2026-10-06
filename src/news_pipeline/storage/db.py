@@ -1,7 +1,8 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -13,6 +14,14 @@ from sqlalchemy.ext.asyncio import (
 class Database:
     def __init__(self, dsn: str) -> None:
         self._engine: AsyncEngine = create_async_engine(dsn, echo=False, pool_pre_ping=True)
+
+        @event.listens_for(self._engine.sync_engine, "connect")
+        def _configure_connection(connection: Any, record: Any) -> None:
+            cursor = connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.close()
+
         self._sessionmaker = async_sessionmaker(self._engine, expire_on_commit=False)
 
     async def initialize(self) -> None:

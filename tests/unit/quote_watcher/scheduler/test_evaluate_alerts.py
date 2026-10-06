@@ -17,22 +17,30 @@ BJ = ZoneInfo("Asia/Shanghai")
 
 def _snap(ticker: str, price: float, prev: float) -> QuoteSnapshot:
     return QuoteSnapshot(
-        ticker=ticker, market="SH", name="贵州茅台",
+        ticker=ticker,
+        market="SH",
+        name="贵州茅台",
         ts=datetime(2026, 5, 8, 10, 0, tzinfo=BJ),
-        price=price, open=prev, high=max(price, prev), low=min(price, prev),
-        prev_close=prev, volume=1000, amount=1.0,
-        bid1=price, ask1=price + 0.01,
+        price=price,
+        open=prev,
+        high=max(price, prev),
+        low=min(price, prev),
+        prev_close=prev,
+        volume=1000,
+        amount=1.0,
+        bid1=price,
+        ask1=price + 0.01,
     )
 
 
 @pytest.mark.asyncio
-async def test_evaluate_alerts_dispatches_when_triggered():
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+async def test_evaluate_alerts_dispatches_when_triggered(quote_db: QuoteDatabase):
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     rule = AlertRule(
-        id="maotai_drop", kind=AlertKind.THRESHOLD,
-        ticker="600519", expr="pct_change_intraday <= -3.0",
+        id="maotai_drop",
+        kind=AlertKind.THRESHOLD,
+        ticker="600519",
+        expr="pct_change_intraday <= -3.0",
     )
     engine = AlertEngine(rules=[rule], tracker=tracker)
     dispatcher = AsyncMock()
@@ -40,7 +48,9 @@ async def test_evaluate_alerts_dispatches_when_triggered():
 
     snap = _snap("600519", price=96.5, prev=100.0)  # -3.5%
     n = await evaluate_alerts(
-        snaps=[snap], engine=engine, dispatcher=dispatcher,
+        snaps=[snap],
+        engine=engine,
+        dispatcher=dispatcher,
         channels=["feishu_cn"],
     )
     assert n == 1
@@ -50,20 +60,22 @@ async def test_evaluate_alerts_dispatches_when_triggered():
 
 
 @pytest.mark.asyncio
-async def test_evaluate_alerts_no_trigger_no_dispatch():
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+async def test_evaluate_alerts_no_trigger_no_dispatch(quote_db: QuoteDatabase):
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     rule = AlertRule(
-        id="r1", kind=AlertKind.THRESHOLD,
-        ticker="600519", expr="pct_change_intraday <= -3.0",
+        id="r1",
+        kind=AlertKind.THRESHOLD,
+        ticker="600519",
+        expr="pct_change_intraday <= -3.0",
     )
     engine = AlertEngine(rules=[rule], tracker=tracker)
     dispatcher = AsyncMock()
 
     snap = _snap("600519", price=99.5, prev=100.0)  # only -0.5%
     n = await evaluate_alerts(
-        snaps=[snap], engine=engine, dispatcher=dispatcher,
+        snaps=[snap],
+        engine=engine,
+        dispatcher=dispatcher,
         channels=["feishu_cn"],
     )
     assert n == 0
@@ -71,15 +83,18 @@ async def test_evaluate_alerts_no_trigger_no_dispatch():
 
 
 @pytest.mark.asyncio
-async def test_evaluate_alerts_burst_merge_for_same_ticker():
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+async def test_evaluate_alerts_burst_merge_for_same_ticker(quote_db: QuoteDatabase):
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     rules = [
-        AlertRule(id="r_pct", kind=AlertKind.THRESHOLD,
-                  ticker="600519", expr="pct_change_intraday <= -3.0"),
-        AlertRule(id="r_vol", kind=AlertKind.THRESHOLD,
-                  ticker="600519", expr="volume_today >= 500"),
+        AlertRule(
+            id="r_pct",
+            kind=AlertKind.THRESHOLD,
+            ticker="600519",
+            expr="pct_change_intraday <= -3.0",
+        ),
+        AlertRule(
+            id="r_vol", kind=AlertKind.THRESHOLD, ticker="600519", expr="volume_today >= 500"
+        ),
     ]
     engine = AlertEngine(rules=rules, tracker=tracker)
     dispatcher = AsyncMock()
@@ -87,7 +102,10 @@ async def test_evaluate_alerts_burst_merge_for_same_ticker():
 
     snap = _snap("600519", price=96.5, prev=100.0)
     await evaluate_alerts(
-        snaps=[snap], engine=engine, dispatcher=dispatcher, channels=["feishu_cn"],
+        snaps=[snap],
+        engine=engine,
+        dispatcher=dispatcher,
+        channels=["feishu_cn"],
     )
     # Both rules trigger but ONE merged message (alert_burst)
     assert dispatcher.dispatch.await_count == 1

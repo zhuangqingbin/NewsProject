@@ -12,7 +12,7 @@ from quote_watcher.storage.db import QuoteDatabase
 
 
 @pytest.mark.asyncio
-async def test_reloader_swaps_engine_rules_on_file_change(tmp_path: Path):
+async def test_reloader_swaps_engine_rules_on_file_change(tmp_path: Path, quote_db: QuoteDatabase):
     alerts_file = tmp_path / "alerts.yml"
     alerts_file.write_text(
         "alerts:\n"
@@ -23,12 +23,12 @@ async def test_reloader_swaps_engine_rules_on_file_change(tmp_path: Path):
         encoding="utf-8",
     )
 
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     rule_old = AlertRule(
-        id="old", kind=AlertKind.THRESHOLD,
-        ticker="000001", expr="pct_change_intraday <= -1.0",
+        id="old",
+        kind=AlertKind.THRESHOLD,
+        ticker="000001",
+        expr="pct_change_intraday <= -1.0",
     )
     engine = AlertEngine(rules=[rule_old], tracker=tracker)
 
@@ -41,16 +41,16 @@ async def test_reloader_swaps_engine_rules_on_file_change(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_reloader_handles_invalid_yaml(tmp_path: Path):
+async def test_reloader_handles_invalid_yaml(tmp_path: Path, quote_db: QuoteDatabase):
     alerts_file = tmp_path / "alerts.yml"
     alerts_file.write_text("alerts: [", encoding="utf-8")  # invalid
 
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     rule_old = AlertRule(
-        id="old", kind=AlertKind.THRESHOLD,
-        ticker="600519", expr="pct_change_intraday <= -3.0",
+        id="old",
+        kind=AlertKind.THRESHOLD,
+        ticker="600519",
+        expr="pct_change_intraday <= -3.0",
     )
     engine = AlertEngine(rules=[rule_old], tracker=tracker)
 
@@ -62,10 +62,8 @@ async def test_reloader_handles_invalid_yaml(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_reloader_handles_missing_file(tmp_path: Path):
-    db = QuoteDatabase("sqlite+aiosqlite:///:memory:")
-    await db.initialize()
-    tracker = StateTracker(dao=AlertStateDAO(db), now_fn=lambda: 1000)
+async def test_reloader_handles_missing_file(tmp_path: Path, quote_db: QuoteDatabase):
+    tracker = StateTracker(dao=AlertStateDAO(quote_db), now_fn=lambda: 1000)
     engine = AlertEngine(rules=[], tracker=tracker)
     reloader = AlertsReloader(alerts_path=tmp_path / "nope.yml", engine=engine)
     assert reloader.reload_now() is False

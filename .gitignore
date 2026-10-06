@@ -12,6 +12,7 @@ data/
 logs/
 secrets/
 config/secrets.yml
+config/common/secrets.yml
 
 # OMC state (already gitignored conceptually)
 .omc/

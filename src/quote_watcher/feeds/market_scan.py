@@ -1,17 +1,19 @@
-"""MarketScanFeed: akshare 全市场 spot wrapper for top-N ranking."""
+"""MarketScanFeed: three sorted Eastmoney pages for top-N ranking."""
+
 from __future__ import annotations
 
-import asyncio
 import math
 from dataclasses import dataclass
 from typing import Any
 
-import akshare as ak
-import pandas as pd
+import httpx
 
+from quote_watcher.feeds.em_scan import fetch_clist_page, optional_number
 from shared.observability.log import get_logger
 
 log = get_logger(__name__)
+_MARKET_FS = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048"
+_FIELDS = "f12,f14,f2,f3,f5,f6,f10"
 
 
 @dataclass(frozen=True)
@@ -66,18 +68,39 @@ def _row_to_market_row(d: dict[str, Any]) -> MarketRow | None:
 
 
 class MarketScanFeed:
-    source_id = "akshare_spot"
+    source_id = "eastmoney_spot"
+
+    def __init__(self, *, timeout_sec: float = 8.0) -> None:
+        self._timeout = timeout_sec
 
     async def fetch(self) -> list[MarketRow]:
-        """Fetch entire A-share spot snapshot. Returns [] on any error."""
+        """Fetch gainers, losers and volume leaders, deduplicated by ticker."""
+        out: dict[str, MarketRow] = {}
         try:
-            df: pd.DataFrame = await asyncio.to_thread(ak.stock_zh_a_spot_em)
-        except Exception as e:  # akshare can raise anything
-            log.warning("market_scan_fetch_failed", error=str(e))
-            return []
-        out: list[MarketRow] = []
-        for _, row in df.iterrows():
-            mr = _row_to_market_row(row.to_dict())
-            if mr is not None:
-                out.append(mr)
-        return out
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                for fid, descending in (("f3", True), ("f3", False), ("f10", True)):
+                    page = await fetch_clist_page(
+                        client,
+                        fs=_MARKET_FS,
+                        fields=_FIELDS,
+                        fid=fid,
+                        descending=descending,
+                    )
+                    for row in page.rows:
+                        mr = _row_to_market_row(
+                            {
+                                "代码": row["f12"],
+                                "名称": row["f14"],
+                                "最新价": row["f2"],
+                                "涨跌幅": row["f3"],
+                                "成交量": row["f5"],
+                                "成交额": row["f6"],
+                                "量比": optional_number(row["f10"]),
+                            }
+                        )
+                        if mr is not None:
+                            out.setdefault(mr.ticker, mr)
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("market_scan_fetch_failed", error=repr(exc))
+            raise
+        return list(out.values())

@@ -91,9 +91,14 @@ class FeishuPusher:
             "grey",
         )
         if msg.digest_items:
-            body_text = "\n".join(
-                f"- [{it.source_label}]({it.url}) {it.summary}" for it in msg.digest_items
-            )
+            lines = []
+            section = ""
+            for it in msg.digest_items:
+                if it.section and it.section != section:
+                    lines.append(f"**{it.section}**")
+                    section = it.section
+                lines.append(f"- [{it.source_label}]({it.url}) {it.summary}")
+            body_text = "\n".join(lines)
         else:
             body_text = (
                 f"**{msg.summary}**\n\n"
@@ -101,6 +106,8 @@ class FeishuPusher:
                 + "\n\n"
                 + " | ".join(f"[{d.label}]({d.url})" for d in msg.deeplinks)
             )
+        if msg.omitted_count:
+            body_text += f"\n\n另有 {msg.omitted_count} 条未展示"
         elements: list[dict] = [  # type: ignore[type-arg]
             {"tag": "div", "text": {"tag": "lark_md", "content": body_text}},
         ]

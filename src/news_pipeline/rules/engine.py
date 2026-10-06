@@ -1,7 +1,13 @@
 from typing import TYPE_CHECKING
 
 from news_pipeline.common.enums import Market
+from news_pipeline.config.schema import FirstPartyConfig, ScoringConfig
+from news_pipeline.rules.aliases import remove_exclusions
+from news_pipeline.rules.first_party import match_first_party
+from news_pipeline.rules.headline import headline
+from news_pipeline.rules.matcher import build_matcher
 from news_pipeline.rules.patterns import Pattern, PatternKind
+from news_pipeline.rules.scoring import contains, evaluate_subject, percentage_moves
 from news_pipeline.rules.verdict import RulesVerdict
 
 if TYPE_CHECKING:
@@ -49,6 +55,16 @@ def _compile(
                         text=alias.lower(),
                         is_english=alias.isascii(),
                         kind=PatternKind.ALIAS,
+                        market=market,
+                        owner=entry.ticker,
+                    )
+                )
+            for person in entry.people:
+                patterns.append(
+                    Pattern(
+                        text=person.lower(),
+                        is_english=person.isascii(),
+                        kind=PatternKind.PERSON,
                         market=market,
                         owner=entry.ticker,
                     )
@@ -104,64 +120,113 @@ def _compute_boost(tickers: set[str], sectors: set[str], macros: set[str]) -> fl
 
 
 class RulesEngine:
-    """Compiles RulesSection into a matcher + reverse indexes, then provides
-    match(article) → RulesVerdict.
-
-    Hot reload: caller (main.py / config loader callback) calls rebuild() with
-    a fresh RulesSection when watchlist.yml changes on disk.
-    """
+    """Recall candidates and provide a deterministic rule fallback for assessment."""
 
     def __init__(
         self,
         rules: "RulesSection",
-        matcher: "MatcherProtocol",
+        matcher: "MatcherProtocol | None" = None,
+        *,
+        scoring: ScoringConfig | None = None,
+        first_party: FirstPartyConfig | None = None,
     ) -> None:
-        self._matcher = matcher
-        self._sector_to_tickers: dict[str, set[str]] = {}
-        self._macro_to_tickers: dict[str, set[str]] = {}
+        self._matcher = matcher or build_matcher(rules.matcher, rules.matcher_options)
+        self._scoring = scoring or ScoringConfig()
+        self._first_party = first_party or FirstPartyConfig()
         self.rebuild(rules)
 
     def rebuild(self, rules: "RulesSection") -> None:
-        patterns, sec_idx, mac_idx = _compile(rules)
+        patterns, _, _ = _compile(rules)
         self._matcher.rebuild(patterns)
-        self._sector_to_tickers = sec_idx
-        self._macro_to_tickers = mac_idx
+        self._rules = rules
+        self._ticker_markets = {
+            entry.ticker: market for market in ("us", "cn") for entry in getattr(rules, market)
+        }
 
     def match(self, art: "RawArticle") -> RulesVerdict:
-        text = f"{art.title}  {art.body or ''}"
-        matches = self._matcher.find_all(text)
-
-        if not matches:
-            return RulesVerdict(matched=False)
-
-        tickers: set[str] = set()
-        sectors: set[str] = set()
-        macros: set[str] = set()
-        generics: list[str] = []
-        markets: set[str] = set()
-        related_tickers: set[str] = set()
-
-        for m in matches:
-            p = m.pattern
-            markets.add(p.market.value)
-            if p.kind in (PatternKind.TICKER, PatternKind.ALIAS):
-                tickers.add(p.owner)
-            elif p.kind == PatternKind.SECTOR:
-                sectors.add(p.text)
-                related_tickers.update(self._sector_to_tickers.get(p.text, []))
-            elif p.kind == PatternKind.MACRO:
-                macros.add(p.text)
-                related_tickers.update(self._macro_to_tickers.get(p.text, []))
-            elif p.kind == PatternKind.GENERIC:
-                generics.append(p.text)
-
-        return RulesVerdict(
-            matched=True,
-            tickers=sorted(tickers),
-            related_tickers=sorted(related_tickers - tickers),
-            sectors=sorted(sectors),
-            macros=sorted(macros),
-            generic_hits=generics,
-            markets=sorted(markets),
-            score_boost=_compute_boost(tickers, sectors, macros),
+        if art.source in ("juchao", "sec_edgar"):
+            return match_first_party(art, self._first_party, self._ticker_markets)
+        title = remove_exclusions(art.title, self._rules)
+        body = remove_exclusions(art.body or "", self._rules)
+        h = headline(title, body)
+        text = f"{title}  {body}"
+        strong_kinds = {PatternKind.TICKER, PatternKind.ALIAS}
+        headline_matches = self._matcher.find_all(h)
+        subjects = {
+            match.pattern.owner for match in headline_matches if match.pattern.kind in strong_kinds
+        }
+        tagged = {
+            match.pattern.owner
+            for match in self._matcher.find_all(text)
+            if match.pattern.kind in strong_kinds | {PatternKind.PERSON}
+        }
+        hint = self._importance_hint(art)
+        roundup = len(percentage_moves(text)) >= 3 or any(
+            contains(h, word) for word in self._scoring.roundup_words
         )
+        keywords = []
+        sectors, macros, generics = [], [], []
+        groups = self._scoring.keywords
+        for category in ("macro", "policy", "sector", "en"):
+            for word in getattr(groups, category):
+                word = word.lower()
+                if contains(h, word):
+                    keywords.append(word)
+                    if category == "sector":
+                        sectors.append(word)
+                    elif category == "macro":
+                        macros.append(word)
+                    else:
+                        generics.append(word)
+        # Deprecated legacy keyword fields remain available during shadow rollout.
+        for field, hits in (
+            ("sector_keywords", sectors),
+            ("macro_keywords", macros),
+            ("keyword_list", generics),
+        ):
+            for market in ("us", "cn"):
+                for word in getattr(getattr(self._rules, field), market):
+                    if contains(h, word.lower()):
+                        keywords.append(word.lower())
+                        hits.append(word.lower())
+        if subjects:
+            positions = [
+                match.start for match in headline_matches if match.pattern.kind in strong_kinds
+            ]
+            decision, reason, roundup = evaluate_subject(h, text, positions, self._scoring)
+        elif tagged:
+            decision, reason = "digest_lo", "mention"
+        elif keywords:
+            decision, reason = "digest_lo", f"keyword:{keywords[0]}"
+        else:
+            decision, reason = "drop", "no_match"
+        market_tickers = subjects or tagged
+        markets = (
+            sorted({self._ticker_markets[ticker] for ticker in market_tickers})
+            if market_tickers
+            else [art.market.value]
+        )
+        return RulesVerdict(
+            decision=decision,
+            reason=reason,
+            subject_tickers=sorted(subjects),
+            tagged_tickers=sorted(tagged),
+            markets=markets,
+            keywords=list(dict.fromkeys(keywords)),
+            is_roundup=roundup,
+            importance_hint=hint,
+            rank_score={"push": 90, "digest_hi": 60, "digest_lo": 30, "drop": 0}[decision]
+            + hint * 10,
+            sectors=sorted(set(sectors)),
+            macros=sorted(set(macros)),
+            generic_hits=sorted(set(generics)),
+        )
+
+    @staticmethod
+    def _importance_hint(art: "RawArticle") -> int:
+        if art.source in ("cls_telegraph", "caixin_telegram"):
+            return {"A": 3, "B": 2}.get(str(art.raw_meta.get("level", "")).upper(), 0)
+        if art.source == "wallstreetcn":
+            score = art.raw_meta.get("score", 0)
+            return 3 if score == 3 else 2 if score == 2 else 0
+        return 0

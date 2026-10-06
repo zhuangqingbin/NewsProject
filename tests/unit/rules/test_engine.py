@@ -82,20 +82,20 @@ def test_chinese_substring_alias():
     assert v.markets == ["cn"]
 
 
-def test_sector_associates_ticker():
+def test_sector_does_not_associate_ticker():
     e = RulesEngine(_section(), AhoCorasickMatcher())
     v = e.match(_article("Semiconductor industry rebounds"))
     assert v.matched is True
     assert v.sectors == ["semiconductor"]
-    assert v.related_tickers == ["NVDA"]
+    assert v.related_tickers == []
     assert v.tickers == []
 
 
-def test_macro_associates_ticker():
+def test_macro_does_not_associate_ticker():
     e = RulesEngine(_section(), AhoCorasickMatcher())
     v = e.match(_article("FOMC decision keeps rates unchanged"))
     assert v.macros == ["fomc"]
-    assert v.related_tickers == ["NVDA"]
+    assert v.related_tickers == []
 
 
 def test_generic_keyword_no_ticker():
@@ -110,8 +110,7 @@ def test_generic_keyword_no_ticker():
 def test_multi_market_match():
     e = RulesEngine(_section(), AhoCorasickMatcher())
     v = e.match(_article("FOMC加息影响A股茅台"))
-    assert "us" in v.markets
-    assert "cn" in v.markets
+    assert v.markets == ["cn"]
 
 
 def test_score_boost_ticker():

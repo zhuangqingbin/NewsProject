@@ -15,8 +15,10 @@ from watchdog.observers import Observer
 from news_pipeline.config.schema import (
     AppConfig,
     ChannelsFile,
+    FirstPartyConfig,
     HoldingsFile,
     QuoteWatchlistFile,
+    ScoringConfig,
     SecretsFile,
     SourcesFile,
     WatchlistFile,
@@ -37,6 +39,8 @@ class ConfigSnapshot:
     quote_watchlist: QuoteWatchlistFile
     alerts: AlertsFile
     holdings: HoldingsFile = field(default_factory=HoldingsFile)
+    scoring: ScoringConfig = field(default_factory=ScoringConfig)
+    first_party: FirstPartyConfig = field(default_factory=FirstPartyConfig)
 
 
 class _Handler(FileSystemEventHandler):
@@ -69,9 +73,7 @@ class ConfigLoader:
         )
         alerts_path = self._dir / "quote_watcher" / "alerts.yml"
         alerts = (
-            AlertsFile.model_validate(
-                yaml.safe_load(alerts_path.read_text(encoding="utf-8")) or {}
-            )
+            AlertsFile.model_validate(yaml.safe_load(alerts_path.read_text(encoding="utf-8")) or {})
             if alerts_path.exists()
             else AlertsFile()
         )
@@ -92,7 +94,18 @@ class ConfigLoader:
             quote_watchlist=quote_watchlist,
             alerts=alerts,
             holdings=holdings,
+            scoring=ScoringConfig.model_validate(
+                self._read_optional("news_pipeline", "scoring.yml")
+            ),
+            first_party=FirstPartyConfig.model_validate(
+                self._read_optional("news_pipeline", "first_party.yml")
+            ),
         )
+
+    def _read_optional(self, subdir: str, name: str) -> dict[str, object]:
+        if not (self._dir / subdir / name).exists():
+            return {}
+        return self._read(subdir, name)
 
     def _read(self, subdir: str, name: str) -> dict[str, object]:
         path = self._dir / subdir / name

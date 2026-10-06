@@ -110,3 +110,10 @@ def test_factory_unknown_raises():
 
     with pytest.raises(ValueError, match="unknown matcher"):
         build_matcher("xxx", {})
+
+
+def test_ascii_word_boundary_rejects_identifier_fragments():
+    m = AhoCorasickMatcher()
+    m.rebuild([_en("META", owner="META")])
+    assert m.find_all("META_Data and prefix_META") == []
+    assert len(m.find_all("META宣布回购")) == 1

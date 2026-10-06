@@ -1,38 +1,21 @@
-import asyncio
+import argparse
 import os
-import sys
-from datetime import timedelta
 from pathlib import Path
 
-from sqlalchemy import select
-
-from news_pipeline.common.timeutil import utc_now
-from news_pipeline.storage.db import Database
-from news_pipeline.storage.models import RawNews
-
-
-async def _check() -> int:
-    db_path = os.environ.get("NEWS_PIPELINE_DB", "data/news.db")
-    if not Path(db_path).exists():
-        print("FAIL: db missing")
-        return 1
-    db = Database(f"sqlite+aiosqlite:///{db_path}")
-    await db.initialize()
-    cutoff = (utc_now() - timedelta(minutes=30)).replace(tzinfo=None)
-    async with db.session() as s:
-        res = await s.execute(select(RawNews).where(RawNews.fetched_at >= cutoff).limit(1))
-        if res.first() is None:
-            print("FAIL: no recent scrape")
-            await db.close()
-            return 1
-    await db.close()
-    print("OK")
-    return 0
+from shared.observability.heartbeat import heartbeat_healthy
 
 
 def main() -> int:
-    return asyncio.run(_check())
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--subsystem", choices=["news_pipeline", "quote_watcher"], default="news_pipeline"
+    )
+    args = parser.parse_args()
+    path = Path(os.environ.get("HEARTBEAT_PATH", f"data/heartbeat_{args.subsystem}.json"))
+    ok = heartbeat_healthy(path)
+    print("OK" if ok else "FAIL: scheduler heartbeat is stale or missing")
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

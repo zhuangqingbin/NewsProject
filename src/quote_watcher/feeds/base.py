@@ -1,4 +1,5 @@
 """Quote feed contracts."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -10,9 +11,9 @@ from typing import Protocol
 @dataclass(frozen=True)
 class QuoteSnapshot:
     ticker: str
-    market: str         # "SH" | "SZ" | "BJ"
+    market: str  # "SH" | "SZ" | "BJ"
     name: str
-    ts: datetime        # tz-aware Asia/Shanghai
+    ts: datetime  # tz-aware Asia/Shanghai
     price: float
     open: float
     high: float
@@ -22,6 +23,9 @@ class QuoteSnapshot:
     amount: float
     bid1: float
     ask1: float
+    volume_ratio: float | None = None
+    limit_up: float | None = None
+    limit_down: float | None = None
 
     @property
     def pct_change(self) -> float:

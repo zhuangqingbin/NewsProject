@@ -1,17 +1,19 @@
 sources:
-  # US
-  finnhub:          {enabled: true, interval_sec: 300}
-  sec_edgar:        {enabled: true, interval_sec: 120}
-  futu_global:      {enabled: true, interval_sec: 180}    # 富途快讯 (US/HK/A)
-  wallstreetcn:     {enabled: true, interval_sec: 300}    # 华尔街见闻 (channel=global)
-  # CN — broad wires (no auth, akshare-backed)
-  caixin_telegram:  {enabled: true, interval_sec: 60}     # 财联社电报
-  eastmoney_global: {enabled: true, interval_sec: 180}    # 东财全球财经
-  ths_global:       {enabled: true, interval_sec: 120}    # 同花顺财经直播
-  sina_global:      {enabled: true, interval_sec: 180}    # 新浪财经全球
-  cjzc_em:          {enabled: true, interval_sec: 3600}   # 东财财经早餐 (~1/day)
-  cctv_news:        {enabled: true, interval_sec: 21600}  # 新闻联播 (1/day)
-  kr36:             {enabled: true, interval_sec: 600}    # 36氪 RSS (tech/VC)
-  # CN — per-ticker
-  akshare_news:     {enabled: true, interval_sec: 180}    # 东财个股新闻
-  juchao:           {enabled: true, interval_sec: 120}    # 巨潮官方公告
+  # 快讯
+  sina_global:      {enabled: true, interval_sec: 180, lookback_min: 360,  max_silence_min: 90,   max_silence_off_min: 180}
+  futu_global:      {enabled: true, interval_sec: 180, lookback_min: 360,  max_silence_min: 150,  max_silence_off_min: 480}
+  eastmoney_global: {enabled: true, interval_sec: 180, lookback_min: 360,  max_silence_min: 90,   max_silence_off_min: 360}
+  ths_global:       {enabled: true, interval_sec: 120, lookback_min: 360,  max_silence_min: 120,  max_silence_off_min: 1080}
+  cls_telegraph:    {enabled: true, interval_sec: 60,  lookback_min: 360,  max_silence_min: 60,   max_silence_off_min: 240}
+  wallstreetcn:     {enabled: true, interval_sec: 120, lookback_min: 360,  max_silence_min: 240,  max_silence_off_min: 1080}
+  finnhub:          {enabled: true, interval_sec: 300, lookback_min: 1440, max_silence_min: 720,  max_silence_off_min: 2880}
+  # 个股与一手
+  em_stock_news:    {enabled: true, interval_sec: 300, lookback_min: 2880, max_silence_min: 1440, max_silence_off_min: 4320}
+  juchao:           {enabled: true, interval_sec: 300, lookback_min: 4320, max_silence_min: 7200, max_silence_off_min: 7200}   # 不按时间过滤，lookback 不生效
+  sec_edgar:        {enabled: true, interval_sec: 120, lookback_min: 4320, max_silence_min: 14400, max_silence_off_min: 14400,
+                     options: {user_agent: "news-pipeline <你的邮箱>"}}
+  # 每日一次
+  cjzc_em:          {enabled: true, interval_sec: 3600,  lookback_min: 2880, max_silence_min: 7200, max_silence_off_min: 7200}
+  cctv_news:        {enabled: true, interval_sec: 21600, lookback_min: 2880, max_silence_min: 1800, max_silence_off_min: 1800}
+  # 停用
+  kr36:             {enabled: false}
