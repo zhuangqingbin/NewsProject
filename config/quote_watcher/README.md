@@ -1,166 +1,63 @@
-# config/quote_watcher — quote_watcher 子系统专用配置
+# config/quote_watcher — 盯盘配置
 
-仅 `quote_watcher` 读取；`news_pipeline` 不使用这里的文件。
-
----
+盯盘为独立 A 股子系统，使用 `data/quotes.db` 和 `_alert` 新闻之外的飞书频道。新闻的 legacy/shadow/v2 开关不改变盯盘告警。
 
 ## quote_watchlist.yml
 
-盯盘股列表 + 全市场扫描参数。
-
-### 字段结构
-
-```yaml
-cn:                        # A 股盯盘列表
-  - ticker: "600519"       # 必填 — 股票代码（6 位字符串，需加引号）
-    name: 贵州茅台           # 必填 — 股票名称（用于显示）
-    market: SH             # 必填 — 交易所（见下表）
-
-us: []                     # 美股盯盘列表（当前暂未接入实时报价）
-
-market_scans:              # 全市场扫描配置
-  cn:
-    top_gainers_n: 50      # 拉取涨幅前 N 只
-    top_losers_n: 50       # 拉取跌幅前 N 只
-    top_volume_ratio_n: 50 # 拉取量比前 N 只
-    push_top_n: 5          # 每次推送前 N 只（超过此数不推送）
-    only_when_score_above: 8.0  # 综合评分阈值，低于此值不推送
-```
-
-### market 字段规则
-
-| market | 适用代码前缀 | 说明 |
-|---|---|---|
-| `SH` | 60xxxx、68xxxx | 上交所主板 + 科创板 |
-| `SZ` | 00xxxx、30xxxx | 深交所主板 + 创业板 |
-| `BJ` | 8xxxxx、4xxxxx、9xxxxx | 北交所 |
-
-### 如何加新股
-
 ```yaml
 cn:
-  - ticker: "000858"
-    name: 五粮液
-    market: SZ
+  - ticker: '600519'
+    name: 贵州茅台
+    market: SH
+us: []
+market_scans:
+  cn:
+    top_gainers_n: 50
+    top_losers_n: 50
+    top_volume_ratio_n: 50
+    push_top_n: 5
+    only_when_score_above: 8.0
 ```
 
-代码前两位判断交易所：`00/30` → SZ，`60/68` → SH，`8/4/9` → BJ。
+交易所：SH 包含 60/68 前缀，SZ 包含 00/30，BJ 包含北交所代码。当前不提供美股实时盯盘。列表改变后重启 `quote_watcher`。
 
-### 推荐规模
-
-核心盯盘：30-50 只以内（过多会增加 Sina 接口压力）。可把持仓股全部加入，配合 `holdings.yml` 使用 composite 规则监控盈亏。
-
----
+默认 `QUOTE_FEED=tencent`，可切 `sina` 并重建容器环境。腾讯成交量统一为股：主板与创业板原始手数 ×100，688/689 科创板原始股数保持；成交额使用人民币元。全市场与行业板块分别使用东财 clist 排序/分页请求，不扫描整个全 A 表。交易时段真实单位校验仍是发布验收的一部分。
 
 ## alerts.yml
 
-告警规则配置。`quote_watcher` 支持热加载：**保存文件后下一个 tick（默认 5 秒）自动生效，无需重启**。
-
-### 4 种规则类型
-
-#### 1. threshold — 数值阈值（最常用）
+只有此文件使用现有 `AlertsReloader` 监听并替换规则，无需重启。其他配置不承诺热加载。规则类型是 threshold、indicator、event、composite；表达式由 asteval 执行，冷却按 id 保持。
 
 ```yaml
 alerts:
-  - id: maotai_drop_3pct          # 唯一 ID（同 id 的告警有冷却去重）
+  - id: maotai_drop_3pct
     kind: threshold
-    ticker: "600519"
-    name: 贵州茅台                  # 可选，用于推送显示
-    expr: "pct_change_intraday <= -3.0"   # asteval 表达式
-    cooldown_min: 30               # 同一规则两次触发的最短间隔（分钟）
-    severity: warning              # info / warning / critical（可选，默认 info）
+    ticker: '600519'
+    expr: 'pct_change_intraday <= -3.0'
+    cooldown_min: 30
+    severity: warning
 ```
 
-#### 2. indicator — 技术指标（需要日 K 数据）
+常用变量：price、prev_close、pct_change_intraday、volume_ratio、bid1、ask1；持仓规则另有 pct_change_from_cost。indicator 使用日 K 缓存和 ma5/ma20/rsi 等函数，冷缓存网络预热耗时随上游而变，不能保证几秒完成。
 
-```yaml
-  - id: maotai_ma_breakout
-    kind: indicator
-    ticker: "600519"
-    expr: "ma5 > ma20"             # 均线金叉
-    cooldown_min: 1440             # 1 天冷却
-```
-
-```yaml
-  - id: catl_rsi_oversold
-    kind: indicator
-    ticker: "300750"
-    expr: "rsi(14) < 25"           # RSI 超卖
-    cooldown_min: 240
-```
-
-> indicator 规则依赖日 K 缓存，启动时会自动预热 250 天数据。如果数据库是空的，首次启动可能需要几秒。
-
-#### 3. event — 事件触发
-
-```yaml
-  - id: maotai_limit_up
-    kind: event
-    ticker: "600519"
-    event_type: limit_up           # limit_up / limit_down / sector_surge
-    cooldown_min: 1440
-```
-
-#### 4. composite — 持仓组合规则（需配合 holdings.yml）
-
-```yaml
-  - id: maotai_loss_alert
-    kind: composite
-    holding: "600519"              # 匹配 holdings.yml 中的 ticker
-    expr: "pct_change_from_cost <= -5.0"   # 从持仓成本算起的亏损比例
-    cooldown_min: 60
-    severity: critical
-```
-
-### asteval 表达式可用变量（threshold / composite）
-
-| 变量 | 说明 |
-|---|---|
-| `price` | 当前价格 |
-| `prev_close` | 昨日收盘价 |
-| `pct_change_intraday` | 今日涨跌幅（%） |
-| `volume_ratio` | 量比（当前量 / 过去 N 日平均量） |
-| `bid1` / `ask1` | 买一 / 卖一价 |
-| `pct_change_from_cost` | 从持仓成本算起的涨跌幅（仅 composite 可用） |
-| `ma5` / `ma10` / `ma20` / `ma60` | N 日均线（仅 indicator 可用） |
-| `rsi(N)` | RSI 指标（仅 indicator 可用） |
-
-完整变量列表和更多示例见 `docs/quote_watcher/getting_started.md` § 1.2。
-
----
+量比优先采用源返回 `volume_ratio`，缺失才使用现有均量计算。涨跌停优先采用明确 `limit_up/limit_down` 价格，允许 0.005 元容差；无字段才使用旧比例估算。源值缺失与值为 0 不应混淆。
 
 ## holdings.yml
 
-持仓表。仅 `composite` 类告警规则需要此文件；若不使用 composite 规则，此文件可以保持空列表。
-
-### 字段结构
-
 ```yaml
 holdings:
-  - ticker: "600519"           # A 股代码（字符串）
-    name: 贵州茅台               # 可选，用于显示
-    qty: 100                   # 持仓数量（股）
-    cost_per_share: 1850.0     # 持仓成本价（元/股）
-
-  - ticker: "300750"
-    name: 宁德时代
-    qty: 200
-    cost_per_share: 220.0
-
+  - ticker: '600519'
+    name: 贵州茅台
+    qty: 100
+    cost_per_share: 1850.0
 portfolio:
-  total_capital: 200000        # 总资金量（元）；用于计算仓位比例（预留字段，当前未强制使用）
+  total_capital: 200000
   base_currency: CNY
 ```
 
-### 无持仓时
+仅持仓/组合规则需要。无持仓可保留空 holdings；修改后重启 `quote_watcher`，alerts reloader 不重新加载 holdings。
 
-```yaml
-holdings: []
-portfolio:
-  total_capital: 0
-  base_currency: CNY
-```
+## 运维
 
-### 更新持仓
+个股、全市场与板块启动探测，任一路失败 Bark 提醒。交易时段个股连续 5 分钟无成功快照只告警一次，恢复再提醒。healthcheck 读取独立心跳文件，不以是否有新闻判断盯盘存活。
 
-直接编辑此文件并保存。`quote_watcher` 会在下一次 `ConfigLoader.load()` 时读取最新值（触发条件是文件系统事件 + 500ms debounce）。
+详见 [部署指南](../../docs/getting-started/deployment-current.md) 和 [可观测性](../../docs/components/observability.md)。配置受版本管理，真实机器人和 Bark 密钥只写共用 secrets。

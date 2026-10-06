@@ -1,5 +1,7 @@
 # Charts
 
+> 本页下方是历史兼容说明。v0.7.0 当前 main 不启动命令服务器或图表流程，也不启用旧 LLM judge；旧模块为 legacy 回滚暂留，不是新默认能力。新行为见 [部署指南](../getting-started/deployment-current.md)、[Assessment](llm-pipeline.md) 和 [C1/C2 清理门槛](../operations/staged-cleanup.md)。
+
 这一页描述 K 线图、柱状图、情绪图的生成方式，以及 TG sendPhoto inline 嵌图流程。
 
 ---

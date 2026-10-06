@@ -1,195 +1,61 @@
 # Scrapers
 
-这一页详解 9 个数据源 Scraper：接入方式、cookie 需求、当前启用状态，以及反爬处理机制。
-
----
+抓取器返回统一 `RawArticle`；保存与调度分别在 `ingest/store.py` 和 `scheduler/jobs.py`。当前源开关以 `config/news_pipeline/sources.yml` 为准，启用配置不等于已经完成服务器上的可用性验收。
 
 ## 数据源总览
 
-| source_id | market | 接入方式 | 需要 cookie | 当前状态 | 间隔 |
-|---|---|---|---|---|---|
-| `finnhub` | US | REST API（token） | 否 | **enabled** | 300s |
-| `sec_edgar` | US | RSS/Atom feed | 否 | **enabled** | 120s |
-| `caixin_telegram` | CN | REST API（无鉴权） | 否 | **enabled** | 60s |
-| `akshare_news` | CN | akshare 库 (`stock_news_em`) | 否 | **enabled** | 180s |
-| `juchao` | CN | HTTP POST (cninfo.com.cn) | 否 | **enabled** | 120s |
-| `yfinance_news` | US | yfinance 库 | 否 | disabled | 600s |
-| `xueqiu` | CN | REST API（v4） | 是 | disabled | 300s |
-| `ths` | CN | HTML 解析（BeautifulSoup） | 是 | disabled | 300s |
-| `tushare_news` | CN | tushare pro API | 否（需积分） | disabled | 600s |
+| source_id | 实现与默认间隔 | 配置要点 |
+|---|---|---|
+| `sina_global` / `futu_global` / `eastmoney_global` | 全球快讯，180 秒 | 使用实际源市场作为无主体新闻的路由兜底 |
+| `ths_global` | 同花顺快讯，120 秒 | 与停用的个股 `ths` 抓取器不同 |
+| `cls_telegraph` | 财联社直连接口，60 秒 | 替代旧 `caixin_telegram` |
+| `wallstreetcn` | 华尔街见闻直连接口，120 秒 | 解析结构变化抛合同异常 |
+| `finnhub` | 美股公司新闻，300 秒 | `secrets.sources.finnhub_token` |
+| `em_stock_news` | 东财个股新闻直连，300 秒 | 按自选 A 股取新闻，替代旧 `akshare_news` |
+| `juchao` | 巨潮公告，300 秒 | 初始化 orgId；不按公告时间过滤；一手源分级 |
+| `sec_edgar` | SEC submissions，120 秒 | 初始化 CIK、真实联系 User-Agent、一手表单分级 |
+| `cjzc_em` / `cctv_news` | 财经早餐 / 新闻联播，3600 / 21600 秒 | 低频内容不要求每次抓取都非空 |
+| `kr36` | 默认关闭 | 扩源与替换等阶段 D 再评估 |
 
----
+旧 `caixin_telegram`、`akshare_news`、雪球/个股同花顺等文件暂留兼容，不是新 factory 的默认路径。删除条件见 [C1/C2 清单](../operations/staged-cleanup.md)。
 
-## 各源详解
+## 抓取与保存
 
-### finnhub（美股新闻）
+每次取 `now - lookback_min`，不用上轮发布时间当排他水位线。晚出现的旧条目仍能进入回看窗口。`ArticleStore` 先查 URL hash：同 URL 不重复插入；不同 URL 的同标题证据在 legacy/shadow 标为 `duplicate` 入库并记录 `dup_of`，不是丢弃。v2 停止标题 simhash 判重，由事件层合并文章。
 
-- **接入**：`GET https://finnhub.io/api/v1/news?category=general&token=...`
-- **认证**：`finnhub_token` 写入 `secrets.yml → sources`
-- **限频**：官方 QPS 60/min（免费版），本系统 300s 间隔，远低于限制
-- **字段**：`headline`、`url`、`summary`、`datetime`（Unix 时间戳）、`source`
-- **一手源**：否（走标准 Tier-0 → router 路由）
+源第一次成功抓取的内容作为 `seeded` 基线，避免初始化历史列表全部推送。抓取外层有 `fetch_timeout_sec`，成功/失败、最新条目时间和退避写入 `source_state`。失败退避为 interval 的指数倍，封顶 30 分钟。
 
-### sec_edgar（美股 SEC 公告）
-
-- **接入**：`GET https://www.sec.gov/cgi-bin/browse-edgar?...&output=atom` — 每个 CIK 一个 Atom feed
-- **认证**：无，但 User-Agent 必须包含联系邮件（SEC 政策要求）
-- **CIK 映射**（硬编码在 `main.py`）：
-
-  ```python
-  sec_ciks = {
-      "NVDA": "1045810",
-      "TSLA": "1318605",
-      "AAPL": "320193",
-  }
-  ```
-
-- **重要**：`sec_edgar` 是**一手源**，所有文章直接路由到 Tier-2 深度抽取（跳过 Tier-0 分类）
-- **频率**：SEC 有速率限制（10 req/s），120s 间隔充裕
-
-### caixin_telegram（财联社）
-
-- **接入**：`GET https://www.cls.cn/v3/depth/home/assembled/1000`
-- **认证**：无需 cookie，公开 API
-- **特点**：财联社是国内一手财经信息源，因此设为**一手源**，直达 Tier-2
-- **间隔**：60 秒（所有源中最频繁）
-- **字段**：`ctime`（Unix 时间戳）、`title`、`brief`、`shareurl`
-
-!!! note "caixin_telegram 命名"
-    命名中的 "telegram" 不是 Telegram 消息，而是历史遗留名称（财联社电报频道）。实际接入的是财联社 REST API。
-
-### akshare_news（东方财富股票新闻）
-
-- **接入**：`akshare.stock_news_em(ticker)` — 同步调用，用 `asyncio.to_thread` 包装
-- **认证**：无需 API key，akshare 内置
-- **字段**：`发布时间`（上海时区字符串）、`标题`、`内容`、`链接`
-- **时区处理**：发布时间 `tz_localize("Asia/Shanghai")` → `ensure_utc` 转换
-
-### juchao（巨潮资讯 A 股公告）
-
-- **接入**：`POST http://www.cninfo.com.cn/new/hisAnnouncement/query`，表单参数 `{stock, tabName, pageSize, pageNum}`
-- **认证**：无需鉴权
-- **重要**：`juchao` 是**一手源**（A 股官方公告），直达 Tier-2
-- **字段**：`announcementTitle`、`secName`、`announcementTime`（毫秒时间戳）、`adjunctUrl`
-
----
-
-## 当前禁用的 4 个源
-
-### yfinance_news（disabled）
-
-**原因**：yfinance 库 0.2.50+ 版本更新后，新闻对象结构变更，`providerPublishTime` 字段已不存在。
-
-**重启需要**：
-1. 检查最新 yfinance 的新闻字段结构：`yf.Ticker("AAPL").news[0]` 看实际 keys
-2. 更新 `scrapers/us/yfinance_news.py` 中的字段读取逻辑
-3. 在 `config/sources.yml` 中改 `enabled: true`
-
-### xueqiu（disabled）
-
-**原因**：`/v4/statuses/stock_timeline.json` 现返回 404，API endpoint 已变更。
-
-**重启需要**：
-1. 用浏览器开发者工具抓包，找到当前雪球移动端/PC端的真实 API endpoint
-2. 更新 `scrapers/cn/xueqiu.py`
-3. 在 `config/secrets.yml` 填入有效的 `xueqiu_cookie`
-4. 在 `config/sources.yml` 改 `enabled: true`
-
-### ths（同花顺，disabled）
-
-**原因**：`https://news.10jqka.com.cn/<ticker>/list.shtml` URL pattern 已变更。
-
-**重启需要**：
-1. 找到同花顺当前的新闻列表页 URL 结构
-2. 更新 `scrapers/cn/ths.py` 中的 URL 和 HTML selector
-3. 在 `config/secrets.yml` 填入有效的 `ths_cookie`
-4. 在 `config/sources.yml` 改 `enabled: true`
-
-### tushare_news（disabled）
-
-**原因**：Tushare `news` API 需要 5000+ 积分（付费），个人免费账号无法调用。
-
-**重启需要**：
-1. 升级 Tushare 积分等级（或找其他付费方案）
-2. 在 `config/secrets.yml` 填入 `tushare_token`
-3. 在 `config/sources.yml` 改 `enabled: true`
-
----
-
-## 反爬检测机制
-
-当 HTTP 层或响应内容检测到反爬信号时，抛出 `AntiCrawlError`，触发以下流程：
-
-```mermaid
-flowchart LR
-    A[fetch 调用] --> B{HTTP 401/403?}
-    B -->|是| E[raise AntiCrawlError]
-    B -->|否| C{JSON Content-Type?}
-    C -->|否，返回 HTML| E
-    C -->|是| D{error_code != 0?}
-    D -->|是| E
-    D -->|否| F{页面含'登录'/captcha?}
-    F -->|是| E
-    F -->|否| G[正常解析]
-    E --> H[set_paused 30min]
-    H --> I[Bark WARN 告警]
+```yaml
+sources:
+  cls_telegraph:
+    enabled: true
+    interval_sec: 60
+    lookback_min: 360
+    max_silence_min: 60
+    max_silence_off_min: 240
+    fetch_timeout_sec: 30
 ```
 
-触发条件（各源已实现）：
-- xueqiu：HTTP 401/403 → `AntiCrawlError`；非 JSON Content-Type → `AntiCrawlError`；`error_code != 0` → `AntiCrawlError`
-- ths：HTTP 401/403 → `AntiCrawlError`；空响应体 → `AntiCrawlError`；含 `登录` 或 `captcha` 关键词 → `AntiCrawlError`
+## 错误契约
 
-暂停期间：
-```python
-await state_dao.set_paused(source_id, until=utc_now() + timedelta(minutes=30))
-# scrape_one_source 在每次调用开始时检查 is_paused
-```
+网络失败和响应结构不合法必须抛异常，不能伪装成空列表。`SourceContractError` 表示结构失败；真正没有新条目才返回空列表。数值、时间和列表结构校验在抓取器边界完成，调度器记录错误并交给源健康状态机。
 
----
+## SEC 与巨潮初始化
 
-## HTTP 公共配置
-
-```python
-# scrapers/common/http.py
-def make_async_client() -> httpx.AsyncClient:
-    # 固定 User-Agent，模拟浏览器
-    # 超时：connect=5s, read=15s
-    # 跟随重定向
-```
-
-Cookie 解析：
-```python
-# scrapers/common/cookies.py
-def parse_cookie_string(cookie: str) -> dict[str, str]:
-    # 解析 "key=value; key2=value2" 格式
-    # 直接传入 httpx cookies= 参数
-```
-
----
+SEC 使用自选美股的 CIK，巨潮使用自选 A 股的 orgId。未知配置 ticker 是启动配置错误；网络初始化失败会记录，后续抓取可以重试。SEC `options.user_agent` 或新闻主进程的 `SEC_USER_AGENT` 必须含真实联系信息，部署方法见 [部署指南](../getting-started/deployment-current.md)。公告原文链接和一手元数据应保留供分级、卡片与核对使用。
 
 ## 启动连通性探测
 
-每次服务启动时，`_probe_scrapers` 对所有已注册的 scraper 发起测试抓取（`since = utc_now() - 5min`，超时 15s）：
+启动和每周日 20:00 北京时间调用 `health.smoke`，逐源真实抓取、验证结构、高频源非空，并核对发布超过 15 分钟的条目是否在库。probe 不插入新闻。服务器 IP 的测试结果才是部署验收证据，录制响应测试不能代替它。
 
-```python
-async def _probe_scrapers(reg: ScraperRegistry, bark: BarkAlerter | None) -> None:
-    for sid in reg.list_ids():
-        scraper = reg.get(sid)
-        try:
-            items = await asyncio.wait_for(scraper.fetch(since), timeout=15)
-            log.info("scraper_probe_ok", source=sid, items=len(items))
-        except Exception as e:
-            log.warning("scraper_probe_failed", source=sid, error=str(e))
-            if bark is not None:
-                await bark.send(f"scraper_probe_{sid}_failed", ...)
+```bash
+docker compose exec app python -m news_pipeline.health.smoke --no-report
+docker compose exec app python -m news_pipeline.health.leak_check
 ```
 
-探测失败不会阻止服务启动，只记录 WARNING 并发 Bark 通知。
-
----
+手工 smoke 默认同时向系统日报频道发送结果卡片；上面的 `--no-report` 是仅 JSON 的只读检查。数据库不写入；启动和每周自动报告经 outbox 发送。
 
 ## 相关
 
-- [Components → Deduplication](dedup.md)
-- [Operations → Secrets](../operations/secrets.md) — cookie 和 token 配置
-- [Operations → Troubleshooting](../operations/troubleshooting.md) — cookie 过期处理
+- [事件与去重](dedup.md) · [源健康与日报](observability.md)
+- [调度](scheduler.md) · [部署与回滚](../getting-started/deployment-current.md)

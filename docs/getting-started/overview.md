@@ -1,64 +1,19 @@
 # Overview
 
-这一页说明 News Pipeline 能做什么、不能做什么、以及适合哪类用户。
+NewsProject 提供财经新闻与 A 股盯盘两个独立子系统。新闻默认使用规则，LLM 默认关闭；v0.7.0 提供事件聚类、可选模型评估、持久投递与归纳摘要。飞书自定义机器人按 US/CN 新闻及 CN 告警分流。
 
----
+## 当前配置默认值
 
-## 系统能做什么
+`pipeline.mode: legacy` 和 `llm.enabled: false`。启用候选源、默认模型名称或单元测试通过都不是线上可用性、模型质量或实际费用的结论。8 条已知案例是未审核 seed；150 条人工标注与付费 benchmark 尚未完成。
 
-- **持续抓取**：从 9 个财经数据源（美股 + A 股）按分钟级间隔获取最新新闻，目前 5 个已启用
-- **去重**：URL 精确匹配 + 标题 SimHash 模糊匹配，24 小时窗口内消除重复
-- **LLM 结构化提取**：四层管线 — 标题分类 → 普通摘要 → 深度实体/关系抽取（一手源直达深度层）
-- **重要性评分**：规则引擎 + LLM judge 灰区兜底，判定 `is_critical`
-- **分级推送**：
-  - 关键新闻：立即实时推送到飞书
-  - 普通新闻：进入 Digest 缓冲区，早晚各一次汇总推送
-- **Bot 命令**：通过飞书发 `/watch NVDA`、`/cost`、`/chart NVDA 30d` 等 11 个命令
-- **图表**：关键新闻自动附 K 线图（mplfinance 生成，TG sendPhoto inline 嵌图）
-- **告警**：Bark iOS 推送 — 反爬触发 / 成本超限 / 推送失败 / 日常心跳
-- **备份**：每日 SQLite → 阿里云 OSS，脚本保留 30 天
+## 开始使用
 
----
+先看 [部署指南](deployment-current.md)，填写真实密钥和 SEC 联系 User-Agent，检查源与频道开关，再启动 Compose。默认规则运行不需要 LLM key；启用 LLM 前需完成 B0 和实际正数单价配置。
 
-## 系统不能做什么
+新闻改配置后重启，盯盘 alerts 支持专用 reloader。系统心跳、源状态与发送结果是三类独立监控。影子观察 2–3 个交易日后才能评估切 v2；一周/两周的后续门槛见 [清理清单](../operations/staged-cleanup.md)。
 
-- **不是实时行情**：抓取间隔最快 60 秒（财联社），大多数源 3-5 分钟，不能替代 Level-2 行情
-- **不做交易决策**：只做新闻推送和摘要，没有信号生成和下单能力
-- **不支持多用户**：单人部署，watchlist 统一，没有用户权限体系
-- **不能抓付费墙内容**：雪球、同花顺需要登录 cookie，且当前禁用；Tushare 新闻需要更高积分
-- **图表不实时**：K 线数据来自 akshare，延迟 T+1
+## 阅读路径
 
----
-
-## 适合谁
-
-| 用户画像 | 适合度 |
-|---|---|
-| 个人投资者，想第一时间收到持仓股的重要新闻 | 非常适合 |
-| 想把 A 股公告 + 美股 SEC 文件都汇聚到一个频道 | 适合 |
-| 需要搭建团队共用的新闻系统 | 需要二次开发（多用户 / 权限） |
-| 需要毫秒级行情数据 | 不适合 |
-
----
-
-## 技术栈速览
-
-| 层 | 技术 |
-|---|---|
-| 语言 | Python 3.12 + asyncio |
-| 抓取 | httpx + feedparser + akshare + BeautifulSoup |
-| LLM | DashScope (DeepSeek-V3) / Anthropic (Claude) |
-| 存储 | SQLite + SQLModel + Alembic |
-| 调度 | APScheduler (AsyncIO 模式) |
-| 推送 | httpx (飞书 webhook) |
-| 图表 | mplfinance + matplotlib |
-| 监控 | structlog (JSON) + Bark |
-| 部署 | uv + systemd (生产) / Docker Compose (Datasette) |
-
----
-
-## 相关
-
-- [Architecture](architecture.md) — 系统全貌和数据流
-- [Deployment](deployment-current.md) — 当前生产部署方式
-- [Components → LLM Pipeline](../components/llm-pipeline.md) — LLM 四层管线详解
+- [架构](architecture.md) · [数据源](../components/scrapers.md) · [规则](../components/rules.md)
+- [事件](../components/dedup.md) · [Assessment](../components/llm-pipeline.md) · [Outbox](../components/dispatch-router.md)
+- [日常操作](../operations/daily-ops.md) · [可观测性](../components/observability.md)

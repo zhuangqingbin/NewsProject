@@ -1,125 +1,51 @@
-# config/news_pipeline — news_pipeline 子系统专用配置
+# config/news_pipeline — 新闻配置
 
-仅 `news_pipeline` 读取；`quote_watcher` 不使用这里的文件。
-
----
+仅新闻子系统使用。修改后执行 `docker compose restart app`。默认 legacy 规则路径；新 LLM 开关位于 `config/common/app.yml`，不是旧 watchlist 的 `llm.enable`。
 
 ## sources.yml
 
-新闻源开关 + 轮询间隔。
+每源配置 `enabled`、`interval_sec`、`lookback_min`、`fetch_timeout_sec`、`max_silence_min`、`max_silence_off_min` 与可选 `options`。抓取回看窗口不使用排他水位线。失败指数退避最多 30 分钟，静默阈值区分交易日白天和其他时段。
 
-### 字段格式
+当前源包括新浪、富途、东财与同花顺全球快讯、`cls_telegraph`、华尔街见闻、Finnhub、`em_stock_news`、巨潮、SEC、财经早餐与新闻联播；`kr36` 关闭。旧 `caixin_telegram` 与 `akshare_news` 由直连新源替代，不应重新打开旧名称。
 
 ```yaml
 sources:
-  <source_id>:
-    enabled: true          # bool — false 则完全跳过
-    interval_sec: 180      # int — 轮询间隔（秒）；不填则用 app.yml scheduler.scrape 默认值
+  sec_edgar:
+    enabled: true
+    interval_sec: 120
+    lookback_min: 4320
+    options:
+      user_agent: 'NewsProject operator operator@example.org'
 ```
 
-### 现有 14 个源
-
-| source_id | 分类 | 说明 | 默认间隔 |
-|---|---|---|---|
-| `finnhub` | 美股 | Finnhub 财经新闻（需 `secrets.sources.finnhub_token`） | 300s |
-| `sec_edgar` | 美股 | SEC EDGAR 官方公告（8-K / 10-K / 10-Q） | 120s |
-| `futu_global` | 美/港/A | 富途快讯（US/HK/A 股混合） | 180s |
-| `wallstreetcn` | 全球 | 华尔街见闻 global 频道 | 300s |
-| `caixin_telegram` | A 股 | 财联社电报（速度最快，60s） | 60s |
-| `eastmoney_global` | A 股 | 东财全球财经快讯 | 180s |
-| `ths_global` | A 股 | 同花顺财经直播 | 120s |
-| `sina_global` | 全球 | 新浪财经全球要闻 | 180s |
-| `cjzc_em` | A 股 | 东财财经早餐（约 1 次 / 天） | 3600s |
-| `cctv_news` | A 股 | 新闻联播（1 次 / 天） | 21600s |
-| `kr36` | 科技/VC | 36氪 RSS | 600s |
-| `akshare_news` | A 股 | 东财个股新闻（watchlist 中的 cn 股逐一拉取） | 180s |
-| `juchao` | A 股 | 巨潮官方公告（公告级别最权威） | 120s |
-| `yfinance_news` | 美股 | Yahoo Finance 新闻 | — |
-
-### 如何添加新源
-
-1. 在 `src/news_pipeline/scrapers/cn/` 或 `us/` 下新建 `<source_id>.py`，实现 `BaseScraper`
-2. 在 `src/news_pipeline/scrapers/factory.py` 的 `build_registry()` 中注册
-3. 在此文件中加一行：`<source_id>: {enabled: true, interval_sec: 300}`
-4. 若需要 API key，在 `config/common/secrets.yml` 的 `sources` 块中加对应字段
-
----
+用自己的真实联系人与邮箱替换示例。当前 Compose 会从宿主 export 或仓库 `.env` 注入 `SEC_USER_AGENT`，新闻主进程用它覆盖文件设置；环境变更后用 `docker compose up -d app` 重建容器。不要原样保留 `<你的邮箱>`。SEC 会初始化 CIK，巨潮初始化 orgId；未知自选代码会拒绝初始化，网络失败由抓取重试。巨潮不按不可靠公告时间过滤。
 
 ## watchlist.yml
 
-关注股/关键词列表。支持 **rules（规则引擎）** 和 **llm（LLM 筛选）** 两段双轨制：
+rules 的每只股票包含 ticker、name、aliases、people、exclude、sectors、macro_links。A 股代码加引号。人物单独放 people；同名公司语境放 exclude。短中文别名须列入 `short_alias_allow`，跨公司别名冲突会启动报错。
 
 ```yaml
 rules:
-  enable: true                # bool — Aho-Corasick 关键词匹配（免费，速度快，推荐开）
-  gray_zone_action: digest    # 灰区新闻处理：digest（汇总推送）/ skip
-  matcher: aho_corasick       # 匹配器类型（目前只支持 aho_corasick）
-  us: [...]                   # 美股关注列表
-  cn: [...]                   # A 股关注列表
-
-llm:
-  enable: false               # bool — LLM 智能筛选（需 dashscope_api_key，会产生费用）
-  us: [...]
-  cn: [...]
-  macro: [...]                # 宏观关键词（FOMC/CPI/加息等）
-  sectors: [...]              # 行业关键词
-```
-
-### 每只股的字段
-
-```yaml
-- ticker: NVDA                # 必填 — 股票代码
-  name: NVIDIA                # 必填 — 英文全称（用于显示）
-  aliases: [英伟达, 老黄家]    # 推荐 — 中英文别名；Aho-Corasick 用这些词匹配新闻正文
-  sectors: [semiconductor, ai] # 推荐 — 所属行业；用于匹配行业层面新闻
-  macro_links: [FOMC, CPI]    # 选填 — 关联宏观关键词
-  alerts: [price_5pct, earnings] # 选填 — 触发告警类型（当前为元数据，未来扩展用）
-```
-
-A 股 `market` 字段不用填（由 `quote_watchlist.yml` 管理盯盘用途）。
-
-### 如何加新股
-
-**US 股**：
-
-```yaml
-rules:
+  enable: true
   us:
-    - ticker: AAPL
-      name: Apple
-      aliases: [苹果, Tim Cook, 库克]
-      sectors: [consumer, ai, hardware]
-      macro_links: [FOMC, CPI]
+    - ticker: NVDA
+      name: NVIDIA
+      aliases: [英伟达]
+      people: [Jensen Huang]
+      exclude: []
+      sectors: [semiconductor]
+      macro_links: [FOMC]
+  cn: []
 ```
 
-**A 股**（6 位数字代码加引号）：
+标题命中决定主体，全文命中补标签；路由优先主体市场，无主体时使用标签，再使用文章市场。旧双层 rules/llm enable、gray_zone_action 和旧通用词表暂留迁移兼容，新评估器使用同一份 rules 持仓清单。
 
-```yaml
-rules:
-  cn:
-    - ticker: "600036"
-      name: 招商银行
-      aliases: [招商银行, 招行]
-      sectors: [银行, 金融]
-      macro_links: [央行, MLF, LPR]
-```
+## scoring.yml 与 first_party.yml
 
-### 详细设计说明
+`scoring.yml` 管理事件词、标题位置、明确金额/涨跌幅和宏观/政策/行业召回词。`first_party.yml` 管理巨潮公告标题 high/normal/low 与 SEC 表单等级，并定义巨潮合并窗口和条数限制。词表变更先做录制样本、只读回放和影子观察，不凭关键词命中就宣称投资重要性。
 
-见 `docs/superpowers/specs/2026-04-26-watchlist-rules-design.md`
+## prompts/ 兼容目录
 
----
+旧 Tier-0/1/2/3 YAML 模板不控制新评估器。新 prompt 在 `src/news_pipeline/assess/prompts.py`，`app.yml` 的 assess/digest `prompt_version` 记录其版本。旧模板目录等待 v2 稳定一周后按 C1/C2 清单删除。
 
-## prompts/
-
-LLM 各 tier 的 prompt 模板目录。**不要随意改动**，字段与 schema 严格绑定。
-
-```
-prompts/
-├── tier0_classify.v1.yaml       # tier-0：快速新闻分类（重要 / 不重要 / 灰区）
-├── tier1_summarize.v1.yaml      # tier-1：摘要 + 实体提取（轻量）
-├── tier2_extract.v1.yaml        # tier-2：深度实体抽取（用 Claude Haiku）
-└── tier3_deep_analysis.v1.yaml  # tier-3：深度分析（预留）
-```
-
-使用的版本由 `app.yml` 的 `llm.prompt_versions` 字段控制。要修改 prompt，请先阅读 `docs/components/llm-pipeline.md`，再新建版本文件（如 `tier1_summarize.v2.yaml`），然后更新 `app.yml` 中对应的版本号。
+详见 [抓取源](../../docs/components/scrapers.md)、[规则](../../docs/components/rules.md)、[评测门槛](../../docs/components/llm-pipeline.md) 和 [清理清单](../../docs/operations/staged-cleanup.md)。这些非密钥配置受版本管理，只有真实 secrets 文件被忽略。

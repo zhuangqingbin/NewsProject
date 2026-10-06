@@ -1,163 +1,57 @@
 # Observability
 
-这一页描述日志系统（structlog）、Bark 告警的 7 个触发点、周报机制，以及健康检查。
-
----
+心跳回答进程和调度器是否活着；源健康回答上游是否可用；投递状态回答消息是否发出。三者分开监控，不用“最近有新闻”代替进程健康。
 
 ## structlog JSON 日志
 
-```python
-# observability/log.py
-import structlog
-
-def configure_logging(*, level: str = "INFO", json_output: bool = True) -> None:
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            structlog.processors.JSONRenderer(),  # JSON 格式输出
-        ],
-        ...
-    )
-```
-
-日志格式（JSON，每行一条）：
-
-```json
-{"timestamp": "2026-04-25T09:30:00Z", "level": "info", "event": "scrape_done", "source": "finnhub", "new": 3, "total": 15}
-{"timestamp": "2026-04-25T09:30:01Z", "level": "warning", "event": "anticrawl", "source": "xueqiu", "error": "xueqiu blocked"}
-```
-
-### 关键日志事件
-
-| event | level | 含义 |
-|---|---|---|
-| `scheduler_started` | info | 调度器启动，列出所有 job |
-| `scrape_done` | info | 单次抓取完成，含 new/total 计数 |
-| `anticrawl` | warning | 反爬触发，source 已暂停 |
-| `scrape_transient_error` | warning | 网络超时等临时错误 |
-| `scrape_structural_error` | error | 解析 bug 等结构性错误 |
-| `llm_skip` | debug | Tier-0 判断无关，跳过 |
-| `llm_failed` | error | LLM 调用异常，文章进 dead letter |
-| `push_suppressed_burst` | info | Burst 抑制，未推送 |
-| `scraper_probe_ok` | info | 启动时连通性探测成功 |
-| `scraper_probe_failed` | warning | 启动时连通性探测失败 |
-| `anthropic_not_configured_fallback_to_tier1` | warning | Anthropic 未配，已 fallback DeepSeek |
-| `shutdown_signal` | info | 收到 SIGTERM/SIGINT |
-| `shutdown_complete` | info | 优雅退出完成 |
-
-### 查看日志
+默认 JSON 日志。`httpx` 和 `httpcore` logger 至少为 WARNING，避免 INFO 请求 URL 泄露飞书 webhook 或 Bark key。错误使用可辨识的异常类别或 repr，不把空列表当作所有故障的统一结果。
 
 ```bash
-# systemd journal（生产）
-sudo journalctl -u news-pipeline -f --no-pager
-
-# 只看 error
-sudo journalctl -u news-pipeline -p err --since "1 hour ago"
-
-# 过滤特定 event（jq 解析 JSON）
-sudo journalctl -u news-pipeline --since today | jq 'select(.event == "scrape_done")'
+docker compose logs --tail=100 app quote_watcher
+docker compose logs -f app
 ```
 
----
+抓取日志关注 `scrape_failed`、`scrape_done`；评估关注 `event_assess_failed`、`assess_input_truncated`；行情关注 `quote_feed_ok`、`ticker_loop_failed` 与启动探测。源码里保留的旧 Tier 日志和死信周报不代表当前 main 会运行旧链路。
 
-## Bark iOS 告警
+## 源健康状态机
 
-Bark 是一个轻量 iOS 推送应用，提供 HTTPS webhook，一次调用 → iPhone 系统通知。
+`source_state` 保存首次/最近成功、最新条目时间、连续失败、暂停时间、健康状态和变更时间。连续 5 次失败进入 down/failing；成功但超过配置静默阈值进入 down/silent。北京时间交易日 09:00–23:00 使用 `max_silence_min`，其他时段用 `max_silence_off_min`；交易日历处理周末与中国节假日。
 
-当 TG 或飞书 token 失效时，Bark 作为独立告警通道。
+抓取失败指数退避封顶 30 分钟。Bark 仅在状态转换时告警：down 发失效，恢复发中断时长，不再每次解析错误都紧急提醒。新闻日报仍逐源展示状态，down 排在前面。
 
-### 配置
+## 行情源监控
 
-```yaml
-# config/secrets.yml
-alert:
-  bark_url: https://api.day.app/<YOUR_BARK_KEY>
-```
-
-### 7 个触发点
-
-| 告警 ID | 触发时机 | 级别 |
-|---|---|---|
-| C-1 | `AntiCrawlError` → source 暂停 30min | WARN |
-| C-2 | 今日 LLM 成本 >= ceiling × 80%（每天只发一次） | WARN |
-| C-3 | 今日 LLM 成本 >= ceiling（每次超限都发） | URGENT |
-| C-4 | 某 channel 最近 60min 失败次数 >= 3 | WARN |
-| C-5 | `scraper_probe_failed`（启动时连通性探测失败） | WARN |
-| C-6 | 每日心跳（24h 间隔，证明服务存活） | INFO |
-| C-7 | 周一 08:00 CST，DLQ 未处理任务汇总 | INFO |
-
-### 告警节流
-
-`BarkAlerter` 内置节流（默认 15 分钟同一告警 key 不重复发送）：
-
-```python
-class BarkAlerter:
-    def __init__(self, base_url: str, throttle_seconds: int = 900):
-        self._throttle = throttle_seconds  # 900s = 15min
-        self._last_sent: dict[str, float] = {}
-
-    async def send(self, title: str, body: str, level: AlertLevel) -> bool:
-        key = f"{level}:{title}"
-        if (now - last_sent[key]) < self._throttle:
-            return False  # 节流，不发
-        ...
-```
-
----
+`QUOTE_FEED=tencent` 是个股默认源，`sina` 是切换选项。启动时分别探测个股、全市场、行业板块，任一路失败发 Bark。交易时段连续 5 分钟没有成功个股快照告警一次，首次恢复再通知；成功记录 `quote_feed_ok`。休市不积累无快照故障时间。
 
 ## 健康检查
 
-`healthcheck.py` 实现了一个简单的健康端点，用于 Docker HEALTHCHECK 或外部监控：
-
-```python
-# healthcheck.py
-# 检查：数据库连通性 + 最近 N 分钟有无新数据
-```
+`shared/observability/heartbeat.py` 每 60 秒写 `data/heartbeat_news_pipeline.json` 或 `data/heartbeat_quote_watcher.json`，包含当前时间与各 job 完成时间。写入使用临时文件替换。healthcheck 要求文件在最近 3 分钟更新；两个子系统有各自的 Compose healthcheck。
 
 ```bash
-# 本地检查
-uv run python -c "from news_pipeline.healthcheck import check; import asyncio; asyncio.run(check())"
+docker compose exec app python -m news_pipeline.healthcheck
+docker compose exec quote_watcher python -m news_pipeline.healthcheck --subsystem quote_watcher
 ```
 
----
+healthy 不意味着所有源正常，也不代表当前新闻已经发送成功。
 
-## 周报（DLQ Summary）
+## 系统日报与影子对比
 
-每周一 08:00 CST，`_weekly_dlq_alert` job 查询未处理的 dead letter 并通过 Bark 发送汇总：
+每天北京时间 08:20 向 `ops.report_channel`（默认 `feishu_cn`）发送系统卡片：逐源过去 24 小时入库/状态、候选、即时推送、去重/突发/新鲜度拦截、摘要期数/展示条数、投递失败、数据库与 WAL 大小、LLM 次数/费用/失败/规则兜底。
 
-```python
-async def build_dlq_summary(*, dlq: DeadLetterDAO) -> str:
-    # 查询 resolved_at IS NULL 的死信
-    # 按 kind 分组统计
-    # 返回摘要字符串，如: "scrape: 2, push_4xx: 1"
+legacy 指标读取旧处理和推送记录，旧摘要使用 `kind=legacy_digest` 的审计记录（`sent` / `legacy_failed`）。新摘要展示数使用 `event_ids`；`consumed_event_ids` 是预选消费范围，不能代替展示条数。同一期多个频道不能重复计作多个事件。
+
+影子日报补充新旧共同、仅新路径与仅旧路径的事件列表。shadow 事件/摘要不发新闻，但系统日报和源冒烟运维卡片照常发，保留每日观察信号。日报本身也走持久投递；未收到日报时检查调度心跳与 outbox。
+
+## 漏抓抽检与源冒烟
+
+```bash
+docker compose exec app python -m news_pipeline.health.leak_check
+docker compose exec app python -m news_pipeline.health.smoke --no-report
 ```
 
----
-
-## daily_metrics 表
-
-每次抓取/LLM/推送后，`MetricsDAO.increment()` 更新 `daily_metrics`：
-
-| metric_name | dimensions | 含义 |
-|---|---|---|
-| `scrape_new` | `source=finnhub` | 新抓取文章数 |
-| `scrape_dup` | `source=finnhub` | 去重丢弃数 |
-| `llm_cost_cny` | — | 今日 LLM 花费（CNY） |
-| `push_ok` | `channel=feishu_us` | 推送成功数 |
-| `push_failed` | `channel=feishu_us` | 推送失败数 |
-
-查询示例：
-```sql
-SELECT metric_date, metric_name, dimensions, metric_value
-FROM daily_metrics
-WHERE metric_date >= date('now', '-7 days')
-ORDER BY metric_date DESC, metric_name;
-```
-
----
+手工 smoke 默认输出 JSON 并向 ops 频道发送卡片，数据库始终只读、不插入新闻；`--no-report` 仅输出 JSON，`--report` 是默认行为的显式别名。启动和每周日 20:00 北京时间自动冒烟经 outbox 排队卡片；包含结构错误与 checked / missing / title_duplicates。发布超过 15 分钟、不在 URL hash 中的条目，再区分旧标题去重与真丢失。失败与漏抓是不同指标，源能返回列表也可能漏新闻。
 
 ## 相关
 
-- [Operations → Monitoring](../operations/monitoring.md) — 看日志 / 看成本 / Datasette 访问
-- [Operations → Troubleshooting](../operations/troubleshooting.md) — 常见问题处理
+- [部署与回滚](../getting-started/deployment-current.md) · [调度](scheduler.md)
+- [投递](dispatch-router.md) · [模型预算](llm-pipeline.md)

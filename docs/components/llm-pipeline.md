@@ -1,240 +1,54 @@
-# LLM Pipeline
+# Assessment 与模型评测
 
-这一页是文档中最关键的一章：详解四层 LLM 路由、当前 fallback 状态、成本追踪熔断机制、prompt 管理，以及 Pydantic 枚举容错。
+保留 `llm-pipeline.md` 页面路径。新路径使用 `assess/{client,prompts,schema,assessor}.py`，每个事件一次结构化评估，摘要单独调用。旧四层 Tier-0/1/2/3、双层 rules/llm watchlist、Anthropic 路由和 YAML prompt 文件暂留兼容，当前 main 不把它们作为新默认链路。
 
----
+## 默认关闭与配置
 
-## 当前运行状态：全程 DeepSeek
-
-!!! warning "Anthropic 未配置，自动 fallback"
-    当前生产环境 `secrets.yml` 中 `anthropic_api_key` 为 `REPLACE_ME`（未配置）。
-    启动时会输出一行 WARN 日志：
-
-    ```
-    anthropic_not_configured_fallback_to_tier1 tier2_configured=claude-haiku-4-5-20251001 fallback_model=deepseek-v3
-    ```
-
-    效果：Tier-2 和 Tier-3 的请求全部路由到 DashScope，使用 `deepseek-v3`。
-    代价：实体/关系抽取质量稍差，但管线正常运行，月成本 ¥10–30。
-
-    配置 Anthropic 见 [Operations → Secrets § Anthropic](../operations/secrets.md)。
-
----
-
-## 四层模型表
-
-| 层 | 触发条件 | 配置模型 | 实际运行（无 Anthropic） | 输入 tokens | 输出 tokens | 单次成本（DeepSeek） |
-|---|---|---|---|---|---|---|
-| **Tier-0** | 每条 pending 文章 | `deepseek-v3` | `deepseek-v3` | ~300 | ~100 | ¥0.00031 |
-| **Tier-1** | 非一手源 + 相关 + 普通 | `deepseek-v3` | `deepseek-v3` | ~800 | ~300 | ¥0.00085 |
-| **Tier-2** | 一手源 / watchlist hit / tier2 hint | `claude-haiku-4-5-20251001` | `deepseek-v3` | ~1500 | ~600 | ¥0.00165 |
-| **Tier-3** | （保留，未在主管线使用） | `claude-sonnet-4-6` | `deepseek-v3` | ~2000 | ~800 | ¥0.00220 |
-
-DeepSeek-V3 定价（阿里云 DashScope）：
-- 输入：¥0.5 / 1M tokens
-- 输出：¥1.5 / 1M tokens
-
----
-
-## 一条新闻的 LLM 流程图
-
-```mermaid
-sequenceDiagram
-    participant PP as process_pending
-    participant CT as CostTracker
-    participant T0 as Tier0Classifier
-    participant LR as LLMRouter
-    participant T1 as Tier1Summarizer
-    participant T2 as Tier2DeepExtractor
-
-    PP->>CT: check_async()
-    alt 成本 >= ceiling (¥5)
-        CT-->>PP: raise CostCeilingExceeded
-    else 成本 >= 80% ceiling
-        CT->>CT: Bark WARN (每天一次)
-    end
-
-    PP->>T0: classify(title, watchlist)
-    T0->>T0: DashScope deepseek-v3<br/>max_tokens=200
-    T0-->>LR: Tier0Verdict{relevant, watchlist_hit, tier_hint}
-
-    LR->>LR: 路由决策
-    alt art.source in {sec_edgar, juchao, caixin_telegram}
-        LR-->>PP: "tier2"
-    else not relevant
-        LR-->>PP: "skip"
-    else watchlist_hit OR tier_hint=="tier2"
-        LR-->>PP: "tier2"
-    else
-        LR-->>PP: "tier1"
-    end
-
-    alt tier1
-        PP->>T1: summarize(art)
-        T1->>T1: DashScope deepseek-v3<br/>max_tokens=600
-        T1-->>PP: EnrichedNews(summary, event_type, sentiment...)
-    else tier2
-        PP->>T2: extract(art)
-        T2->>T2: DashScope/Anthropic<br/>max_tokens=1200
-        T2-->>PP: EnrichedNews(summary + entities + relations)
-    end
-```
-
----
-
-## 路由决策表
-
-`LLMRouter.decide()` 按以下优先级顺序决策：
-
-| 优先级 | 条件 | 路由结果 |
-|---|---|---|
-| 1（最高） | `art.source` 是一手源（`sec_edgar` / `juchao` / `caixin_telegram`） | `tier2` |
-| 2 | `verdict.relevant == False` | `skip` |
-| 3 | `verdict.watchlist_hit == True` OR `verdict.tier_hint == "tier2"` | `tier2` |
-| 4（默认） | 其余 | `tier1` |
-
-一手源直达 Tier-2 的原因：这些是官方公告和一手资讯，质量高，值得深度抽取。
-
----
-
-## Prompt Cache 机制
-
-```yaml
-# config/app.yml
-llm:
-  enable_prompt_cache: true
-```
-
-- **Anthropic**：支持 prompt cache，system prompt 命中 90% 折扣。`cache_segments: [system]` 在所有 prompt YAML 中已配置，命中率约 80–90%
-- **DeepSeek（DashScope）**：不支持 Anthropic 格式的 prompt cache。当前 fallback 到 DeepSeek 后，`cache_segments` 字段被传入 `LLMRequest` 但 DashScope client 忽略它——无副作用，只是不起作用
-
----
-
-## Cost Tracker 熔断流程
-
-`CostTracker` 在每条文章进入 LLM 处理前调用 `check_async()`：
-
-```mermaid
-flowchart TD
-    A[check_async 被调用] --> B{今日成本 >= ceiling?}
-    B -->|是 ¥5| C[Bark URGENT 告警]
-    C --> D[raise CostCeilingExceeded]
-    D --> E[文章标记 dead, 不再 LLM 处理]
-    B -->|否| F{今日成本 >= 80% ceiling?}
-    F -->|是 ¥4| G{今天已发过 warn?}
-    G -->|否| H[Bark WARN 告警]
-    H --> I[_warned_today.add(today)]
-    G -->|是| J[跳过，避免重复告警]
-    F -->|否| K[正常处理]
-```
-
-`CostTracker.record()` 在每次 LLM 调用完成后记录实际 token 消耗：
-
-```python
-def record(self, *, model: str, usage: TokenUsage) -> None:
-    p = self._pricing.get(model)  # 查 PRICING 字典
-    cost = (usage.input_tokens / 1_000_000) * p.input_per_m_cny + \
-           (usage.output_tokens / 1_000_000) * p.output_per_m_cny
-    with self._lock:  # threading.Lock 保证线程安全
-        self._daily_total[date_key] += cost
-```
-
-当前 ceiling：¥5/天（`config/app.yml → runtime.daily_cost_ceiling_cny`）。
-
----
-
-## Prompt 文件结构
-
-```
-config/prompts/
-├── tier0_classify.v1.yaml     # 标题分类 prompt
-├── tier1_summarize.v1.yaml    # 普通摘要 prompt
-├── tier2_extract.v1.yaml      # 深度实体/关系抽取 prompt
-└── tier3_deep_analysis.v1.yaml # 深度分析（保留）
-```
-
-版本 pin 在 `config/app.yml`：
+仓库默认 `llm.enabled: false`、`pricing: {}`。在默认 legacy 模式规则仍可抓取、即时推送和发摘要。启用新 LLM 前必须配置 API key、经过授权的模型选型，以及评估/摘要模型的实际正数 input/output 单价（人民币 / 百万 token）；缺价或零价会拒绝启动。
 
 ```yaml
 llm:
-  prompt_versions:
-    tier0_classify: v1
-    tier1_summarize: v1
-    tier2_extract: v1
-    tier3_deep_analysis: v1
+  enabled: false
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  assess: {model: qwen-plus, max_tokens: 400, prompt_version: assess_v1}
+  digest: {model: qwen-plus, max_tokens: 1500, prompt_version: digest_v1}
+  daily_cost_ceiling_cny: 5.0
+  pricing: {}
 ```
 
-升级 prompt 的安全流程：
-1. 新建文件 `tier1_summarize.v2.yaml`（不改动 v1）
-2. 在测试环境改 `prompt_versions.tier1_summarize: v2`
-3. 用 eval set（`tests/eval/`）验证 F1 不下降
-4. 确认后推到生产，改 `prompt_versions`，重启服务
+模型名是配置默认值，不是已完成 benchmark 的推荐。`llm.tier*` 和旧 `runtime.daily_cost_ceiling_cny` 不控制新调用。
 
----
+## 哪些事件送评估
 
-## Pydantic 输出校验 + 枚举容错
+每批最多 20 个待评估事件，共享最多 4 个并发请求。被公司标签命中、一手源、或源侧重要度 ≥ 2 的候选可以送评估；其余跳过并使用规则。正文选最长文章，超过 1500 字保留前 1000 和后 500 字。输入含持仓清单、一手来源/来源数、主体标题和相同标的最近 24 小时最多 8 个事件，帮助识别重复与更新。
 
-LLM 返回 JSON 后，通过 `safe_*` 辅助函数做枚举 coercion（宽松兼容）：
+## 输出校验
 
-```python
-# common/enums.py
+`event_type`、`scope`、`holdings` 关系与方向使用枚举；`materiality` 是 1–5 整数，`confidence` 在 0–1 内。summary 校验后截到 60 字；未知 ticker 从 holdings 删除，未知近期引用清空，错误 repeat 不沿用。新闻正文中的指令只作为数据，不得改变系统规则。
 
-def safe_event_type(value: str | None) -> EventType:
-    if value is None:
-        return EventType.OTHER
-    try:
-        return EventType(value.lower())
-    except (ValueError, AttributeError):
-        return EventType.OTHER  # fallback 而非 crash
+JSON 或 schema 不合法时带上错误信息重试一次，仍失败则 `assess_status='failed'`，决策使用规则。评估写入检查事件 `article_count` 和待评估状态，避免聚类追加证据期间写入旧响应。
+
+## HTTP、预算与熔断
+
+复用 OpenAI-compatible `AsyncClient`，默认超时 30 秒。网络错误、429、5xx、超时最多重试 2 次，等待 2 秒与 6 秒；其他 4xx 不重试。每次调用尝试的模型、prompt 版本、token、费用、耗时与错误写入 `llm_calls`。
+
+评估与摘要共享预算、并发和熔断。预算按北京时间当天持久记录计算，并为在途请求预留保守成本，避免并发越限；上限后停止新调用，规则兜底，并一天告警一次。连续 10 次终态调用失败熔断 10 分钟，开断与恢复各告警一次。
+
+## B0：模型选型不是已完成验收
+
+先从三周样本导出 150 个事件：push 50、digest_hi 50、提及 30、宏观 20。人工修正预填 label/tickers，保留 30 条只做最终验证。`tests/eval/gold_events.jsonl` 目前只有 8 个未审核 seed，不是 150 条已审核 gold set。
+
+付费对比在明确授权后才能运行；尚未进行付费 benchmark，不能引用虚构精度或生产费用。目标线是精度 ≥ 0.70、必推召回 ≥ 0.90、认错公司率 ≤ 2%、JSON 合法率 ≥ 99%、p95 ≤ 8 秒。
+
+## 只读回放
+
+```bash
+uv run python -m news_pipeline.tools.replay --db /path/to/read-only-copy.db --from 2026-09-14 --to 2026-10-06 --mode rules --export data/review-events.csv
 ```
 
-同样的模式用于 `safe_sentiment`、`safe_magnitude`、`safe_predicate`、`safe_entity_type`。
-
-**为什么需要这个**：LLM 有 5-10% 的概率返回不在枚举定义内的值，例如：
-- `"market_analysis"` 不是合法 `EventType` → coerce 为 `EventType.OTHER`
-- `"neutral_to_positive"` 不是合法 `Sentiment` → coerce 为 `Sentiment.NEUTRAL`
-
-这避免了整条新闻因为一个 enum 字段验证失败而进入 dead letter。
-
----
-
-## client_selection：Anthropic 可选路由
-
-```python
-# llm/client_selection.py
-
-def pick_client_and_model(
-    configured_model: str,
-    *,
-    anthropic_client: LLMClient | None,
-    dashscope_client: LLMClient,
-    tier1_fallback_model: str,
-) -> tuple[LLMClient, str]:
-    if configured_model.startswith("claude-"):
-        if anthropic_client is not None:
-            return anthropic_client, configured_model
-        return dashscope_client, tier1_fallback_model  # fallback
-    return dashscope_client, configured_model
-```
-
-在 `main.py` 启动时调用一次，决定 Tier-2 和 Tier-3 使用哪个 client。
-
----
-
-## 如何换到 Anthropic
-
-1. 申请 Anthropic API key（见 [Operations → Secrets § Anthropic](../operations/secrets.md)）
-2. 填入 `config/secrets.yml → llm.anthropic_api_key`
-3. 重启服务：`sudo systemctl restart news-pipeline`
-4. 确认启动日志没有 `anthropic_not_configured_fallback_to_tier1`
-
-配置后成本会上升（Haiku ¥7/M input，vs DeepSeek ¥0.5/M），建议把 `daily_cost_ceiling_cny` 上调到 ¥15–20。
-
----
+SQLite 用只读 URI 打开，不迁移或修改来源库。导出样本标为 unreviewed；规则/模型回放输出日推送候选数、合并倍数和已知案例，不等于线上发送成功数。`--eval --mode rules` 不调用模型，输出样本审核状态（seed 为 seed_unreviewed），不能把未审核指标当验收。取得授权、完成标注并配置真实单价后，才使用 `--mode llm`；`--eval --model ID` 未显式给 mode 时也自动选 llm，会触发付费调用。响应缓存哈希含完整输入、模型、prompt 版本和供应商，重复缓存命中不再次计为新调用费用。
 
 ## 相关
 
-- [Reference → LLM Cost](../reference/llm-cost.md) — 详细成本估算
-- [Components → Classifier](classifier.md) — 打分和 LLM judge
-- [Operations → Secrets](../operations/secrets.md) — 配置 API key
-- [Operations → Monitoring](../operations/monitoring.md) — 查看成本
+- [规则兜底](rules.md) · [决策与摘要](dispatch-router.md)
+- [灰度与回滚](../getting-started/deployment-current.md) · [运维报告](observability.md)

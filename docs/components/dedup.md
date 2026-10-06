@@ -1,129 +1,34 @@
-# Deduplication
+# Events 与去重
 
-这一页解释去重的两层机制：URL 精确匹配和 SimHash 模糊标题匹配。
-
----
-
-## 为什么需要去重
-
-财经新闻有两种常见重复模式：
-
-1. **完全相同 URL**：同一篇文章被多次抓取（如 Finnhub 同一篇文章在不同分类里出现）
-2. **相同内容，不同 URL**：同一事件被不同媒体转载，标题几乎一致但 URL 不同（如"NVDA 财报超预期"同时出现在 Finnhub 和雪球）
-
-对于投资者来说，同一条信息收到 3 遍通知比漏掉信息更令人烦躁。
-
----
-
-## 两层去重流程
-
-```mermaid
-flowchart TD
-    A[新 RawArticle] --> B[url_hash 精确查找]
-    B -->|找到| C[is_new=False, reason=url_hash]
-    B -->|未找到| D[查询 24h 内 title_simhash 列表]
-    D --> E{存在 hamming_distance ≤ 4?}
-    E -->|是| F[is_new=False, reason=simhash]
-    E -->|否| G[INSERT raw_news]
-    G --> H[is_new=True]
-```
-
----
+保留 `dedup.md` 页面路径供旧链接使用。新版核心在 `ingest/store.py`、`events/similarity.py`、`events/clusterer.py` 和 `events/sent_cache.py`；旧 `dedup/` 模块暂留兼容，删除等待 v2 稳定一周。
 
 ## 第一层：URL Hash 精确匹配
 
-```python
-def url_hash(url: str) -> str:
-    return hashlib.sha1(url.encode("utf-8")).hexdigest()
-```
+URL hash 是原始新闻的唯一键。相同 URL 不重复写入；不同媒体 URL 是独立证据，不因为相似标题丢掉正文、来源或原文链接。
 
-- 对原始 URL 字符串做 SHA-1，生成 40 位十六进制字符串
-- `raw_news.url_hash` 字段有 `UNIQUE` 约束（数据库层强制去重）
-- 优先级最高，成本最低（单次主键查找）
+## 第二层：事件相似度
 
----
+标题句先去快讯前缀、括号代码、空白与标点，提取字符二元组与关键数字。主体都非空而不相同时不合并。数字都非空且没有交集时，要求 Jaccard ≥ 0.9；一般 Jaccard ≥ 0.6 可合并。同一主体允许数字包含且 Jaccard ≥ 0.3，或标题包含度 ≥ 0.85 的变体。
 
-## 第二层：SimHash 模糊标题匹配
+聚类接受乱序证据，但距事件最近时间不超过 6 小时、整个事件跨度不超过 12 小时。索引保留前两篇和最近六篇的特征。巨潮同主体 high 公告另有 10 分钟、最多 5 份的合并条件。
 
-SimHash 是一种局部敏感哈希，相似文本生成的哈希值在汉明距离上也相近。
+## 事件与文章
 
-### 计算方式
+`events` 存储统一标题、主体/标签、来源数、首次/最近时间、规则兜底和评估结果。`event_articles` 关联原始新闻，一篇文章只能归属一个事件。追加更强证据时，未即时推送的事件重新进入待评估；异步评估提交必须检查文章版本，不能用旧响应覆盖新证据。
 
-```python
-def title_simhash(title: str) -> int:
-    # 用字符 bigram（2-gram）作为特征
-    # 对中文和英文都有效（字符级 bigram 不依赖分词）
-    text = title.strip()
-    tokens = [text[i:i+2] for i in range(len(text) - 1)] or [text]
-    return int(Simhash(tokens, f=64).value)  # 64-bit 整数
-```
+模型 `novelty=repeat` 只有引用同标的最近 24 小时、最多 8 个有效事件 id 才成立；未知引用被清理。有效 repeat 可把文章重归到已有事件，不再独立推送。
 
-**字符 bigram 示例**：
-- `"NVDA 财报超预期"` → `["NV", "VD", "DA", " 财", "财报", "报超", "超预", "预期"]`
-- 中英文混合文本也能处理，不需要分词器
+## legacy / shadow / v2
 
-### 汉明距离
+| 模式 | 原始状态与去重 |
+|---|---|
+| legacy | URL 唯一；标题 simhash 重复仍入库标记；近期已推送事件特征防重复推送 |
+| shadow | legacy 使用 `status`；新事件使用 `v2_state`，也处理不同 URL 的重复证据 |
+| v2 | 标题 simhash 写 0；保留全部不同 URL 证据，由事件层合并 |
 
-```python
-def hamming(a: int, b: int) -> int:
-    return bin(a ^ b).count("1")  # 两个 64-bit 整数不同位的数量
-```
-
-**示例**：
-- `"NVDA 财报超预期"` vs `"英伟达财报超出市场预期"` → hamming ≈ 5–8（不同词，不视为重复）
-- `"NVDA 财报超预期"` vs `"NVDA 财报大幅超预期"` → hamming ≈ 2–3（视为重复）
-
-### 查询范围
-
-去重只对 **24 小时内**的文章做 SimHash 比较：
-- 超过 24 小时的老文章不参与比较，避免把相关但不同时间的新闻误判为重复
-- 通过 `idx_raw_simhash` 索引加速 simhash 列的查询
-
----
-
-## distance=4 的含义
-
-`config/app.yml` 中设定：
-
-```yaml
-dedup:
-  title_simhash_distance: 4
-```
-
-!!! note "distance=4 偏紧"
-    64 位 SimHash 中，汉明距离 4 意味着两个 hash 只有 4 位不同（差异率 6.25%）。
-    这是一个相对严格的阈值：
-    - **优点**：避免把只有细微差异的标题（如"超预期" vs "超出预期"）视为不同新闻
-    - **代价**：标题差异较大的同一事件报道会被视为新文章（可接受，宁漏勿重）
-
-    如果你发现漏推太多，可以把 `title_simhash_distance` 改小（如 2 或 3）。
-    如果推了太多重复，可以改大（如 6 或 8）。
-
----
-
-## 数据库索引
-
-```sql
--- raw_news 上的 SimHash 查询用索引
-CREATE INDEX idx_raw_simhash ON raw_news (title_simhash);
-```
-
-SimHash 本身存储为 64 位整数（`INTEGER`），占用空间极小。查询时扫描 24 小时窗口内所有 simhash 值，在内存中做汉明距离计算（Python 层）。
-
----
-
-## 配置
-
-```yaml
-# config/app.yml
-dedup:
-  url_strict: true          # URL hash 精确去重始终启用
-  title_simhash_distance: 4 # 汉明距离阈值，越小越严格
-```
-
----
+旧推送特征缓存从 `push_log`、`news_processed`、`raw_news` 重建，重启后继续去重。迁移前历史原始行标 `v2_state='legacy'`，防止启动时回放历史消息。
 
 ## 相关
 
-- [Components → Storage](storage.md) — `raw_news` 表结构
-- [Components → Scrapers](scrapers.md) — 数据源
+- [抓取与保存](scrapers.md) · [规则](rules.md) · [存储](storage.md)
+- [部署与灰度](../getting-started/deployment-current.md) · [后续清理](../operations/staged-cleanup.md)

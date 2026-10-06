@@ -1,148 +1,64 @@
-# config/common — 两个子系统共用的配置
+# config/common — 共用配置
 
-`news_pipeline` 和 `quote_watcher` 都会读取这里的文件。
-
----
+两个子系统读取此目录。默认 `pipeline.mode: legacy`、`llm.enabled: false`；配置加载不等于线上验收完成。新闻改配置后重启 `app`，不使用旧新闻 watchdog 热加载。
 
 ## secrets.yml
 
-API 密钥集合。**绝对不要提交到 git**（已在 `.gitignore` 中排除）。
-
-从模板复制后按需填写：
-
 ```bash
+umask 077
 cp config/common/secrets.yml.example config/common/secrets.yml
-$EDITOR config/common/secrets.yml
+chmod 600 config/common/secrets.yml
 ```
 
-**关于飞书 webhook 拆分**：新闻和盯盘告警分到 2 个不同的飞书机器人，避免互相吵。A 股新闻 → `news_pipeline.feishu_hook_cn` 机器人，A 股盯盘告警 → `quote_watcher.feishu_hook_cn` 机器人。建群时分开建，或同一群多个机器人也行。
+真实 `config/common/secrets.yml` 与旧 `config/secrets.yml` 被 `.gitignore` 排除；示例、app、channels、watchlist 和 sources 配置受版本管理，不能把所有配置目录当作已忽略。
 
-**结构说明（v0.5.0 起）**：`push` 字段按子系统嵌套，`news_pipeline` 和 `quote_watcher` 各自独立。旧的 flat 格式（`push.feishu_hook_cn` 等）在迁移窗口内仍能工作，但建议尽快迁移到嵌套格式。
+| 路径 | 用途 |
+|---|---|
+| `push.news_pipeline.feishu_hook_us / feishu_sign_us` | 美股新闻机器人 |
+| `push.news_pipeline.feishu_hook_cn / feishu_sign_cn` | A 股新闻机器人 |
+| `push.quote_watcher.feishu_hook_cn / feishu_sign_cn` | A 股盯盘机器人 |
+| `llm.dashscope_api_key` | 新评估/摘要开启后才需要，默认规则运行可留未配置 |
+| `sources.finnhub_token` | 启用 Finnhub 时需要 |
+| `alert.bark_url` | 源失效/恢复、模型控制和行情告警 |
 
-### 字段说明
-
-| 字段 | 必要程度 | 用途 | 怎么获取 |
-|---|---|---|---|
-| `push.news_pipeline.feishu_hook_us` | ⭐ 必填 | 美股新闻推送的飞书机器人 webhook key | 飞书群 → 设置 → 群机器人 → 添加自定义机器人 → 复制 webhook URL 中 `v2/hook/` 后面的 key |
-| `push.news_pipeline.feishu_sign_us` | 推荐 | 美股新闻频道机器人签名校验密钥 | 添加机器人时勾选"签名校验"，复制密钥 |
-| `push.news_pipeline.feishu_hook_cn` | ⭐ 必填 | A 股新闻推送的飞书机器人 webhook key | 同上，推荐另开一个群分流告警 |
-| `push.news_pipeline.feishu_sign_cn` | 推荐 | A 股新闻频道机器人签名校验密钥 | 同上 |
-| `push.quote_watcher.feishu_hook_cn` | ⭐ 必填 | A 股盯盘告警飞书机器人 webhook key | 同上，建议与新闻机器人分开 |
-| `push.quote_watcher.feishu_sign_cn` | 推荐 | A 股告警频道机器人签名校验密钥 | 同上 |
-| `llm.dashscope_api_key` | ⭐ 必填 | DeepSeek tier-0/tier-1 LLM（阿里云百炼） | https://dashscope.console.aliyun.com → API-KEY 管理 → 创建 API Key |
-| `llm.anthropic_api_key` | 推荐 | Claude Haiku tier-2 实体抽取；无此 key 时自动降级到 dashscope | https://console.anthropic.com → API Keys → Create Key |
-| `sources.finnhub_token` | 美股必填 | Finnhub 财经新闻 + 基本面数据 | https://finnhub.io 注册后首页直接显示免费 token |
-| `sources.xueqiu_cookie` | 选填 | 雪球 A 股新闻（`sources.yml` 中默认禁用） | 浏览器登录 xueqiu.com → F12 Network → 任意请求 → 复制 Cookie 请求头 |
-| `sources.ths_cookie` | 选填 | 同花顺新闻（`sources.yml` 中默认禁用） | 同上，登录 ths.com 后复制 |
-| `alert.bark_url` | 推荐 | iOS Bark 系统级告警（独立于飞书，费用超限 / scraper 挂掉会直接推手机通知） | iOS 安装 Bark App → 首页复制个人推送 URL（形如 `https://api.day.app/xxxx/`） |
-
-### 最小可用集（能跑起来的最少配置）
-
-```yaml
-push:
-  news_pipeline:
-    feishu_hook_cn: REPLACE_ME      # A股新闻飞书群机器人
-  quote_watcher:
-    feishu_hook_cn: REPLACE_ME      # A股盯盘告警飞书群机器人
-llm:
-  dashscope_api_key: REPLACE_ME
-sources:
-  finnhub_token: REPLACE_ME
-```
-
-> 最小可用集：`push.news_pipeline.feishu_hook_cn` + `push.news_pipeline.feishu_sign_cn` + `push.quote_watcher.feishu_hook_cn` + `push.quote_watcher.feishu_sign_cn` + `llm.dashscope_api_key` + `sources.finnhub_token`。
-
-### 从旧 flat 格式迁移
-
-旧 `secrets.yml`（v0.4.x）的 flat 格式在迁移窗口内仍可使用，factory 会自动回退查找。迁移时将 `push` 段改为嵌套结构：
-
-```yaml
-# 旧（flat，仍能工作但已弃用）
-push:
-  feishu_hook_cn: xxx
-  feishu_sign_cn: yyy
-  feishu_hook_cn_alert: zzz
-  feishu_sign_cn_alert: www
-
-# 新（nested，推荐）
-push:
-  news_pipeline:
-    feishu_hook_cn: xxx
-    feishu_sign_cn: yyy
-  quote_watcher:
-    feishu_hook_cn: zzz
-    feishu_sign_cn: www
-```
-
----
+只启用已经填好密钥的源与频道。旧 flat push、Anthropic key 和 cookie 字段暂留兼容，不是新默认依赖。真实密钥不得提交或写入日志。
 
 ## app.yml
 
-全局调度 / LLM 路由 / 分类阈值。**默认值已调好，通常不需要改。**
+| 字段 | 默认 / 含义 |
+|---|---|
+| `pipeline.mode` | legacy / shadow / v2，默认 legacy |
+| `llm.enabled` | false；新评估与归纳摘要的总开关 |
+| `llm.assess` / `llm.digest` | 模型、max_tokens、prompt_version；默认 qwen-plus 不是选型结论 |
+| `llm.pricing.<model>.input / output` | 人民币 / 百万 token；开启时两个实际模型都必须有正数单价 |
+| `llm.daily_cost_ceiling_cny` | 5.0；评估和摘要共享的持久日预算 |
+| `push.max_age_min` / `dedup_window_hours` | 90 分钟新鲜度、6 小时近期推送去重 |
+| `push.same_ticker_burst_window_min / threshold` | 5 分钟 / 3 次；主体键突发降级 |
+| `push.push_min_materiality / push_min_materiality_macro` | 公司 4、宏观/行业 5 |
+| `push.digest_min_materiality / min_confidence` | 3 / 0.5 |
+| `push.quiet_hours` | 默认关闭；北京时间 00:30–07:30 的可选静默策略 |
+| `push.color_scheme` | us 默认，或 cn |
+| `digest.max_items / max_age_hours` | 列表兜底 20 条、24 小时 |
+| `scheduler.digest.cn / us` | 每项显式 at/tz；中国 08:27、20:57，美国纽约 08:27、16:27 |
+| `ops.report_at / report_channel` | 北京时间 08:20 / feishu_cn |
 
-### 主要字段速查
+先保留 `enabled: false, pricing: {}`。获授权完成模型评测、从真实控制台核对并填入两个模型的正数单价后，才开启 LLM；缺价、零价和负价会拒绝启动。不提供伪装成实际报价的示例单价。
 
-| 字段 | 默认值 | 说明 |
-|---|---|---|
-| `runtime.daily_cost_ceiling_cny` | `5.0` | 每日 LLM 费用上限（CNY）；超限停止调用 LLM，Bark 告警 |
-| `runtime.hot_reload` | `true` | 运行中修改 yml → 自动生效，无需重启 |
-| `scheduler.scrape.market_hours_interval_sec` | `180` | 交易时段各 scraper 轮询间隔（秒） |
-| `scheduler.scrape.off_hours_interval_sec` | `1800` | 非交易时段轮询间隔 |
-| `scheduler.llm.process_interval_sec` | `120` | 待处理新闻 LLM 批处理间隔 |
-| `scheduler.digest.morning_cn` | `"08:30"` | A 股早报推送时间（CST） |
-| `scheduler.digest.evening_cn` | `"21:00"` | A 股晚报推送时间 |
-| `scheduler.digest.morning_us` | `"21:00"` | 美股早报（北京时间晚 9 点对应美东早盘前） |
-| `scheduler.digest.evening_us` | `"04:30"` | 美股晚报（北京时间次日凌晨，美东收盘后） |
-| `llm.tier0_model` | `deepseek-v3` | tier-0 快速分类模型 |
-| `llm.tier1_model` | `deepseek-v3` | tier-1 摘要模型 |
-| `llm.tier2_model` | `claude-haiku-4-5-20251001` | tier-2 深度实体抽取（需 anthropic_api_key，否则降级 tier1） |
-| `llm.prompt_versions` | `v1` | 各 tier prompt 版本，与 `prompts/` 目录文件名对应 |
-| `classifier.rules.price_move_critical_pct` | `5.0` | 价格变动超过此百分比 → 自动标记为 critical |
-| `classifier.llm_fallback_when_score` | `[40, 70]` | 规则打分落在此区间时，调用 LLM 二次判断 |
-| `dedup.title_simhash_distance` | `4` | 标题 SimHash 去重阈值；越小越严格 |
-| `push.same_ticker_burst_threshold` | `3` | 同一 ticker N 条内抑制重复推送 |
-| `retention.raw_news_hot_days` | `30` | 原始新闻保留天数 |
-
----
+旧 `runtime.hot_reload`、`runtime.daily_cost_ceiling_cny`、`scheduler.scrape.*`、`scheduler.llm`、`llm.tier*`/旧 prompt/cache/batch、classifier/charts、旧 push rate 和 retention 字段为迁移兼容，不能据此推断新入口行为。新保留任务使用 60/365/30/180 天规则，见存储文档。删除这些字段等待 v2 稳定一周。
 
 ## channels.yml
 
-推送频道路由。**默认配置已就绪，通常不需要改。**
-
-v0.5.0 起共 3 个频道（去掉 `feishu_us_alert`，quote_watcher Phase 1 = CN only）：
-
-| 频道 ID | market | 用途 | 使用者 |
-|---|---|---|---|
-| `feishu_us` | us | 美股新闻推送 | news_pipeline |
-| `feishu_cn` | cn | A 股新闻推送 | news_pipeline |
-| `feishu_cn_alert` | cn | A 股盯盘告警 | quote_watcher |
-
-路由规则：
-- `news_pipeline` 只使用**不含** `_alert` 后缀的频道（market 匹配 + `enabled: true`）
-- `quote_watcher` 只使用**含** `_alert` 后缀的频道（market 匹配 + `enabled: true`）
-
-`webhook_key` / `sign_key` 使用 **dotted 路径** `subsystem.key`，对应 `secrets.yml` 的嵌套结构：
+新闻只选匹配 market 且不以 `_alert` 结尾的启用频道；盯盘只选 cn 且以 `_alert` 结尾的频道。默认 `feishu_us`、`feishu_cn`、`feishu_cn_alert`，分别对应独立密钥。
 
 ```yaml
 channels:
-  feishu_us:
-    type: feishu
-    market: us
-    options:
-      webhook_key: news_pipeline.feishu_hook_us    # 对应 secrets.yml push.news_pipeline.feishu_hook_us
-      sign_key: news_pipeline.feishu_sign_us
   feishu_cn:
     type: feishu
     market: cn
+    enabled: true
     options:
       webhook_key: news_pipeline.feishu_hook_cn
       sign_key: news_pipeline.feishu_sign_cn
-  feishu_cn_alert:
-    type: feishu
-    market: cn
-    options:
-      webhook_key: quote_watcher.feishu_hook_cn    # 对应 secrets.yml push.quote_watcher.feishu_hook_cn
-      sign_key: quote_watcher.feishu_sign_cn
 ```
 
-如需新增频道（例如再加一个测试群）：复制一段，改 ID + `webhook_key`，在 `secrets.yml` 对应子系统下加上 token 即可。
+更多说明见 [部署](../../docs/getting-started/deployment-current.md)、[Assessment](../../docs/components/llm-pipeline.md) 和 [清理门槛](../../docs/operations/staged-cleanup.md)。

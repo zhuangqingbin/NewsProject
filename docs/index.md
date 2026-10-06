@@ -1,33 +1,21 @@
-# News Pipeline
+# NewsProject
 
-News Pipeline 是一个全自动财经新闻处理系统：从 9 个数据源持续抓取新闻，通过四层 LLM 管线提取结构化信息，按重要性分级后实时推送到飞书，并每天早晚发送摘要。系统运行在阿里云轻量服务器（1c2g），每月 LLM 成本约 ¥10–30。
+新闻与 A 股盯盘独立运行，共用飞书发送、配置、交易日历和心跳。v0.7.0 新闻默认 legacy 规则路径、LLM 关闭；事件聚类、结构化评估、持久投递和归纳摘要通过 shadow/v2 灰度启用。
 
-```
-新闻源 → 抓取 → 去重 → LLM 提取 → 分类打分 → 推送（实时 or 摘要）
-```
+## 阅读入口
 
----
-
-## 关键章节
-
-| 目标 | 链接 |
+| 目标 | 页面 |
 |---|---|
-| 了解系统能做什么 | [Getting Started → Overview](getting-started/overview.md) |
-| 看整体架构图 | [Getting Started → Architecture](getting-started/architecture.md) |
-| 当前生产部署方式 | [Getting Started → Deployment](getting-started/deployment-current.md) |
-| LLM 四层路由详解 | [Components → LLM Pipeline](components/llm-pipeline.md) |
-| 日常运维命令 | [Operations → Daily Ops](operations/daily-ops.md) |
-| 常见问题排查 | [Operations → Troubleshooting](operations/troubleshooting.md) |
+| 部署、备份、灰度与回滚 | [Current Deployment](getting-started/deployment-current.md) |
+| 了解数据流 | [架构](architecture.md) |
+| 新闻源与规则 | [Scrapers](components/scrapers.md) · [Rules](components/rules.md) |
+| 事件与可选模型 | [Events](components/dedup.md) · [Assessment](components/llm-pipeline.md) |
+| 消息投递与摘要 | [Outbox](components/dispatch-router.md) · [Pushers](components/pushers.md) |
+| 心跳、源状态、日报和冒烟 | [Observability](components/observability.md) |
+| 一周后的代码清理 | [稳定门槛与删除清单](operations/staged-cleanup.md) |
 
----
+## 发布状态与待完成验证
 
-## 当前版本
+本次实现不代表已部署上线。B0 的 150 条人工标注和付费模型评测尚未完成，8 条 seed 不作为质量验收。shadow 需要 2–3 个交易日观察；v2 稳定一周后才执行 C1/C2 删除，稳定至少两周后逐项评估 D 扩源。真实源可用性、行情单位和线上推送效果仍需从部署服务器验证。
 
-**v0.1.7** — 生产运行中，部署于 `8.135.67.243`（阿里云轻量）。
-
-- 5 个抓取源已启用，4 个暂停（endpoint 变动，需重新验证）
-- LLM：DashScope DeepSeek-V3 全程（Anthropic 未配置，自动 fallback）
-- 推送：飞书 webhook
-- 存储：SQLite 13 表，Datasette 浏览
-
-查看完整版本历史：[Reference → Changelog](reference/changelog.md)
+历史组件页面路径保留以维护旧链接。Tier-0/1/2/3、旧双层 LLM 配置、commands/charts 和新闻 watchdog 只作为迁移兼容说明，不是新的默认运行入口。

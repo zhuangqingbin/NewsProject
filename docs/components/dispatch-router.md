@@ -1,124 +1,34 @@
-# Dispatch Router
+# 决策、Outbox 与 Digest
 
-这一页解释新闻的推送路由逻辑：immediate（实时推）vs digest（早晚汇总），以及 Burst 抑制机制。
+保留 `dispatch-router.md` 页面路径。新版入口在 `deliver/policy.py`、`deliver/outbox.py`、`deliver/digest.py` 和 `runtime.py`。旧 router 与 `process_pending` 在 legacy/shadow 保留，等待 v2 稳定一周后再删除。
 
----
+## 决策与市场路由
 
-## 两种推送模式
+未评估、跳过或失败时使用 `rule_decision`。评估完成后，直接主体/交易对手默认实质性 ≥ 4、置信度 ≥ 0.5 才即时推送；市场/行业事件要求 ≥ 5。一手 high/normal 有评分底线；评分低但规则判 push 的事件降为摘要，避免直接丢弃。有效 repeat 合并文章并 drop 独立推送。
 
-| 模式 | 触发条件 | 时效 |
-|---|---|---|
-| **immediate** | `is_critical=True` | 推送延迟 ≤ 处理间隔（120s） |
-| **digest** | `is_critical=False` | 早晚两次固定时刻汇总 |
+非一手新闻超过 90 分钟降为摘要。夜间静默默认关闭；开启后规则放行理由和模型高实质性事件有明确例外。同一主体默认 5 分钟内 3 次即时候选触发突发降级。路由优先使用公司主体所属市场；模型直接影响标的也可决定目标市场，只有跨市场主体才发两边。
 
----
+## 持久投递
 
-## DispatchRouter 路由逻辑
+即时决策与所有频道的 outbox 入队在同一事务提交。唯一键 `(kind,event_id,channel)` 防止重复入队，摘要用 `(kind,digest_slot,channel)`。单个 worker 由 APScheduler `max_instances=1` 每 10 秒扫描。
 
-```python
-class DispatchRouter:
-    def route(self, scored: ScoredNews, msg: CommonMessage) -> list[DispatchPlan]:
-        channels = self._by_market.get(msg.market.value, [])
-        if not channels:
-            return []
-        return [
-            DispatchPlan(
-                message=msg,
-                channels=channels,
-                immediate=scored.is_critical,   # 关键判定
-            )
-        ]
-```
+每频道至少间隔 1 秒、每分钟最多 20 次投递尝试，历史写入数据库，重启继续限速。失败按 10、30、120、600、1800 秒序列计算退避，累计 5 次失败进入 `failed`；达到终态不再自动执行后续重试。即时投递达到 30 分钟转 `expired`，事件降为摘要。dispatcher 缺失结果也算失败。
 
-Channel 按 market 分组（在 `main.py` 启动时按 `channels.yml` 构建），news_pipeline 只使用不含 `_alert` 后缀的频道：
-- `us` → `[feishu_us]`
-- `cn` → `[feishu_cn]`
+`shadow` 不进入实际发送 worker；系统日报与冒烟报告是运维例外，在影子模式仍发送。已发送记录和 pending 状态分别记录，不能把入队视为成功发送。
 
-quote_watcher 只使用含 `_alert` 后缀的频道：
-- `cn` → `[feishu_cn_alert]`
-- `us` → `[feishu_us_alert]`（Phase 1.x 预留，`enabled: false`）
+## Digest 候选与消费
 
----
+v2 选本市场未消费、24 小时内的摘要事件，加上上一期已成功或影子摘要之后的即时推送回顾。最多预选 60 个，按实质性、规则等级、来源数、源侧重要度和时间排序。
 
-## Burst Suppressor（防刷屏）
+可选 LLM 按持仓、主题、宏观归纳；每行必须引用输入事件 id，未知 id 的整行丢弃，全部无效或调用失败则使用最多 20 条的列表兜底。主文章优先一手源，否则选正文最长的一篇。飞书最终请求体按 UTF-8 渲染计量，预留签名空间并裁剪到 20 KB 限制以内，标明未展示条数。
 
-`BurstSuppressor` 防止同一 ticker 在短时间内被反复实时推送：
+所有频道的摘要投递同事务入队。`event_ids` 记录真正展示的事件，`consumed_event_ids` 记录全部预选候选。只有同一期所有频道成功后才事务性消费；失败或 pending 保留候选预约，防止下一期重复。终态失败可在下一期释放预约。影子摘要模拟消费以避免反复回放，旧路径消费列不受影响。
 
-```python
-class BurstSuppressor:
-    def __init__(self, *, window_seconds: int, threshold: int) -> None:
-        self._win = window_seconds    # 默认: 5 * 60 = 300 秒
-        self._th = threshold          # 默认: 3 条
+## legacy 摘要兼容
 
-    def should_send(self, tickers: list[str]) -> bool:
-        # 对每个 ticker：检查过去 window 秒内发过几条
-        # 任意 ticker 超过 threshold → 返回 False（抑制）
-        # 只有真正发送时才追加时间戳（避免永久抑制）
-```
-
-配置来自 `app.yml`：
-
-```yaml
-push:
-  same_ticker_burst_window_min: 5    # 滑动窗口 5 分钟
-  same_ticker_burst_threshold: 3     # 每个 ticker 每 5 分钟最多推 3 条
-```
-
-**重要修复（v0.1.3 I8）**：抑制时不追加时间戳。原始 bug：连续被抑制的尝试会不断延伸窗口，导致永久抑制。修复后：窗口自然过期，5 分钟后自动解除。
-
-```mermaid
-flowchart LR
-    A[immediate 推送] --> B[BurstSuppressor.should_send]
-    B -->|True| C[dispatcher.dispatch]
-    B -->|False| D[log: push_suppressed_burst<br/>直接丢弃，不进 digest]
-```
-
-!!! note "被 Burst 抑制的新闻不会进 Digest"
-    Burst 抑制发生在 immediate 路径。被抑制的新闻直接丢弃（不是推迟到 digest）。
-    这是设计选择：如果同一 ticker 5 分钟内已推了 3 条，再加 1 条 digest 也是噪音。
-
----
-
-## Digest 缓冲区
-
-非 critical 新闻进入 `digest_buffer` 表：
-
-```python
-await digest_dao.enqueue(
-    news_id=proc_id,
-    market=art.market.value,
-    scheduled_digest=_choose_digest_key(art.market, utc_now()),
-)
-```
-
-`_choose_digest_key` 根据市场本地时间决定目标 digest：
-- 本地时间 < 12:00 → `morning_{market}`
-- 本地时间 >= 12:00 → `evening_{market}`
-
-每天四次 cron job 消费 digest_buffer，汇总推送：
-
-| Digest key | 触发时刻（本地） |
-|---|---|
-| `morning_cn` | 08:30 CST |
-| `evening_cn` | 21:00 CST |
-| `morning_us` | 21:00 CST（相当于美股盘前） |
-| `evening_us` | 04:30 CST（次日，相当于美股盘后） |
-
----
-
-## 推送计划数据结构
-
-```python
-class DispatchPlan:
-    message: CommonMessage    # 格式化好的消息
-    channels: list[str]       # 目标 channel IDs
-    immediate: bool           # True=实时, False=进入 digest
-```
-
----
+旧路径从 `digest_buffer` 取本市场全部未消费记录，兼容旧时段键，过期 24 小时直接消费。事件去重、排序后最多 20 条，分“自选相关”“宏观与行业”，标题句最多 60 字；只有所有目标频道成功才标消费。它不使用新的事件摘要归纳器。
 
 ## 相关
 
-- [Components → Pushers](pushers.md) — TG / 飞书 消息发送
-- [Components → Scheduler](scheduler.md) — Digest cron 时刻
-- [Components → Classifier](classifier.md) — is_critical 判定
+- [Pushers 与卡片](pushers.md) · [调度与时区](scheduler.md)
+- [存储](storage.md) · [发布门槛](../operations/staged-cleanup.md)

@@ -1,10 +1,12 @@
 # Quote Watcher 入门
 
+> v0.7.0 个股默认腾讯（QUOTE_FEED=sina 可切换），全市场/行业使用东财直连；日 K 仍使用 akshare。仅 alerts 热加载，持仓/列表修改后重启。新闻灰度不改变盯盘。完整部署见 [Current Deployment](../getting-started/deployment-current.md)。
+
 > 假设你已经把 news_pipeline 跑起来了(参见根 README).quote_watcher 复用同一份 `secrets.yml + channels.yml`,只是多了几个自己的配置文件.
 
 ## 1. 准备配置
 
-### 1.1 `config/quote_watchlist.yml`
+### 1.1 `config/quote_watcher/quote_watchlist.yml`
 
 盯盘的股票列表 + 全市场扫描参数:
 
@@ -26,7 +28,7 @@ market_scans:
     only_when_score_above: 8.0 # 只关注涨跌幅 ≥ 8% 或量比 ≥ 8 的
 ```
 
-### 1.2 `config/alerts.yml`
+### 1.2 `config/quote_watcher/alerts.yml`
 
 规则定义.每条规则一个 `kind`:
 
@@ -110,7 +112,7 @@ per-holding 可用变量:threshold 那些 + `cost_per_share / qty / pct_change_f
 
 portfolio 可用变量:`total_unrealized_pnl / total_unrealized_pnl_pct / holding_count_in_loss`.
 
-### 1.3 `config/holdings.yml`(只在用 composite 规则时需要)
+### 1.3 `config/quote_watcher/holdings.yml`(只在用 composite 规则时需要)
 
 ```yaml
 holdings:
@@ -184,6 +186,6 @@ sqlite3 data/quotes.db "SELECT rule_id, ticker, datetime(last_triggered_at,'unix
 
 ## 6. 进阶
 
-- `config/alerts.yml` 是**热加载**的——编辑文件保存后,quote_watcher 自动检测并 swap 规则,不用重启
+- `config/quote_watcher/alerts.yml` 是**热加载**的——编辑文件保存后,quote_watcher 自动检测并 swap 规则,不用重启
 - 想要新加一只股:在 `quote_watchlist.yml` 加一行,然后 `quote_watcher` 自动 poll 它(下个 5 秒 tick)
 - 想关停整个 quote_watcher 但保留 news_pipeline:`docker compose stop quote_watcher`(news_pipeline 不动)
