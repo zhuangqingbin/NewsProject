@@ -1,11 +1,14 @@
 from datetime import timedelta
 from unittest.mock import AsyncMock
 
+import pytest
+
 from news_pipeline.events.sent_cache import SentEventCache
 from news_pipeline.events.similarity import features
 from news_pipeline.storage.dao.news_processed import NewsProcessedDAO
 from news_pipeline.storage.dao.push_log import PushLogDAO
 from news_pipeline.storage.dao.raw_news import RawNewsDAO
+from news_pipeline.storage.models import Delivery, Event, EventArticle
 from shared.common.timeutil import utc_now
 from tests.unit.optimization.test_ingest_health import article
 
@@ -38,6 +41,53 @@ async def test_sent_event_cache_survives_restart(db):
         features("英伟达宣布回购授权增加1500亿美元", ["NVDA"], item.published_at)
     )
     assert not cache.duplicate(features("英伟达目标价上调至200美元", ["NVDA"], item.published_at))
+
+
+@pytest.mark.parametrize(
+    ("kind", "status", "sent_hours_ago", "duplicate"),
+    [
+        ("immediate", "sent", 0, True),
+        ("immediate", "shadow", 0, False),
+        ("immediate", "pending", 0, False),
+        ("immediate", "failed", 0, False),
+        ("immediate", "expired", 0, False),
+        ("immediate", "sent", 7, False),
+        ("immediate", "sent", None, False),
+        ("digest", "sent", 0, False),
+    ],
+)
+async def test_rollback_cache_uses_only_recent_real_immediate_sends(
+    db, kind, status, sent_hours_ago, duplicate
+):
+    from tests.unit.optimization.test_events import engine
+
+    at = utc_now().replace(tzinfo=None)
+    item = article("v2-cache")
+    raw_id = await RawNewsDAO(db).insert_article(item)
+    ev = Event(
+        first_seen_at=item.published_at.replace(tzinfo=None),
+        last_seen_at=item.published_at.replace(tzinfo=None),
+        headline=item.title,
+        subject_tickers=["NVDA"],
+    )
+    async with db.session() as session:
+        session.add(ev)
+        await session.flush()
+        session.add(EventArticle(event_id=ev.id, raw_id=raw_id, source=item.source, joined_at=at))
+        session.add(
+            Delivery(
+                kind=kind,
+                event_id=ev.id,
+                channel="feishu_us",
+                status=status,
+                created_at=at - timedelta(hours=8),
+                sent_at=None if sent_hours_ago is None else at - timedelta(hours=sent_hours_ago),
+            )
+        )
+        await session.commit()
+    cache = SentEventCache(db, rules=engine())
+    await cache.rebuild()
+    assert cache.duplicate(features(item.title, ["NVDA"], item.published_at)) is duplicate
 
 
 async def test_burst_suppression_is_enqueued_for_digest():

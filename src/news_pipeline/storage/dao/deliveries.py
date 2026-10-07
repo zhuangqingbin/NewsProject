@@ -63,25 +63,31 @@ class DeliveryDAO:
                 await DeliveryDAO._consume_completed_digest(session, stored)
         return delivery_id
 
-    async def ready(self, now: datetime, limit: int = 100) -> list[Delivery]:
+    async def ready(
+        self,
+        now: datetime,
+        limit: int = 100,
+        *,
+        allowed_kinds: tuple[str, ...] | None = None,
+    ) -> list[Delivery]:
         at = naive_utc(now)
         async with self.db.session() as session:
-            result = await session.execute(
-                select(Delivery)
-                .where(
-                    or_(
-                        (col(Delivery.status) == "pending")
-                        & (
-                            col(Delivery.next_attempt_at).is_(None)
-                            | (col(Delivery.next_attempt_at) <= at)
-                        ),
-                        col(Delivery.status).in_(["pending", "failed"])
-                        & (col(Delivery.kind) == "immediate")
-                        & (col(Delivery.created_at) <= at - timedelta(minutes=30)),
-                    )
+            query = select(Delivery).where(
+                or_(
+                    (col(Delivery.status) == "pending")
+                    & (
+                        col(Delivery.next_attempt_at).is_(None)
+                        | (col(Delivery.next_attempt_at) <= at)
+                    ),
+                    col(Delivery.status).in_(["pending", "failed"])
+                    & (col(Delivery.kind) == "immediate")
+                    & (col(Delivery.created_at) <= at - timedelta(minutes=30)),
                 )
-                .order_by(col(Delivery.created_at), col(Delivery.id))
-                .limit(limit)
+            )
+            if allowed_kinds is not None:
+                query = query.where(col(Delivery.kind).in_(allowed_kinds))
+            result = await session.execute(
+                query.order_by(col(Delivery.created_at), col(Delivery.id)).limit(limit)
             )
             return list(result.scalars())
 

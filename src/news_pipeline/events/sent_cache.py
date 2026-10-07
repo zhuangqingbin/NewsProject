@@ -9,7 +9,7 @@ from news_pipeline.events.similarity import Features, features, same_event, with
 from news_pipeline.rules.engine import RulesEngine
 from news_pipeline.rules.headline import headline
 from news_pipeline.storage.db import Database
-from news_pipeline.storage.models import NewsProcessed, PushLog, RawNews
+from news_pipeline.storage.models import Delivery, EventArticle, NewsProcessed, PushLog, RawNews
 from shared.common.timeutil import ensure_utc, utc_now
 
 
@@ -31,6 +31,18 @@ class SentEventCache:
                 .join(PushLog, col(PushLog.news_id) == col(NewsProcessed.id))
                 .where(col(PushLog.status) == "ok", col(PushLog.sent_at) >= cutoff)
             )
+            v2_result = await session.execute(
+                select(RawNews, col(Delivery.sent_at))
+                .join(EventArticle, col(EventArticle.raw_id) == col(RawNews.id))
+                .join(Delivery, col(Delivery.event_id) == col(EventArticle.event_id))
+                .where(
+                    col(Delivery.kind) == "immediate",
+                    col(Delivery.status) == "sent",
+                    col(Delivery.sent_at) >= cutoff,
+                )
+            )
+            rows: list[tuple[RawNews, datetime]] = [(raw, sent_at) for raw, sent_at in result.all()]
+            rows.extend((raw, sent_at) for raw, sent_at in v2_result.all() if sent_at is not None)
             self._sent = [
                 (
                     features(
@@ -40,7 +52,7 @@ class SentEventCache:
                     ),
                     ensure_utc(sent_at),
                 )
-                for raw, sent_at in result.all()
+                for raw, sent_at in rows
             ]
 
     def duplicate(self, feature: Features) -> bool:

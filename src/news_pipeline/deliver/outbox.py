@@ -17,14 +17,21 @@ class Dispatcher(Protocol):
 
 
 class Outbox:
-    def __init__(self, dao: DeliveryDAO, dispatcher: Dispatcher) -> None:
+    def __init__(
+        self,
+        dao: DeliveryDAO,
+        dispatcher: Dispatcher,
+        *,
+        allowed_kinds: tuple[str, ...] | None = None,
+    ) -> None:
         self.dao = dao
         self.dispatcher = dispatcher
+        self.allowed_kinds = allowed_kinds
 
     async def run(self, now: datetime | None = None) -> int:
         at = now or utc_now()
         attempted = 0
-        for candidate in await self.dao.ready(at):
+        for candidate in await self.dao.ready(at, allowed_kinds=self.allowed_kinds):
             if candidate.id is None:
                 continue
             row = await self.dao.reserve_attempt(candidate.id, at)

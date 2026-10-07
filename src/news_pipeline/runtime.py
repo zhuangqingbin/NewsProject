@@ -71,7 +71,11 @@ class PipelineRuntime:
         self.assessor = EventAssessor(
             self.events, self.client, snap.app.llm, snap.watchlist, bark=bark
         )
-        self.outbox = Outbox(self.deliveries, dispatcher)
+        self.outbox = Outbox(
+            self.deliveries,
+            dispatcher,
+            allowed_kinds=("ops",) if self.mode in {"legacy", "shadow"} else None,
+        )
         self.digest_builder = DigestBuilder(self.events, snap.app.digest, self.assessor)
         self.ticker_market = {
             entry.ticker: market

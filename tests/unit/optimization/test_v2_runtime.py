@@ -1,5 +1,7 @@
+from datetime import timedelta
 from unittest.mock import AsyncMock
 
+import pytest
 from sqlalchemy import select
 
 from news_pipeline.config.loader import ConfigSnapshot
@@ -16,8 +18,9 @@ from news_pipeline.config.schema import (
 )
 from news_pipeline.runtime import PipelineRuntime
 from news_pipeline.storage.dao.raw_news import RawNewsDAO
-from news_pipeline.storage.models import Delivery, Event
+from news_pipeline.storage.models import Delivery, Event, NewsProcessed, RawNews
 from quote_watcher.alerts.rule import AlertsFile
+from shared.common.timeutil import utc_now
 from shared.push.base import SendResult
 from shared.push.dispatcher import PusherDispatcher
 from tests.unit.optimization.test_ingest_health import article
@@ -61,6 +64,120 @@ async def test_v2_event_to_outbox_and_shadow_never_sends(db):
         await runtime.outbox.run()
         assert pusher.send.await_count == (0 if mode == "shadow" else 1)
         await runtime.close()
+
+
+@pytest.mark.parametrize("mode", ["legacy", "shadow"])
+async def test_mode_rollback_pauses_news_outbox_until_v2_resumes(db, mode):
+    pusher = AsyncMock(channel_id="feishu_us")
+    pusher.send.return_value = SendResult(ok=True)
+    dispatcher = PusherDispatcher({"feishu_us": pusher})
+    runtime = PipelineRuntime(db, snapshot("v2"), dispatcher)
+    try:
+        await runtime.raw.insert_article(article("rollback-news"))
+        await runtime.process_v2()
+        immediate = (await runtime.deliveries.ready(utc_now()))[0]
+        digest_id = await runtime.deliveries.enqueue(
+            Delivery(
+                kind="digest",
+                channel="feishu_us",
+                market="us",
+                digest_slot="queued-before-rollback",
+                payload=immediate.payload,
+            )
+        )
+    finally:
+        await runtime.close()
+
+    rollback = PipelineRuntime(db, snapshot(mode), dispatcher)
+    try:
+        assert await rollback.outbox.run() == 0
+        assert not pusher.send.await_count
+        for delivery_id in (immediate.id, digest_id):
+            row = await rollback.deliveries.get(delivery_id)
+            assert row.status == "pending"
+            assert row.attempt_timestamps == []
+    finally:
+        await rollback.close()
+
+    resumed = PipelineRuntime(db, snapshot("v2"), dispatcher)
+    try:
+        at = utc_now()
+        assert await resumed.outbox.run(now=at) == 1
+        assert await resumed.outbox.run(now=at + timedelta(seconds=2)) == 1
+        assert pusher.send.await_count == 2
+        assert (await resumed.deliveries.get(immediate.id)).status == "sent"
+        assert (await resumed.deliveries.get(digest_id)).status == "sent"
+    finally:
+        await resumed.close()
+
+
+@pytest.mark.parametrize("mode", ["legacy", "shadow"])
+async def test_ops_outbox_bypasses_more_than_one_page_of_paused_news(db, mode):
+    from tests.unit.optimization.test_outbox import message
+
+    at = utc_now().replace(tzinfo=None)
+    news = [
+        Delivery(
+            kind="immediate" if n % 2 else "digest",
+            channel="feishu_us",
+            created_at=at - timedelta(minutes=1),
+            payload=message().model_dump(mode="json"),
+        )
+        for n in range(101)
+    ]
+    ops = Delivery(
+        kind="ops",
+        channel="feishu_us",
+        created_at=at,
+        payload=message().model_copy(update={"title": "运维日报"}).model_dump(mode="json"),
+    )
+    async with db.session() as session:
+        session.add_all([*news, ops])
+        await session.commit()
+    pusher = AsyncMock(channel_id="feishu_us")
+    pusher.send.return_value = SendResult(ok=True)
+    runtime = PipelineRuntime(db, snapshot(mode), PusherDispatcher({"feishu_us": pusher}))
+    try:
+        assert await runtime.outbox.run(now=at) == 1
+        assert pusher.send.await_count == 1
+        assert pusher.send.call_args.args[0].title == "运维日报"
+        assert (await runtime.deliveries.get(ops.id)).status == "sent"
+        async with db.session() as session:
+            paused = (
+                await session.execute(select(Delivery).where(Delivery.kind != "ops"))
+            ).scalars()
+            assert all(row.status == "pending" and not row.attempt_timestamps for row in paused)
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.parametrize("mode", ["legacy", "shadow"])
+async def test_successful_v2_delivery_is_not_sent_again_after_rollback(db, mode):
+    pusher = AsyncMock(channel_id="feishu_us")
+    pusher.send.return_value = SendResult(ok=True)
+    dispatcher = PusherDispatcher({"feishu_us": pusher})
+    runtime = PipelineRuntime(db, snapshot("v2"), dispatcher)
+    try:
+        raw_id = await runtime.raw.insert_article(article("sent-before-rollback"))
+        await runtime.process_v2()
+        assert await runtime.outbox.run() == 1
+        assert pusher.send.await_count == 1
+        raw = await runtime.raw.get(raw_id)
+        assert raw.status == "pending" and raw.v2_state == "clustered"
+    finally:
+        await runtime.close()
+
+    rollback = PipelineRuntime(db, snapshot(mode), dispatcher)
+    try:
+        assert await rollback.process_legacy() == 1
+        assert pusher.send.await_count == 1
+        async with db.session() as session:
+            proc = (await session.execute(select(NewsProcessed))).scalar_one()
+            raw = await session.get(RawNews, raw_id)
+        assert proc.push_status == "dup"
+        assert raw.status == "processed" and raw.v2_state == "clustered"
+    finally:
+        await rollback.close()
 
 
 def test_scheduler_registers_modes_and_market_timezones(tmp_path):
