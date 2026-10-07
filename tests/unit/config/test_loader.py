@@ -67,7 +67,7 @@ def test_loader_loads_all(cfg_dir: Path) -> None:
 async def test_loader_hot_reload_emits_event(cfg_dir: Path) -> None:
     loader = ConfigLoader(cfg_dir, debounce_ms=50)
     loader.load()
-    seen: list[str] = []
+    seen: list[float] = []
 
     def on_change(snap):  # type: ignore[no-untyped-def]
         seen.append(snap.app.runtime.daily_cost_ceiling_cny)
@@ -81,7 +81,7 @@ async def test_loader_hot_reload_emits_event(cfg_dir: Path) -> None:
         (cfg_dir / "common" / "app.yml").write_text(new)
         for _ in range(20):
             await asyncio.sleep(0.1)
-            if seen:
+            if seen and seen[-1] == 7.5:
                 break
         assert seen and seen[-1] == 7.5
     finally:

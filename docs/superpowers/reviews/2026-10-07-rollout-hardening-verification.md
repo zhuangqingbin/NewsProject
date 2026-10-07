@@ -10,6 +10,8 @@ A runtime audit found two rollback defects: legacy/shadow could dispatch pending
 
 Root review checked the request/cache changes, SQL filter placement, successful-send time filtering, rollback/resume behavior and status independence. Independent specification and quality review of this final patch were attempted but could not complete because the review subagents hit their usage limit. Earlier independent reviews remain evidence only for the earlier commits; this patch has no independent approval claim.
 
+The initial post-integration full run exposed an existing hot-reload test race: it stopped waiting after any callback, including an old-value filesystem notification. A deterministic old-then-updated callback schedule reproduced the failure. The test now waits for the expected value within the original bounded timeout; the same schedule passes, while an old-only schedule still fails. This is a test-only correction; production hot-reload behavior is unchanged. The final full run also treats unhandled worker-thread warnings as errors.
+
 ## Real source snapshot
 
 The repository's deployment documentation identified the existing SSH target. A single read-only SQLite transaction selected the raw-news window, compressed it in server memory, closed the transaction and streamed it locally. No remote file, service, configuration, migration or database row was changed. The server was still at migration **0003**.
@@ -52,7 +54,7 @@ Human review must correct `label` and `tickers`, then mark genuinely reviewed ro
 
 | Check | Result |
 |---|---|
-| `uv run pytest` | 891 passed, 1 real-model test skipped; nine existing deprecation warnings |
+| `uv run pytest -W error::pytest.PytestUnhandledThreadExceptionWarning` | 891 passed, 1 real-model test skipped; nine existing deprecation warnings |
 | `uv run ruff check .` | Passed |
 | `uv run ruff format --check .` | Passed, 384 files |
 | `uv run mypy src/` | Passed, 198 source files |
