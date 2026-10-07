@@ -62,6 +62,28 @@ async def test_fetch_uses_three_sorted_pages_and_deduplicates_tickers():
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_fetch_follows_redirects_for_all_sorted_pages():
+    def redirect(request):
+        return httpx.Response(
+            302,
+            headers={"Location": f"//push2delay.eastmoney.com{request.url.raw_path.decode()}"},
+        )
+
+    respx.get(URL).mock(side_effect=redirect)
+    delayed = respx.get("https://push2delay.eastmoney.com/api/qt/clist/get").mock(
+        return_value=httpx.Response(200, json={"data": {"total": 1, "diff": [em_row()]}})
+    )
+
+    rows = await MarketScanFeed().fetch()
+
+    assert [row.ticker for row in rows] == ["600519"]
+    params = [call.request.url.params for call in delayed.calls]
+    assert [(p["fid"], p["po"]) for p in params] == [("f3", "1"), ("f3", "0"), ("f10", "1")]
+    assert all(p["fs"] == MARKET_FS for p in params)
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_fetch_handles_missing_ratio_and_suspended_rows():
     valid = em_row(ratio="-")
     halted = {**em_row("300001"), "f2": "-", "f3": "-"}

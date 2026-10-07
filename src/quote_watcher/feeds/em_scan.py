@@ -48,6 +48,7 @@ async def fetch_clist_page(
             "fid": fid,
             "po": int(descending),
         },
+        follow_redirects=True,
     )
     response.raise_for_status()
     payload = response.json()

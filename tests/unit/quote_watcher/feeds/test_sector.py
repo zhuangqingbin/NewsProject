@@ -43,6 +43,30 @@ async def test_fetch_pct_changes_normal():
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_fetch_pct_changes_follows_redirect_to_delayed_host():
+    def redirect(request):
+        return httpx.Response(
+            302,
+            headers={"Location": f"//push2delay.eastmoney.com{request.url.raw_path.decode()}"},
+        )
+
+    respx.get(URL).mock(side_effect=redirect)
+    delayed = respx.get("https://push2delay.eastmoney.com/api/qt/clist/get").mock(
+        return_value=httpx.Response(200, json={"data": {"total": 1, "diff": [sector_row()]}})
+    )
+
+    out = await SectorFeed().fetch_pct_changes()
+
+    assert out["半导体"].pct_change == 3.5
+    assert out["半导体"].volume_ratio == 1.36
+    assert delayed.call_count == 1
+    params = delayed.calls[0].request.url.params
+    assert params["fs"] == "m:90+t:2+f:!50"
+    assert params["fields"] == "f14,f3,f8,f10"
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_fetch_paginates_by_total():
     route = respx.get(URL).mock(
         side_effect=[
