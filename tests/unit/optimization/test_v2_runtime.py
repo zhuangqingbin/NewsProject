@@ -112,6 +112,39 @@ async def test_mode_rollback_pauses_news_outbox_until_v2_resumes(db, mode):
 
 
 @pytest.mark.parametrize("mode", ["legacy", "shadow"])
+async def test_resuming_v2_suppresses_news_successfully_sent_during_rollback(db, mode):
+    pusher = AsyncMock(channel_id="feishu_us")
+    pusher.send.return_value = SendResult(ok=True)
+    dispatcher = PusherDispatcher({"feishu_us": pusher})
+    runtime = PipelineRuntime(db, snapshot("v2"), dispatcher)
+    try:
+        await runtime.raw.insert_article(article("legacy-sent-while-paused"))
+        await runtime.process_v2()
+        immediate = (await runtime.deliveries.ready(utc_now()))[0]
+    finally:
+        await runtime.close()
+
+    rollback = PipelineRuntime(db, snapshot(mode), dispatcher)
+    try:
+        assert await rollback.process_legacy() == 1
+        assert pusher.send.await_count == 1
+        assert (await rollback.deliveries.get(immediate.id)).status == "pending"
+    finally:
+        await rollback.close()
+
+    resumed = PipelineRuntime(db, snapshot("v2"), dispatcher)
+    try:
+        assert await resumed.outbox.run() == 0
+        assert pusher.send.await_count == 1
+        stored = await resumed.deliveries.get(immediate.id)
+        assert stored.status == "superseded"
+        assert stored.sent_at is None
+        assert stored.attempt_timestamps == []
+    finally:
+        await resumed.close()
+
+
+@pytest.mark.parametrize("mode", ["legacy", "shadow"])
 async def test_ops_outbox_bypasses_more_than_one_page_of_paused_news(db, mode):
     from tests.unit.optimization.test_outbox import message
 

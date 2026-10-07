@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from news_pipeline.storage.db import Database
-from news_pipeline.storage.models import Delivery, Event
+from news_pipeline.storage.models import Delivery, Event, EventArticle, NewsProcessed, PushLog
 
 RETRY_SECONDS = (10, 30, 120, 600, 1800)
 
@@ -99,6 +99,25 @@ class DeliveryDAO:
             row = await session.get(Delivery, delivery_id)
             if row is None or row.status not in {"pending", "failed"}:
                 return None
+            if row.kind == "immediate" and row.event_id is not None:
+                legacy_send = await session.execute(
+                    select(col(PushLog.id))
+                    .join(NewsProcessed, col(NewsProcessed.id) == col(PushLog.news_id))
+                    .join(EventArticle, col(EventArticle.raw_id) == col(NewsProcessed.raw_id))
+                    .where(
+                        col(EventArticle.event_id) == row.event_id,
+                        col(PushLog.channel) == row.channel,
+                        col(PushLog.status).in_(["ok", "sent"]),
+                        col(PushLog.sent_at) <= at,
+                    )
+                    .limit(1)
+                )
+                if legacy_send.scalar_one_or_none() is not None:
+                    row.status = "superseded"
+                    row.next_attempt_at = None
+                    row.last_error = "Already sent by legacy on this channel"
+                    await session.commit()
+                    return None
             if row.kind == "immediate" and row.created_at <= at - timedelta(minutes=30):
                 row.status = "expired"
                 row.next_attempt_at = None

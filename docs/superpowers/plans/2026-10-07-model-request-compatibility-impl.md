@@ -16,7 +16,7 @@
 - [x] Add red/green rollback tests and prevent legacy/shadow from dispatching old v2 news queues while allowing ops; restore old-path send deduplication from successful recent v2 immediate deliveries.
 - [x] Extract the actual three-week raw-news slice in a single read-only SQLite transaction over the documented SSH target, verify a local snapshot and produce an unreviewed source-backed 150-event CSV with the required cases.
 - [x] Record current public Beijing non-thinking list prices, DeepSeek peak pricing and the 4×120 training plus 1×30 final-holdout cost arithmetic. Distinguish estimates from hard limits and account-specific availability; do not request paid-call approval until the real dataset is reviewable.
-- [ ] Obtain specification then quality review of the final patch. Attempts were blocked by review-subagent usage limits; no independent approval is claimed.
+- [x] Obtain specification then quality review of the final patch. Review resumed after the earlier usage limit. The quality review reproduced a pending-v2 → successful-legacy → resumed-v2 duplicate; nine red/green cases now cover same-event/channel supersession and exclusions. Both reviewers approved the final fix.
 - [x] Complete root review and affected/full tests, Ruff, mypy and documentation/Compose checks. Results and limits are in the [verification record](../reviews/2026-10-07-rollout-hardening-verification.md).
 
 Integration target: local commits in the isolated worktree, then fast-forward `feature/pipeline-optimization`; no push or production change. Retain the worktree for the pending independent review and later B0 acceptance.

@@ -1,6 +1,8 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from news_pipeline.storage.models import Delivery, Event
 from shared.common.contracts import CommonMessage
 from shared.push.base import SendResult
@@ -210,3 +212,71 @@ async def test_missing_dispatch_result_is_a_failed_attempt(db):
     row = await dao.get(row_id)
     assert row.attempts == 1
     assert "missing" in row.last_error.lower()
+
+
+@pytest.mark.parametrize(
+    ("kind", "legacy_status", "legacy_channel", "same_event", "suppressed"),
+    [
+        ("immediate", "ok", "feishu_cn", True, True),
+        ("immediate", "sent", "feishu_cn", True, True),
+        ("immediate", "failed", "feishu_cn", True, False),
+        ("immediate", "ok", "feishu_us", True, False),
+        ("immediate", "ok", "feishu_cn", False, False),
+        ("digest", "ok", "feishu_cn", True, False),
+        ("ops", "ok", "feishu_cn", True, False),
+    ],
+)
+async def test_only_matching_successful_legacy_immediate_sends_supersede_queue(
+    db, kind, legacy_status, legacy_channel, same_event, suppressed
+):
+    from news_pipeline.deliver.outbox import Outbox
+    from news_pipeline.storage.dao.deliveries import DeliveryDAO
+    from news_pipeline.storage.dao.raw_news import RawNewsDAO
+    from news_pipeline.storage.models import EventArticle, NewsProcessed, PushLog
+    from tests.unit.optimization.test_ingest_health import article
+
+    ev = await event(db)
+    raw_id = await RawNewsDAO(db).insert_article(article("queued"))
+    legacy_raw_id = raw_id if same_event else await RawNewsDAO(db).insert_article(article("other"))
+    async with db.session() as session:
+        session.add(EventArticle(event_id=ev.id, raw_id=raw_id, source="wire", joined_at=NOW))
+        processed = NewsProcessed(
+            raw_id=legacy_raw_id,
+            summary="legacy send",
+            event_type="other",
+            sentiment="neutral",
+            magnitude="low",
+            confidence=0,
+            score=70,
+            is_critical=False,
+            model_used="rules",
+            extracted_at=NOW,
+        )
+        session.add(processed)
+        await session.flush()
+        session.add(
+            PushLog(
+                news_id=processed.id,
+                channel=legacy_channel,
+                status=legacy_status,
+                sent_at=NOW,
+            )
+        )
+        await session.commit()
+    dao = DeliveryDAO(db)
+    row_id = await dao.enqueue(
+        Delivery(
+            kind=kind,
+            event_id=ev.id,
+            channel="feishu_cn",
+            payload=message().model_dump(mode="json"),
+            created_at=NOW,
+        )
+    )
+    dispatcher = Dispatcher()
+    assert await Outbox(dao, dispatcher).run(now=NOW) == (0 if suppressed else 1)
+    stored = await dao.get(row_id)
+    assert stored.status == ("superseded" if suppressed else "sent")
+    if suppressed:
+        assert stored.sent_at is None and stored.attempt_timestamps == []
+        assert not dispatcher.calls

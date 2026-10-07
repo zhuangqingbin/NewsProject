@@ -8,7 +8,7 @@ The shared model client now explicitly sends `enable_thinking: false` for assess
 
 A runtime audit found two rollback defects: legacy/shadow could dispatch pending v2 news, and the legacy send cache ignored successful v2 immediate deliveries. The outbox now filters delivery kinds in SQL before pagination, allowing ops through a backlog of paused news. Legacy cache rebuilding includes recent successful v2 immediate sends, without changing either raw-news status column. Seven regression cases failed against the prior implementation; all 36 affected runtime/cache tests passed after the fix. They also cover resuming v2, more than one page of paused news, shadow/pending/failed/expired sends, old sends, missing send timestamps and digest exclusion.
 
-Root review checked the request/cache changes, SQL filter placement, successful-send time filtering, rollback/resume behavior and status independence. Independent specification and quality review of this final patch were attempted but could not complete because the review subagents hit their usage limit. Earlier independent reviews remain evidence only for the earlier commits; this patch has no independent approval claim.
+Independent specification and quality review subsequently completed. The quality reviewer reproduced another rollback case: a pending v2 item could be sent successfully by the legacy path during rollback, then sent again on resuming v2. Reservation now checks successful legacy sends for the same event and channel inside its existing write transaction. It marks the queue item `superseded` without adding an attempt, setting `sent_at`, or counting a v2 send. Nine new cases failed on the prior code or exercise exclusions: both rollback modes, successful statuses, failed sends, other channels/events, digest and ops items. Both reviewers approved the final fix; 45 affected tests passed. Concurrent supersession, expiry ordering and future-dated evidence were also checked.
 
 The initial post-integration full run exposed an existing hot-reload test race: it stopped waiting after any callback, including an old-value filesystem notification. A deterministic old-then-updated callback schedule reproduced the failure. The test now waits for the expected value within the original bounded timeout; the same schedule passes, while an old-only schedule still fails. This is a test-only correction; production hot-reload behavior is unchanged. The final full run also treats unhandled worker-thread warnings as errors.
 
@@ -54,7 +54,7 @@ Human review must correct `label` and `tickers`, then mark genuinely reviewed ro
 
 | Check | Result |
 |---|---|
-| `uv run pytest -W error::pytest.PytestUnhandledThreadExceptionWarning` | 891 passed, 1 real-model test skipped; nine existing deprecation warnings |
+| `uv run pytest -W error::pytest.PytestUnhandledThreadExceptionWarning` | 900 passed, 1 real-model test skipped; nine existing deprecation warnings |
 | `uv run ruff check .` | Passed |
 | `uv run ruff format --check .` | Passed, 384 files |
 | `uv run mypy src/` | Passed, 198 source files |
