@@ -39,6 +39,8 @@ Integrity and foreign-key checks passed. Every original raw column, including ol
 | Independent specification review | Approved; 142 targeted tests passed |
 | Independent quality review | Approved; 526 targeted tests passed, Ruff/mypy/diff checks passed |
 
+The implementation commit is `96ddc49`, based on the reviewed v0.7.0 rollout fix `f97e328`. Rebase conflicts in deployment guidance and retired-mode tests were resolved using the approved cleanup versions; `git diff --exit-code 06d9bb5 HEAD` then confirmed an identical tree before this documentation-only record update. The v0.7.0 rollout branch remains separate.
+
 ## Remaining release conditions
 
 The 150 real B0 events remain unreviewed. Human annotation, actual account/model checks, paid-run confirmation, train/final-holdout acceptance, production-IP smoke and trading-session volume checks remain outstanding. v0.7.0 still needs 2–3 trading days of shadow observation and one stable v2 week before this cleanup release is deployed. D1–D7 are optional and require selection after two stable weeks; none was silently added to this release. See [staged cleanup](../../operations/staged-cleanup.md), [B0 acceptance](../../operations/b0-acceptance.md) and [deployment](../../getting-started/deployment-current.md).

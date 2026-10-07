@@ -8,7 +8,7 @@
 
 **Tech Stack:** Existing Python/SQLModel/httpx/pytest/uv stack. No model or external notification calls during development.
 
-**Workspace:** `/Users/qingbin.zhuang/.config/superpowers/worktrees/NewsProject/pipeline-cleanup`, branch `codex/pipeline-cleanup`, baseline `db33f22`. Original `feature/pipeline-optimization` and `codex/pipeline-optimization` retain legacy/shadow rollback.
+**Workspace:** `/Users/qingbin.zhuang/.config/superpowers/worktrees/NewsProject/pipeline-cleanup`, branch `codex/pipeline-cleanup`, initial baseline `db33f22`, final base `f97e328`. Original `feature/pipeline-optimization` and `codex/pipeline-optimization` retain legacy/shadow rollback.
 
 ## Task 1: Remove the legacy runtime and stale configuration
 
@@ -58,4 +58,4 @@ B0 human review and paid-call confirmation remain required; the existing 150-eve
 
 ## Verification evidence
 
-See [C1/C2 verification](../reviews/2026-10-07-pipeline-cleanup-verification.md). The rollout resume guard from `f97e328` is retained; this staged branch will be aligned on that commit before final delivery.
+See [C1/C2 verification](../reviews/2026-10-07-pipeline-cleanup-verification.md). The rollout resume guard from `f97e328` is retained; the reviewed cleanup was rebased onto that commit. Its tree was confirmed identical to the approved pre-rebase tree; the two conflicts retained the reviewed v2 deployment guidance and v2-only runtime tests.
