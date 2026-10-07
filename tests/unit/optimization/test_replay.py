@@ -147,16 +147,95 @@ def test_export_stratifies_and_marks_labels_as_unreviewed(tmp_path):
     groups = group_articles(rows, RulesEngine(rules))
     path = tmp_path / "review.csv"
     selected = export_samples(groups, path, sample_size=150)
-    assert len(selected) == 150
+    assert len(selected) == 140
     with path.open() as handle:
         exported = list(csv.DictReader(handle))
-    assert len(exported) == 150
+    assert len(exported) == 140
     assert all(row["annotation_status"] == "unreviewed" for row in exported)
     counts = {
         name: sum(row["stratum"] == name for row in exported)
         for name in ["push", "digest_hi", "mention", "macro"]
     }
-    assert counts == {"push": 60, "digest_hi": 50, "mention": 20, "macro": 20}
+    assert counts == {"push": 50, "digest_hi": 50, "mention": 20, "macro": 20}
+
+
+def test_review_export_preserves_evidence_and_stable_ids_without_overwriting(tmp_path):
+    evidence = article("英伟达回购股票", 9).model_copy(
+        update={"body": "Original evidence", "raw_meta": {"symbols": ["NVDA"]}}
+    )
+    groups = group_articles([evidence], engine())
+    path = tmp_path / "review.csv"
+    export_samples(groups, path)
+    with path.open() as handle:
+        row = next(csv.DictReader(handle))
+    assert row["market"] == "us"
+    assert row["source"] == evidence.source
+    assert row["url"] == str(evidence.url)
+    assert row["published_at"] == evidence.published_at.isoformat()
+    assert json.loads(row["raw_meta"]) == evidence.raw_meta
+    assert json.loads(row["sources"]) == ["wire"]
+    assert row["case"] == ""
+    groups[0].id = 100
+    second = tmp_path / "second.csv"
+    export_samples(groups, second)
+    with second.open() as handle:
+        assert next(csv.DictReader(handle))["id"] == row["id"]
+    with pytest.raises(FileExistsError):
+        export_samples(groups, path)
+
+
+def test_export_review_import_replay_preserves_human_corrections(tmp_path, capsys):
+    from news_pipeline.tools import replay
+    from news_pipeline.tools.gold import import_reviewed_csv, load_dataset
+
+    original = article("英伟达回购股票", 9).model_copy(update={"raw_meta": {"level": "B"}})
+    source, reviewed, output = (
+        tmp_path / name for name in ("export.csv", "review.csv", "gold.jsonl")
+    )
+    export_samples(group_articles([original], engine()), source)
+    before = source.read_bytes()
+    with source.open() as handle:
+        rows = list(csv.DictReader(handle))
+    rows[0].update(label="drop", tickers="[]", annotation_status="reviewed")
+    with reviewed.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    report = import_reviewed_csv(reviewed, output)
+    row = load_dataset(output)[0]
+    assert row["raw_meta"] == original.raw_meta
+    assert row["url"] == str(original.url)
+    assert row["label"] == "drop"
+    assert row["tickers"] == []
+    assert source.read_bytes() == before
+    assert report["acceptance_ready"] is False
+    replay.main(["--eval", str(output), "--mode", "rules"])
+    report = json.loads(capsys.readouterr().out)
+    assert report["evaluated_split"] == "train"
+    assert report["gold_sample_count"] == 1
+    assert report["acceptance"]["status"] == "not_eligible"
+
+
+def test_acceptance_requires_reviewed_holdout_and_all_five_thresholds():
+    from news_pipeline.tools.replay import acceptance_report
+
+    dataset = {"acceptance_ready": True, "acceptance_issues": []}
+    metrics = dict(
+        push_precision=0.7,
+        must_push_recall=0.9,
+        wrong_ticker_rate=0.02,
+        json_legal_rate=0.99,
+        latency_p95_ms=8000,
+    )
+    assert acceptance_report(dataset, metrics, "llm", "holdout", 30)["status"] == "pass"
+    bad = metrics | {"latency_p95_ms": 8001}
+    report = acceptance_report(dataset, bad, "llm", "holdout", 30)
+    assert report["status"] == "fail"
+    assert report["thresholds"]["latency_p95_ms"]["passed"] is False
+    for mode, split, count in [("rules", "holdout", 30), ("llm", "train", 120)]:
+        assert acceptance_report(dataset, metrics, mode, split, count)["status"] == "not_eligible"
+    dataset = {"acceptance_ready": False, "acceptance_issues": ["unreviewed"]}
+    assert acceptance_report(dataset, metrics, "llm", "holdout", 30)["status"] == "not_eligible"
 
 
 def test_seed_gold_is_eight_documented_cases_not_reviewed_annotations():
@@ -246,3 +325,148 @@ def test_explicit_rules_evaluation_never_enables_or_constructs_llm(monkeypatch, 
     assert report["annotation_status"] == ["seed_unreviewed"]
     assert "push_precision" in report["metrics"]
     assert "json_legal_rate" not in report["metrics"]
+    assert report["dataset"]["acceptance_ready"] is False
+    assert report["evaluated_split"] == "all"
+    assert report["acceptance"]["status"] == "not_eligible"
+
+
+def test_replay_uses_persisted_split_and_defaults_to_training(monkeypatch, tmp_path, capsys):
+    from news_pipeline.tools import replay
+
+    path = tmp_path / "gold.jsonl"
+    path.write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "id": str(n),
+                    "title": "英伟达回购股票",
+                    "body": "",
+                    "source": "wire",
+                    "market": "us",
+                    "label": "must_push",
+                    "tickers": ["NVDA"],
+                    "annotation_status": "reviewed",
+                    "split": "train" if n < 120 else "holdout",
+                }
+            )
+            for n in range(150)
+        )
+    )
+    # This test isolates replay selection; full provenance/strata validation is tested in gold.
+    monkeypatch.setattr(
+        replay,
+        "dataset_report",
+        lambda rows: {
+            "acceptance_ready": True,
+            "acceptance_issues": [],
+            "dataset_hash": "full-dataset",
+        },
+    )
+    replay.main(["--eval", str(path), "--mode", "rules"])
+    report = json.loads(capsys.readouterr().out)
+    assert report["evaluated_split"] == "train"
+    assert report["gold_sample_count"] == 120
+    assert report["dataset"]["dataset_hash"] == "full-dataset"
+    assert report["acceptance"]["status"] == "not_eligible"
+    replay.main(["--eval", str(path), "--mode", "rules", "--split", "holdout"])
+    report = json.loads(capsys.readouterr().out)
+    assert report["evaluated_split"] == "holdout"
+    assert report["gold_sample_count"] == 30
+    assert report["acceptance"]["status"] == "not_eligible"
+    monkeypatch.setattr(
+        replay,
+        "dataset_report",
+        lambda rows: {
+            "acceptance_ready": False,
+            "acceptance_issues": ["missing known case"],
+            "dataset_hash": "full-dataset",
+        },
+    )
+    replay.main(["--eval", str(path), "--mode", "rules"])
+    report = json.loads(capsys.readouterr().out)
+    assert report["evaluated_split"] == "train"
+    assert report["gold_sample_count"] == 120
+
+
+def test_empty_split_fails_before_constructing_llm(monkeypatch, tmp_path):
+    from news_pipeline.tools import replay
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("empty split must be rejected before creating an LLM client")
+
+    monkeypatch.setattr(replay, "ChatClient", forbidden)
+    with pytest.raises(SystemExit) as error:
+        replay.main(
+            ["--eval", "tests/eval/gold_events.jsonl", "--mode", "llm", "--split", "holdout"]
+        )
+    assert error.value.code == 2
+
+
+@pytest.mark.parametrize("budget_fallback", [False, True])
+def test_llm_evaluates_only_holdout_and_counts_gold_budget_fallbacks(
+    monkeypatch, tmp_path, capsys, budget_fallback
+):
+    from news_pipeline.config.schema import AppConfig, WatchlistFile
+    from news_pipeline.tools import replay
+
+    path = tmp_path / "gold.jsonl"
+    path.write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "id": str(n),
+                    "title": f"英伟达回购股票 {n}",
+                    "body": "",
+                    "source": "wire",
+                    "market": "us",
+                    "label": "must_push",
+                    "tickers": ["NVDA"],
+                    "annotation_status": "reviewed",
+                    "split": "train" if n < 120 else "holdout",
+                }
+            )
+            for n in range(150)
+        )
+    )
+    cfg = AppConfig(llm={"enabled": True, "pricing": {"qwen-plus": {"input": 1, "output": 2}}})
+    client = AsyncMock()
+    monkeypatch.setattr(
+        replay, "_configuration", lambda directory: (cfg, WatchlistFile(), engine())
+    )
+    monkeypatch.setattr(replay, "_api_key", lambda directory: "test-key")
+    monkeypatch.setattr(replay, "ChatClient", lambda *args: client)
+    monkeypatch.setattr(
+        replay,
+        "dataset_report",
+        lambda rows: {
+            "acceptance_ready": True,
+            "acceptance_issues": [],
+            "dataset_hash": "full-dataset",
+        },
+    )
+    evaluated = []
+
+    async def evaluate(group, *args, **kwargs):
+        evaluated.append(group.title)
+        fallback = budget_fallback and len(evaluated) == 1
+        return dict(
+            decision="push",
+            tickers=["NVDA"],
+            legal=not fallback,
+            latency_ms=100,
+            cost_cny=0,
+            new_cost_cny=0,
+            budget_fallback=fallback,
+        )
+
+    monkeypatch.setattr(replay, "_evaluate", evaluate)
+    replay.main(["--eval", str(path), "--mode", "llm", "--split", "holdout"])
+    report = json.loads(capsys.readouterr().out)
+    assert evaluated == [f"英伟达回购股票 {n}" for n in range(120, 150)]
+    assert report["gold_sample_count"] == 30
+    assert report["budget_fallback_events"] == int(budget_fallback)
+    assert report["acceptance"]["status"] == ("fail" if budget_fallback else "pass")
+    assert report["model"] == cfg.llm.assess.model
+    assert report["prompt_version"] == cfg.llm.assess.prompt_version
+    client.close.assert_awaited_once()
+    client.chat_json.assert_not_awaited()

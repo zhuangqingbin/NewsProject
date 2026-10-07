@@ -96,6 +96,7 @@ nav:
     - Configuration: operations/configuration.md
     - Secrets: operations/secrets.md
     - Daily Ops: operations/daily-ops.md
+    - B0 模型验收: operations/b0-acceptance.md
     - Monitoring: operations/monitoring.md
     - Upgrading: operations/upgrading.md
     - Backup: operations/backup.md

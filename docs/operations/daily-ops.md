@@ -25,3 +25,5 @@ smoke 默认输出 JSON 并发送运维卡片；上面的 `--no-report` 只输�
 修改新闻配置后 `docker compose restart app`；修改盯盘列表/持仓后重启 quote_watcher，只有 alerts 规则专门热加载。`NEWS_PIPELINE_ONCE=1` 按当前模式真实抓取、处理和运行一次 outbox，可能发送新闻，不能当只读检查。
 
 备份与灰度切换严格按 [部署指南](../getting-started/deployment-current.md)。规则 replay 读数据库副本；LLM/eval 回放会花费供应商余额，先获授权并完成真实定价配置。
+
+B0 的 CSV 审核、固定 120/30 拆分、模型训练集评测与最终留出集验收，按 [B0 验收流程](b0-acceptance.md) 执行。未审核 seed 与规则基线不能代替模型验收。

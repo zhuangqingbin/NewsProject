@@ -33,6 +33,7 @@ from news_pipeline.events.similarity import Features, features, same_event, with
 from news_pipeline.rules.engine import RulesEngine
 from news_pipeline.rules.headline import headline
 from news_pipeline.rules.verdict import RulesVerdict
+from news_pipeline.tools.gold import dataset_report, load_dataset, select_split
 
 _STRENGTH = {"drop": 0, "digest_lo": 1, "digest_hi": 2, "push": 3}
 _SEED_PATH = Path(__file__).resolve().parents[3] / "tests" / "eval" / "gold_events.jsonl"
@@ -185,17 +186,21 @@ def export_samples(
     chosen = []
     for (_key, bucket), quota in zip(buckets.items(), quotas, strict=True):
         chosen.extend(bucket[:quota])
-    ids = {group.id for group in chosen}
-    remaining = [group for bucket in buckets.values() for group in bucket if group.id not in ids]
-    chosen.extend(remaining[: max(sample_size - len(chosen), 0)])
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
+    with path.open("x", encoding="utf-8", newline="") as handle:
         fields = [
+            "id",
             "event_id",
             "stratum",
+            "case",
             "title",
             "body",
+            "source",
             "sources",
+            "market",
+            "published_at",
+            "url",
+            "raw_meta",
             "tickers",
             "rule_decision",
             "label",
@@ -204,14 +209,29 @@ def export_samples(
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         for group in chosen:
-            body = max((article.body or "" for article in group.articles), key=len, default="")
+            representative = max(
+                group.articles,
+                key=lambda article: (
+                    article.source in {"juchao", "sec_edgar"},
+                    len(article.body or ""),
+                    str(article.url),
+                ),
+            )
+            evidence = json.dumps(sorted({str(article.url) for article in group.articles}))
             writer.writerow(
                 {
+                    "id": "event-" + hashlib.sha256(evidence.encode()).hexdigest(),
                     "event_id": group.id,
                     "stratum": _stratum(group),
-                    "title": group.title,
-                    "body": body,
-                    "sources": ",".join(sorted({a.source for a in group.articles})),
+                    "case": "",
+                    "title": representative.title,
+                    "body": representative.body or "",
+                    "source": representative.source,
+                    "sources": json.dumps(sorted({a.source for a in group.articles})),
+                    "market": representative.market.value,
+                    "published_at": representative.published_at.isoformat(),
+                    "url": representative.url,
+                    "raw_meta": json.dumps(representative.raw_meta, ensure_ascii=False),
                     "tickers": json.dumps(group.tagged_tickers),
                     "rule_decision": group.verdict.decision,
                     "label": "must_push" if group.verdict.decision == "push" else "digest",
@@ -222,9 +242,7 @@ def export_samples(
 
 
 def load_gold(path: Path) -> list[dict[str, Any]]:
-    return [
-        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
-    ]
+    return load_dataset(path)
 
 
 def _percentile(values: list[float], fraction: float) -> float:
@@ -266,6 +284,43 @@ def evaluation_metrics(
         "mean_cost_cny": sum(float(row.get("cost_cny", 0)) for row in predictions) / count
         if count
         else 0,
+    }
+
+
+def acceptance_report(
+    dataset: dict[str, Any], metrics: dict[str, float], mode: str, split: str, count: int
+) -> dict[str, Any]:
+    limits = {
+        "push_precision": ("min", 0.70),
+        "must_push_recall": ("min", 0.90),
+        "wrong_ticker_rate": ("max", 0.02),
+        "json_legal_rate": ("min", 0.99),
+        "latency_p95_ms": ("max", 8000),
+    }
+    thresholds = {}
+    for key, (direction, limit) in limits.items():
+        actual = metrics.get(key)
+        thresholds[key] = {
+            "actual": actual,
+            direction: limit,
+            "passed": actual is not None
+            and (actual >= limit if direction == "min" else actual <= limit),
+        }
+    issues = list(dataset["acceptance_issues"])
+    if not dataset["acceptance_ready"] and not issues:
+        issues.append("dataset is not ready for acceptance")
+    if mode != "llm":
+        issues.append("LLM evaluation is required for model acceptance")
+    if split != "holdout" or count != 30:
+        issues.append("final acceptance requires the reserved 30-event holdout")
+    return {
+        "status": "not_eligible"
+        if issues
+        else "pass"
+        if all(threshold["passed"] for threshold in thresholds.values())
+        else "fail",
+        "eligibility_issues": issues,
+        "thresholds": thresholds,
     }
 
 
@@ -505,10 +560,22 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     if args.export:
         exported = export_samples(groups, args.export, args.sample_size)
         result["exported_count"] = len(exported)
+        result["exported_strata"] = dict(Counter(_stratum(group) for group in exported))
+        result["export_shortfall"] = args.sample_size - len(exported)
         result["annotation_status"] = "unreviewed"
-    gold = (
+    full_gold = (
         load_gold(args.eval) if args.eval else load_gold(_SEED_PATH) if _SEED_PATH.exists() else []
     )
+    gold = full_gold
+    split = "all"
+    if args.eval:
+        dataset = dataset_report(full_gold)
+        split = args.split or ("train" if any("split" in row for row in full_gold) else "all")
+        gold = select_split(full_gold, split)
+        if not gold:
+            raise ValueError(f"no evaluation events in split {split!r}")
+        result["dataset"] = dataset
+        result["evaluated_split"] = split
     result["known_case_decisions"] = {
         row.get("case", str(index)): rules.match(_seed_article(row, index)).decision
         for index, row in enumerate(gold)
@@ -538,6 +605,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 key: metrics[key]
                 for key in ("push_precision", "must_push_recall", "wrong_ticker_rate")
             }
+            result["acceptance"] = acceptance_report(
+                dataset, result["metrics"], args.mode, split, len(gold)
+            )
     if args.mode == "llm":
         raw_llm = app.llm.model_dump()
         raw_llm["enabled"] = True
@@ -546,6 +616,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         raw_llm["digest"]["model"] = raw_llm["assess"]["model"]
         # Validating an enabled config enforces real positive prices before any request.
         app = app.model_copy(update={"llm": type(app.llm).model_validate(raw_llm)})
+        result["model"] = app.llm.assess.model
+        result["prompt_version"] = app.llm.assess.prompt_version
+        result["provider"] = app.llm.base_url
         client = ChatClient(_api_key(args.config), app.llm.base_url)
         cached = CachedChatClient(
             client, args.cache_dir, app.llm.assess.prompt_version, app.llm.base_url
@@ -553,6 +626,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         try:
             recent: list[ReplayEvent] = []
             spent = 0.0
+            budget_fallbacks = 0
             for group in groups:
                 eligible = (
                     bool(group.tagged_tickers)
@@ -571,6 +645,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                     remaining_budget=app.llm.daily_cost_ceiling_cny - spent,
                 )
                 spent += group.prediction["new_cost_cny"]
+                budget_fallbacks += bool(group.prediction.get("budget_fallback"))
                 recent.append(group)
             result.update(replay_report(groups))
             if args.eval:
@@ -591,15 +666,17 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                     )
                     predictions.append(prediction)
                     spent += prediction["new_cost_cny"]
+                    budget_fallbacks += bool(prediction.get("budget_fallback"))
                 result["metrics"] = evaluation_metrics(gold, predictions)
+                result["acceptance"] = acceptance_report(
+                    dataset, result["metrics"], args.mode, split, len(gold)
+                )
                 result["annotation_status"] = sorted(
                     {row.get("annotation_status", "unknown") for row in gold}
                 )
             result["cache_hits"], result["cache_misses"] = cached.cache_hits, cached.cache_misses
             result["new_cost_cny"] = spent
-            result["budget_fallback_events"] = sum(
-                bool((group.prediction or {}).get("budget_fallback")) for group in groups
-            )
+            result["budget_fallback_events"] = budget_fallbacks
         finally:
             await client.close()
     return result
@@ -612,6 +689,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--to", dest="to_date", default="2026-10-06")
     parser.add_argument("--mode", choices=("rules", "llm"))
     parser.add_argument("--eval", type=Path)
+    parser.add_argument("--split", choices=("train", "holdout", "all"))
     parser.add_argument("--model")
     parser.add_argument("--config", type=Path, default=Path("config"))
     parser.add_argument("--cache-dir", type=Path, default=Path("data/replay-cache"))
@@ -622,6 +700,10 @@ def main(argv: list[str] | None = None) -> int:
         args.mode = "llm" if args.eval and args.model else "rules"
     if not args.db and not args.eval:
         parser.error("provide --db or --eval")
+    if args.split and not args.eval:
+        parser.error("--split requires --eval")
+    if args.export and not args.db:
+        parser.error("--export requires --db")
     if args.sample_size <= 0:
         parser.error("--sample-size must be positive")
     if args.from_date > args.to_date:
