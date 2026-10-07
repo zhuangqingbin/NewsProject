@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
-from news_pipeline.common.hashing import title_simhash, url_hash
+from news_pipeline.common.hashing import url_hash
 from news_pipeline.common.timeutil import utc_now
 from news_pipeline.scrapers.common.http import make_async_client
 
@@ -41,7 +41,6 @@ class FinnhubScraper:
                     url=link,
                     url_hash=url_hash(link),
                     title=item["headline"],
-                    title_simhash=title_simhash(item["headline"]),
                     body=item.get("summary"),
                     raw_meta={"finnhub_id": item["id"], "source": item["source"]},
                 )

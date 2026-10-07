@@ -1,6 +1,6 @@
 # Current Deployment
 
-本页描述 v0.7.0 的部署与灰度步骤，不代表已经完成线上发布或模型验收。服务使用 **Docker Compose**，服务器工作目录为 `/opt/NewsProject`；容器内为 `/app`。仓库默认 `pipeline.mode: legacy`、`llm.enabled: false`。
+本分支为待发布的 v0.7.1 清理候选，仅支持 `pipeline.mode: v2`，默认 `llm.enabled: false`。生产仍须先在保留的 v0.7.0 完成下述灰度与一周稳定观察。文档不代表已上线或模型验收通过。服务使用 **Docker Compose**，服务器目录 `/opt/NewsProject`，容器内 `/app`。
 
 ## 当前状态
 
@@ -18,7 +18,7 @@
 
 ## 首次部署步骤
 
-在 `/opt/NewsProject` 放置仓库后执行：
+以下命令用于满足发布门槛后的安装；现有生产环境先用 v0.7.0 完成 A/B 灰度。选定对应发布分支后，在 `/opt/NewsProject` 执行：
 
 ```bash
 cd /opt/NewsProject
@@ -41,7 +41,7 @@ docker compose logs --tail=100 app quote_watcher
 
 SEC 必须使用包含**真实联系人和邮箱**的 User-Agent。在 `sources.yml` 的 `sec_edgar.options.user_agent` 填入，例如 `NewsProject operator operator@example.org`，并用自己的真实邮箱替换示例。不能把 `<你的邮箱>` 原样上线。主进程也支持 `SEC_USER_AGENT` 覆盖；当前 Compose 的 `app.environment.SEC_USER_AGENT: ${SEC_USER_AGENT:-}` 会读取宿主 export 或仓库 `.env`，传入新闻容器。修改后需 `docker compose up -d app` 重建容器环境；仅 restart 不会更改容器环境。
 
-新闻配置修改后执行 `docker compose restart app`。新闻没有运行中的 YAML 热加载；旧 `runtime.hot_reload` 和 watchdog 的新闻配置监听仅是待清理兼容项。盯盘只对 `alerts.yml` 使用 `AlertsReloader`，持仓和盯盘列表修改后重启 `quote_watcher`。
+新闻配置修改后执行 `docker compose restart app`。新闻没有运行中的 YAML 热加载；旧 `runtime.hot_reload` 和新闻配置监听已删除。盯盘只对 `alerts.yml` 使用 `AlertsReloader`，持仓和盯盘列表修改后重启 `quote_watcher`。
 
 ## 升级流程
 
@@ -53,10 +53,10 @@ SEC 必须使用包含**真实联系人和邮箱**的 User-Agent。在 `sources.
 cd /opt/NewsProject
 umask 077
 docker compose stop app quote_watcher
-docker image tag news-pipeline:latest news-pipeline:rollback-before-0.7.0
+docker image tag news-pipeline:latest news-pipeline:rollback-before-0.7.1
 mkdir -p data/backups
 chmod 700 data/backups
-tar -czf data/backups/config-before-0.7.0.tar.gz config
+tar -czf data/backups/config-before-0.7.1.tar.gz config
 docker compose run --rm --no-deps -T -e RUN_MIGRATIONS=0 app python - <<'PYBACKUP'
 import sqlite3
 from datetime import datetime, timezone
@@ -84,31 +84,31 @@ docker compose exec quote_watcher python -m news_pipeline.healthcheck --subsyste
 
 0004 增加源健康字段；0005 增加 `v2_state`、事件、投递、LLM 调用记录，保留旧处理与推送表，同时将旧 `news_fts` 换为 `events_fts`。迁移前的原始记录标为 `v2_state='legacy'`，避免升级时把历史积压全部补推。
 
-### 阶段 A：规则与取数修复
+### 阶段 A：规则与取数修复（使用保留的 v0.7.0）
 
 保持 `legacy` 和 LLM 关闭。验证回看抓取、源健康转换、即时推送去重、摘要失败不消费、腾讯个股/东财全市场与板块三个启动探测。交易时段验证主板、创业板、科创板成交量单位和日 K 均量单位后，才记录 A7 的线上验收结果。启动成功或离线测试不等同于这个实测。
 
-### B0 与阶段 B：事件评估灰度
+### B0 与阶段 B：事件评估灰度（使用保留的 v0.7.0）
 
 B0 要先从三周只读样本导出 150 个事件，人工标注规则 push 50、digest_hi 50、提及 30、宏观 20，并保留 30 条只做最终验证。仓库中的 8 个已知案例是 **unreviewed seed**，不是完成的 gold set。付费模型对比需先取得明确授权；本次变更没有模型 benchmark 或真实生产精度结论。
 
 评测通过线：推送精度 ≥ 0.70，必推召回 ≥ 0.90，认错公司率 ≤ 2%，JSON 合法率 ≥ 99%，p95 延迟 ≤ 8 秒。记录模型、prompt 版本、费用和样本审核状态，未通过就继续规则兜底。
 
-启用 LLM 前，在 `config/common/app.yml` 为 `llm.assess.model` 和 `llm.digest.model` 分别配置 `llm.pricing.<model>.input/output`，单位为 **人民币 / 百万 token**，两项必须是从实际供应商控制台核对的正数。默认 `pricing: {}` 与 `enabled: false` 可启动；缺价、零价或负价时启用 LLM 会被配置校验拒绝。示例模型名 `qwen-plus` 不是选型验收结论，旧 `llm.tier*` 不控制新评估器。
+启用 LLM 前，在 `config/common/app.yml` 为 `llm.assess.model` 和 `llm.digest.model` 分别配置 `llm.pricing.<model>.input/output`，单位为 **人民币 / 百万 token**，两项必须是从实际供应商控制台核对的正数。默认 `pricing: {}` 与 `enabled: false` 可启动；缺价、零价或负价时启用 LLM 会被配置校验拒绝。示例模型名 `qwen-plus` 不是选型验收结论，旧 `llm.tier*` 在本清理版本已删除。
 
 完成 B0 后设 `pipeline.mode: shadow`，重启 `app`，观察 **2–3 个交易日**。旧路径继续发新闻；新事件与摘要只写 `status='shadow'`，不发送。系统日报和源冒烟属于运维信号，影子模式仍发送。依据日报的新旧独有事件检查误推与漏推，再切 `v2` 并重启。
 
 ### 后续门槛
 
-`v2` 连续稳定运行至少 **一周**、各源冒烟与日报可用、重试/回滚有证据后，才执行 C1/C2 的旧代码、配置和依赖删除，规划为 v0.7.1。阶段 C3/C4/C5 的保留任务、冒烟和文档可以先准备。阶段 D 扩源等待 **至少两周稳定运行**，逐个评估与启用，不能一次开启全部候选源。完整删除清单见 [稳定门槛与清理清单](../operations/staged-cleanup.md)。
+`v2` 连续稳定运行至少 **一周**、各源冒烟与日报可用、重试/回滚有证据后，才发布已在独立分支完成开发的 v0.7.1 C1/C2 清理。C3/C4/C5 保留任务、冒烟和文档已包含在代码中。阶段 D 扩源等待 **至少两周稳定运行**，逐个评估与启用，不能一次开启全部候选源。完整删除清单见 [稳定门槛与清理清单](../operations/staged-cleanup.md)。
 
 ## 回滚
 
-阶段 B 首先把 `pipeline.mode` 改回 `legacy`、`llm.enabled` 改为 `false`，然后 `docker compose restart app`。无须删事件表或执行 Alembic downgrade。保留新路径记录用于调查；已发出去的消息不能通过回滚收回。
+使用 v0.7.0 时，阶段 B 首先把 `pipeline.mode` 改回 `legacy`、`llm.enabled` 改为 `false`，然后 `docker compose restart app`。无须删事件表或执行 Alembic downgrade。保留新路径记录用于调查；已发出去的消息不能通过回滚收回。
 
-`legacy`/`shadow` 会暂停尚未发送的 v2 即时新闻和摘要队列，保留其状态与重试记录；运维队列仍可发送。重新进入 v2 后恢复处理；若回滚期间旧路径已成功发送同事件到同频道，待发即时项会标为 `superseded`，不计作 v2 发送。其他过期即时新闻按原有过期策略降为摘要。旧路径重建去重缓存时会读取最近六小时实际成功的 v2 即时投递，避免回滚后再次发送；影子记录、失败投递和摘要不作为即时发送成功证据。
+`legacy`/`shadow` 会暂停尚未发送的 v2 即时新闻和摘要队列，保留其状态与重试记录；运维队列仍可发送。重新进入 v2 后恢复处理；若旧路径已成功发送同事件到同频道，待发即时项终止为 `superseded`，不新增尝试或计作 v2 发送。其他过期即时新闻按原有过期策略降为摘要。旧路径重建去重缓存时会读取最近六小时实际成功的 v2 即时投递，避免回滚后再次发送；影子记录、失败投递和摘要不作为即时发送成功证据。
 
-C1/C2 删除旧路径后，配置回滚不再足够：恢复保留的 v0.7.0 镜像和其配置，再启动服务。删除阶段不应删除旧表；正常回滚不需要恢复数据库。若迁移失败或确需恢复备份，先停止两个写入服务，并在隔离副本核对恢复后的数据及 WAL，不能把运行中的库直接覆盖。
+本 v0.7.1 已删除旧路径，配置回滚不再足够：恢复保留的 v0.7.0 镜像和其配置，再启动服务。删除阶段不应删除旧表；正常回滚不需要恢复数据库。若迁移失败或确需恢复备份，先停止两个写入服务，并在隔离副本核对恢复后的数据及 WAL，不能把运行中的库直接覆盖。
 
 ## Datasette（仍用 Docker）
 

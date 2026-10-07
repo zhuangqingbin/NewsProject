@@ -1,6 +1,6 @@
 # Pushers 与新闻卡片
 
-共用发送层在 `shared/push`；新闻内容在 `news_pipeline/deliver/cards.py` 构建。当前配置使用飞书自定义机器人 webhook，新闻 US/CN 与盯盘 CN 告警频道分开。WeCom 实现保留但默认没有频道使用。Telegram、命令服务器和图表代码是待清理兼容模块，不是当前默认功能。
+共用发送层在 `shared/push`；新闻内容在 `news_pipeline/deliver/cards.py` 构建。当前配置使用飞书自定义机器人 webhook，新闻 US/CN 与盯盘 CN 告警频道分开。WeCom 实现保留但默认没有频道使用。Telegram、命令服务器和新闻图表代码已删除。
 
 ## CommonMessage 消息结构
 
@@ -24,7 +24,7 @@
 
 ## 速率与体积限制
 
-新闻新 outbox 每频道 1 秒间隔、20 次尝试/分钟；旧 `push.per_channel_rate` 不是新 worker 的配置入口。卡片和摘要在渲染后按 UTF-8 字节裁剪，计入签名余量，确保最终体积不超过飞书 20 KB 限制；摘要显示“另有 N 条未展示”。共享 pusher 的底层 HTTP 重试不替代持久 outbox。
+新闻新 outbox 每频道 1 秒间隔、20 次尝试/分钟；旧 `push.per_channel_rate` 已删除。卡片和摘要在渲染后按 UTF-8 字节裁剪，计入签名余量，确保最终体积不超过飞书 20 KB 限制；摘要显示“另有 N 条未展示”。共享 pusher 的底层 HTTP 重试不替代持久 outbox。
 
 ## 相关
 

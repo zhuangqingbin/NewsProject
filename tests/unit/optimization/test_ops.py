@@ -7,7 +7,7 @@ from sqlalchemy import select, text
 
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
-from news_pipeline.common.hashing import title_simhash, url_hash
+from news_pipeline.common.hashing import url_hash
 from news_pipeline.config.schema import SourceDef, SourcesFile
 from news_pipeline.scrapers.registry import ScraperRegistry
 from news_pipeline.storage.dao.raw_news import RawNewsDAO
@@ -35,7 +35,6 @@ def article(index, age_min=30, title=None, source="wire"):
         url=link,
         url_hash=url_hash(link),
         title=title,
-        title_simhash=title_simhash(title),
     )
 
 
@@ -98,7 +97,7 @@ async def test_smoke_timeout_is_reported(monkeypatch):
     assert result[0]["error_type"] == "TimeoutError" and not result[0]["ok"]
 
 
-async def test_leak_check_distinguishes_present_legacy_simhash_and_true_misses(db):
+async def test_leak_check_counts_same_title_at_a_new_url_as_missing(db):
     module = import_module("news_pipeline.health.leak_check")
     raw = RawNewsDAO(db)
     await raw.insert_article(article(1))
@@ -115,13 +114,12 @@ async def test_leak_check_distinguishes_present_legacy_simhash_and_true_misses(d
     )
     assert result[0]["checked"] == 3
     assert result[0]["present"] == 1
-    assert result[0]["title_duplicates"] == 1
-    assert result[0]["missing"] == 1
-    assert result[0]["missing_urls"] == ["https://news.example.com/4"]
+    assert result[0]["missing"] == 2
+    assert result[0]["missing_urls"] == ["https://news.example.com/3", "https://news.example.com/4"]
     assert len(await raw.list_pending()) == 2
 
 
-async def test_ops_report_counts_sent_separately_from_shadow_and_compares_legacy(db, tmp_path):
+async def test_ops_report_ignores_historical_shadow_and_legacy_rows(db, tmp_path):
     report_module = import_module("news_pipeline.health.ops_report")
     raw = RawNewsDAO(db)
     for i in (1, 2, 3):
@@ -234,7 +232,7 @@ async def test_ops_report_counts_sent_separately_from_shadow_and_compares_legacy
         )
         await session.commit()
     report = await report_module.build_ops_report(
-        db, db_path=tmp_path / "news.db", mode="shadow", now=NOW
+        db, db_path=tmp_path / "news.db", mode="v2", now=NOW
     )
     assert report.title == "系统日报"
     assert report.summary.index("broken") < report.summary.index("wire")
@@ -242,7 +240,6 @@ async def test_ops_report_counts_sent_separately_from_shadow_and_compares_legacy
         "入库 3",
         "候选 3",
         "即时推送 1",
-        "影子推送 1",
         "新鲜度 1",
         "简报 1 期 / 2 条",
         "推送失败 1",
@@ -250,12 +247,10 @@ async def test_ops_report_counts_sent_separately_from_shadow_and_compares_legacy
         "0.50",
         "LLM失败 1",
         "数据库",
-        "共同 1",
-        "新路径独有 1",
-        "旧路径独有 1",
     ]:
         assert expected in report.summary
-    assert "旧路径独有" in report.summary
+    assert "旧路径独有" not in report.summary
+    assert "影子推送" not in report.summary
     async with db.session() as session:
         assert len((await session.execute(select(Delivery))).scalars().all()) == 4
 
@@ -291,34 +286,6 @@ async def test_leak_check_propagates_failures_as_safe_result_rows(db):
     assert result == [{"source_id": "broken", "ok": False, "error_type": "RuntimeError"}]
 
 
-async def test_legacy_ops_counts_successful_ok_push_log_status(db, tmp_path):
-    module = import_module("news_pipeline.health.ops_report")
-    raw = RawNewsDAO(db)
-    await raw.insert_article(article(10))
-    at = NOW.replace(tzinfo=None)
-    async with db.session() as session:
-        session.add(
-            NewsProcessed(
-                id=10,
-                raw_id=1,
-                summary="Old pipeline",
-                event_type="other",
-                sentiment="neutral",
-                magnitude="low",
-                confidence=0.9,
-                score=80,
-                is_critical=True,
-                model_used="rules",
-                extracted_at=at,
-            )
-        )
-        await session.commit()
-        session.add(PushLog(news_id=10, channel="cn", sent_at=at, status="ok"))
-        await session.commit()
-    report = await module.build_ops_report(db, db_path=tmp_path / "news.db", mode="legacy", now=NOW)
-    assert "即时推送 1" in report.summary
-
-
 @pytest.mark.parametrize(
     ("markets", "expected"),
     [
@@ -349,70 +316,3 @@ async def test_ops_digest_counts_displayed_events_once_per_slot_and_market(
         await session.commit()
     report = await module.build_ops_report(db, db_path=tmp_path / "news.db", mode="v2", now=NOW)
     assert expected in report.summary
-
-
-async def test_legacy_ops_uses_interception_statuses_and_legacy_digest_audits(db, tmp_path):
-    module = import_module("news_pipeline.health.ops_report")
-    raw = RawNewsDAO(db)
-    for index in range(1, 5):
-        await raw.insert_article(article(index))
-    at = NOW.replace(tzinfo=None)
-    async with db.session() as session:
-        session.add_all(
-            NewsProcessed(
-                id=index,
-                raw_id=index,
-                summary=f"Legacy item {index}",
-                event_type="other",
-                sentiment="neutral",
-                magnitude="low",
-                confidence=0.9,
-                score=80,
-                is_critical=True,
-                model_used="rules",
-                extracted_at=at,
-                push_status=status,
-            )
-            for index, status in enumerate(["dup", "burst_digest", "stale_digest", "digest"], 1)
-        )
-        session.add_all(
-            Delivery(
-                kind="legacy_digest",
-                market="cn",
-                channel=channel,
-                status="sent",
-                created_at=at,
-                sent_at=at,
-                digest_slot="2026-10-06@08:27",
-                event_ids=[2, 3],
-                consumed_event_ids=list(range(1, 61)),
-            )
-            for channel in ["legacy_feishu", "legacy_bark"]
-        )
-        session.add_all(
-            [
-                Delivery(
-                    kind="legacy_digest",
-                    market="cn",
-                    channel="legacy_failed_channel",
-                    status="legacy_failed",
-                    created_at=at,
-                    digest_slot="2026-10-06@08:27",
-                ),
-                Delivery(
-                    kind="digest",
-                    market="cn",
-                    channel="v2_feishu",
-                    status="sent",
-                    created_at=at,
-                    sent_at=at,
-                    digest_slot="2026-10-06@08:27",
-                    event_ids=[99],
-                ),
-            ]
-        )
-        await session.commit()
-    report = await module.build_ops_report(db, db_path=tmp_path / "news.db", mode="legacy", now=NOW)
-    assert "候选 4" in report.summary
-    assert "去重 1 · 突发 1 · 新鲜度 1" in report.summary
-    assert "简报 1 期 / 2 条 · 推送失败 1" in report.summary

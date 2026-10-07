@@ -10,6 +10,6 @@
 
 ## 旧 Anthropic 与 cookie 字段
 
-Anthropic、雪球/旧同花顺 cookie 是兼容模块的配置，不是新 Assessment 的默认依赖。旧 Tier 路由与命令服务器要等 v2 稳定一周后清理，目录存在不意味着正在运行。
+Anthropic、雪球/旧同花顺 cookie 没有当前调用方，可从自己的密钥文件移除。旧 Tier 路由、抓取器与命令服务器已删除；不改动或清除用户真实密钥文件。
 
 日志中不打印 webhook/设备 key。HTTP 客户端 INFO 日志已关闭，但操作时仍应避免把秘密放到共享终端记录或 issue 中。详见 [部署](../getting-started/deployment-current.md) 与 [Pushers](../components/pushers.md)。

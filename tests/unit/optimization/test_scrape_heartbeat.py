@@ -15,7 +15,7 @@ async def test_lookback_catches_late_article_and_seeds_first_success(db):
     raw, state = RawNewsDAO(db), SourceStateDAO(db)
     scraper = MagicMock(source_id="sina_global")
     scraper.fetch = AsyncMock(return_value=[article(1)])
-    store = ArticleStore(raw, mode="v2")
+    store = ArticleStore(raw)
     cfg = SourceDef(lookback_min=360, interval_sec=60)
     assert await scrape_one_source(scraper=scraper, store=store, state_dao=state, cfg=cfg) == 1
     assert (await raw.get(1)).status == "seeded"

@@ -17,14 +17,13 @@ def test_typed_source_defaults() -> None:
     assert source.max_silence_off_min is None
 
 
-def test_app_v2_defaults_preserve_rollback_and_disable_paid_calls() -> None:
+def test_app_v2_defaults_disable_paid_calls() -> None:
     cfg = AppConfig()
-    assert cfg.pipeline.mode == "legacy"
+    assert cfg.pipeline.mode == "v2"
     assert cfg.llm.enabled is False
     assert cfg.llm.assess.max_tokens == 400
     assert cfg.llm.digest.max_tokens == 1500
     assert cfg.push.max_age_min == 90
-    assert cfg.push.dedup_window_hours == 6
     assert cfg.digest.max_items == 20
     assert cfg.digest.max_age_hours == 24
     assert cfg.ops.report_at == "08:20"
@@ -140,13 +139,3 @@ def test_optional_vocabulary_files_are_loaded_when_present(cfg_dir: Path) -> Non
     snap = ConfigLoader(cfg_dir).load()
     assert snap.scoring.big_move_pct == 7.0
     assert snap.first_party.juchao.merge_max_items == 3
-
-
-def test_legacy_explicit_empty_keyword_refs_keep_validation() -> None:
-    with pytest.raises(ValidationError, match="not in sector_keywords"):
-        WatchlistFile(
-            rules={
-                "us": [{"ticker": "NVDA", "name": "NVIDIA", "sectors": ["semi"]}],
-                "sector_keywords": {},
-            }
-        )

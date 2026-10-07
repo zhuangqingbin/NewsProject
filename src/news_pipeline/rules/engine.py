@@ -18,15 +18,9 @@ if TYPE_CHECKING:
 
 def _compile(
     rules: "RulesSection",
-) -> tuple[list[Pattern], dict[str, set[str]], dict[str, set[str]]]:
-    """Compile RulesSection config into:
-    - flat pattern list (for matcher.rebuild)
-    - sector_to_tickers reverse index (lowercase keyword → set of ticker codes)
-    - macro_to_tickers reverse index (same)
-    """
+) -> list[Pattern]:
+    """Compile strong aliases and person mentions for candidate recall."""
     patterns: list[Pattern] = []
-    sector_to_tickers: dict[str, set[str]] = {}
-    macro_to_tickers: dict[str, set[str]] = {}
 
     for market_str in ("us", "cn"):
         market = Market(market_str)
@@ -69,54 +63,7 @@ def _compile(
                         owner=entry.ticker,
                     )
                 )
-            for sec in entry.sectors:
-                sector_to_tickers.setdefault(sec.lower(), set()).add(entry.ticker)
-            for mac in entry.macro_links:
-                macro_to_tickers.setdefault(mac.lower(), set()).add(entry.ticker)
-
-        for kw in getattr(rules.sector_keywords, market_str):
-            patterns.append(
-                Pattern(
-                    text=kw.lower(),
-                    is_english=kw.isascii(),
-                    kind=PatternKind.SECTOR,
-                    market=market,
-                    owner=kw,
-                )
-            )
-        for kw in getattr(rules.macro_keywords, market_str):
-            patterns.append(
-                Pattern(
-                    text=kw.lower(),
-                    is_english=kw.isascii(),
-                    kind=PatternKind.MACRO,
-                    market=market,
-                    owner=kw,
-                )
-            )
-        for kw in getattr(rules.keyword_list, market_str):
-            patterns.append(
-                Pattern(
-                    text=kw.lower(),
-                    is_english=kw.isascii(),
-                    kind=PatternKind.GENERIC,
-                    market=market,
-                    owner=kw,
-                )
-            )
-
-    return patterns, sector_to_tickers, macro_to_tickers
-
-
-def _compute_boost(tickers: set[str], sectors: set[str], macros: set[str]) -> float:
-    boost = 0.0
-    if tickers:
-        boost += 50.0
-    if sectors:
-        boost += 20.0
-    if macros:
-        boost += 15.0
-    return min(boost, 100.0)
+    return patterns
 
 
 class RulesEngine:
@@ -130,13 +77,13 @@ class RulesEngine:
         scoring: ScoringConfig | None = None,
         first_party: FirstPartyConfig | None = None,
     ) -> None:
-        self._matcher = matcher or build_matcher(rules.matcher, rules.matcher_options)
+        self._matcher = matcher or build_matcher("aho_corasick", {})
         self._scoring = scoring or ScoringConfig()
         self._first_party = first_party or FirstPartyConfig()
         self.rebuild(rules)
 
     def rebuild(self, rules: "RulesSection") -> None:
-        patterns, _, _ = _compile(rules)
+        patterns = _compile(rules)
         self._matcher.rebuild(patterns)
         self._rules = rules
         self._ticker_markets = {
@@ -178,17 +125,6 @@ class RulesEngine:
                         macros.append(word)
                     else:
                         generics.append(word)
-        # Deprecated legacy keyword fields remain available during shadow rollout.
-        for field, hits in (
-            ("sector_keywords", sectors),
-            ("macro_keywords", macros),
-            ("keyword_list", generics),
-        ):
-            for market in ("us", "cn"):
-                for word in getattr(getattr(self._rules, field), market):
-                    if contains(h, word.lower()):
-                        keywords.append(word.lower())
-                        hits.append(word.lower())
         if subjects:
             positions = [
                 match.start for match in headline_matches if match.pattern.kind in strong_kinds
@@ -224,7 +160,7 @@ class RulesEngine:
 
     @staticmethod
     def _importance_hint(art: "RawArticle") -> int:
-        if art.source in ("cls_telegraph", "caixin_telegram"):
+        if art.source == "cls_telegraph":
             return {"A": 3, "B": 2}.get(str(art.raw_meta.get("level", "")).upper(), 0)
         if art.source == "wallstreetcn":
             score = art.raw_meta.get("score", 0)

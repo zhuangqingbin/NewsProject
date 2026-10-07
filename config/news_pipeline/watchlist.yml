@@ -183,11 +183,3 @@ rules:
     sectors:
     - 半导体
     - 设备
-  enable: true
-  matcher: aho_corasick
-llm:
-  enable: false
-  us: []
-  cn: []
-  macro: []
-  sectors: []

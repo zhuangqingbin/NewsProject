@@ -43,13 +43,13 @@ async def test_manual_smoke_sends_report_unless_no_report_is_selected(tmp_path, 
     assert dispatcher.dispatch.await_count == 1
 
 
-async def test_startup_and_weekly_probes_enqueue_ops_report_even_in_shadow(db):
+async def test_startup_and_weekly_probes_enqueue_ops_report(db):
     from news_pipeline.main import enqueue_smoke_report
     from news_pipeline.runtime import PipelineRuntime
     from shared.push.dispatcher import PusherDispatcher
     from tests.unit.optimization.test_v2_runtime import snapshot
 
-    snap = snapshot("shadow")
+    snap = snapshot("v2")
     snap.app.ops.report_channel = "feishu_us"
     runtime = PipelineRuntime(db, snap, PusherDispatcher({}))
     try:

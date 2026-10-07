@@ -6,7 +6,7 @@
 
 `shared/common` 提供 CommonMessage、Badge、DigestItem、Deeplink、Market、UTC 时间与 MarketCalendar。`shared/observability` 提供 structlog、Bark 和原子心跳文件。`shared/push` 将通用消息渲染并发送，使用嵌套 secrets 路径解析频道。
 
-新闻卡片在 news_pipeline/deliver/cards.py；持久状态/重试在新闻 Outbox。旧 shared MessageBuilder 对新闻契约的反向引用为 legacy 兼容，等待 C1/C2 删除，不能当作新业务代码示例。旧每周死信报告同样不由当前 main 启动。
+新闻卡片在 news_pipeline/deliver/cards.py；持久状态/重试在新闻 Outbox。旧 shared MessageBuilder 和每周死信报告已删除，共用层不再依赖新闻业务模型。
 
 ## 边界与兼容
 

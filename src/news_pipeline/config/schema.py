@@ -1,6 +1,6 @@
 # src/news_pipeline/config/schema.py
 import re
-from typing import Annotated, Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -10,27 +10,10 @@ class _Base(BaseModel):
 
 
 # --- app.yml ---
-class RuntimeCfg(_Base):
-    daily_cost_ceiling_cny: float = 5.0
-    hot_reload: bool = True
-    timezone_display: dict[str, str] = Field(
-        default_factory=lambda: {"us": "America/New_York", "cn": "Asia/Shanghai"}
-    )
 
 
 class PipelineCfg(_Base):
-    mode: Literal["legacy", "shadow", "v2"] = "legacy"
-
-
-class ScrapeIntervalsCfg(_Base):
-    # Deprecated: retained until the v2 stability gate permits removing legacy mode.
-    market_hours_interval_sec: int = 180
-    off_hours_interval_sec: int = 1800
-    caixin_interval_sec: int = 60
-
-
-class LLMIntervalCfg(_Base):
-    process_interval_sec: int = 120
+    mode: Literal["v2"] = "v2"
 
 
 class DigestSchedule(_Base):
@@ -51,15 +34,9 @@ class DigestTimesCfg(_Base):
             DigestSchedule(at="16:27", tz="America/New_York"),
         ]
     )
-    morning_cn: str = "08:30"
-    evening_cn: str = "21:00"
-    morning_us: str = "21:00"
-    evening_us: str = "04:30"
 
 
 class SchedulerCfg(_Base):
-    scrape: ScrapeIntervalsCfg = Field(default_factory=ScrapeIntervalsCfg)
-    llm: LLMIntervalCfg = Field(default_factory=LLMIntervalCfg)
     digest: DigestTimesCfg = Field(default_factory=DigestTimesCfg)
 
 
@@ -83,14 +60,6 @@ class LLMCfg(_Base):
     )
     daily_cost_ceiling_cny: float = Field(default=5.0, gt=0, allow_inf_nan=False)
     pricing: dict[str, ModelPricing] = Field(default_factory=dict)
-    # Deprecated tier settings support the legacy and shadow rollout paths.
-    tier0_model: str = "deepseek-v3"
-    tier1_model: str = "deepseek-v3"
-    tier2_model: str = "claude-haiku-4-5-20251001"
-    tier3_model: str = "claude-sonnet-4-6"
-    prompt_versions: dict[str, str] = Field(default_factory=dict)
-    enable_prompt_cache: bool = True
-    enable_batch: bool = True
 
     @model_validator(mode="after")
     def enabled_models_have_prices(self) -> "LLMCfg":
@@ -104,30 +73,6 @@ class LLMCfg(_Base):
         return self
 
 
-class ClassifierRulesCfg(_Base):
-    price_move_critical_pct: float = 5.0
-    sources_always_critical: list[str] = Field(default_factory=list)
-    sentiment_high_magnitude_critical: bool = True
-
-
-class ClassifierCfg(_Base):
-    rules: ClassifierRulesCfg | None = None
-    llm_fallback_when_score: Annotated[list[float], Field(min_length=2, max_length=2)] = Field(
-        default_factory=lambda: [40.0, 70.0]
-    )
-
-
-class DedupCfg(_Base):
-    url_strict: bool = True
-    title_simhash_distance: int = 4
-
-
-class ChartsCfg(_Base):
-    auto_on_critical: bool = True
-    auto_on_earnings: bool = True
-    cache_ttl_days: int = 30
-
-
 class QuietHoursCfg(_Base):
     enabled: bool = False
     start: str = "00:30"
@@ -138,7 +83,6 @@ class QuietHoursCfg(_Base):
 
 class PushCfg(_Base):
     max_age_min: int = Field(default=90, gt=0)
-    dedup_window_hours: int = Field(default=6, gt=0)
     quiet_hours: QuietHoursCfg = Field(default_factory=QuietHoursCfg)
     color_scheme: Literal["us", "cn"] = "us"
     push_min_materiality: int = Field(default=4, ge=1, le=5)
@@ -152,10 +96,8 @@ class PushCfg(_Base):
             "tier:normal": 3,
         }
     )
-    per_channel_rate: str = "30/min"
     same_ticker_burst_window_min: int = Field(default=5, gt=0)
     same_ticker_burst_threshold: int = Field(default=3, gt=0)
-    digest_max_items_per_section: int = 30
 
 
 class DigestCfg(_Base):
@@ -168,39 +110,13 @@ class OpsCfg(_Base):
     report_channel: str = "feishu_cn"
 
 
-class DeadLetterCfg(_Base):
-    auto_retry_kinds: list[str] = Field(default_factory=list)
-    notify_only_kinds: list[str] = Field(default_factory=list)
-    weekly_summary_day: Literal[
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-        "sunday",
-    ] = "monday"
-
-
-class RetentionCfg(_Base):
-    raw_news_hot_days: int = 30
-    news_processed_hot_days: int = 365
-    push_log_days: int = 90
-
-
 class AppConfig(_Base):
-    runtime: RuntimeCfg = Field(default_factory=RuntimeCfg)
     pipeline: PipelineCfg = Field(default_factory=PipelineCfg)
     scheduler: SchedulerCfg = Field(default_factory=SchedulerCfg)
     llm: LLMCfg = Field(default_factory=LLMCfg)
-    classifier: ClassifierCfg = Field(default_factory=ClassifierCfg)
-    dedup: DedupCfg = Field(default_factory=DedupCfg)
-    charts: ChartsCfg = Field(default_factory=ChartsCfg)
     push: PushCfg = Field(default_factory=PushCfg)
     digest: DigestCfg = Field(default_factory=DigestCfg)
     ops: OpsCfg = Field(default_factory=OpsCfg)
-    dead_letter: DeadLetterCfg = Field(default_factory=DeadLetterCfg)
-    retention: RetentionCfg = Field(default_factory=RetentionCfg)
 
 
 # --- watchlist.yml ---
@@ -213,8 +129,6 @@ class TickerEntry(_Base):
     people: list[str] = Field(default_factory=list)
     exclude: list[str] = Field(default_factory=list)
     sectors: list[str] = Field(default_factory=list)
-    macro_links: list[str] = Field(default_factory=list)
-    alerts: list[str] = Field(default_factory=list)  # legacy, LLM-only
 
     @field_validator("aliases", "people", "exclude", mode="after")
     @classmethod
@@ -222,46 +136,14 @@ class TickerEntry(_Base):
         return [value.lower() for value in values]
 
 
-class MarketKeywords(_Base):
-    """A keyword list split by market."""
-
-    us: list[str] = Field(default_factory=list)
-    cn: list[str] = Field(default_factory=list)
-
-
 class RulesSection(_Base):
-    enable: bool = True
-    gray_zone_action: Literal["skip", "digest", "push"] = "digest"
     short_alias_allow: list[str] = Field(default_factory=list)
-    matcher: str = "aho_corasick"
-    matcher_options: dict[str, Any] = Field(default_factory=dict)
     us: list[TickerEntry] = Field(default_factory=list)
     cn: list[TickerEntry] = Field(default_factory=list)
-    keyword_list: MarketKeywords = Field(default_factory=MarketKeywords)
-    macro_keywords: MarketKeywords = Field(default_factory=MarketKeywords)
-    sector_keywords: MarketKeywords = Field(default_factory=MarketKeywords)
-
-
-class LLMSection(_Base):
-    enable: bool = False
-    us: list[str] = Field(default_factory=list)
-    cn: list[str] = Field(default_factory=list)
-    macro: list[str] = Field(default_factory=list)
-    sectors: list[str] = Field(default_factory=list)
 
 
 class WatchlistFile(_Base):
     rules: RulesSection = Field(default_factory=RulesSection)
-    llm: LLMSection = Field(default_factory=LLMSection)
-
-    @model_validator(mode="after")
-    def at_least_one_enabled(self) -> "WatchlistFile":
-        if not self.rules.enable and not self.llm.enable:
-            raise ValueError(
-                "watchlist.yml: rules.enable AND llm.enable both False — "
-                "at least one must be enabled"
-            )
-        return self
 
     @model_validator(mode="after")
     def ticker_unique(self) -> "WatchlistFile":
@@ -293,40 +175,12 @@ class WatchlistFile(_Base):
         return self
 
     def effective_us(self) -> list[str]:
-        """Tickers in scope for US. When rules.enable=True the rules section is
-        the single source of truth (llm.us is ignored, even if llm.enable=True);
-        otherwise fall back to llm.us."""
-        if self.rules.enable:
-            return [t.ticker for t in self.rules.us]
-        return list(self.llm.us)
+        """US ticker scope is defined by the rules watchlist."""
+        return [entry.ticker for entry in self.rules.us]
 
     def effective_cn(self) -> list[str]:
-        """Tickers in scope for CN. Same precedence rule as effective_us."""
-        if self.rules.enable:
-            return [t.ticker for t in self.rules.cn]
-        return list(self.llm.cn)
-
-    @model_validator(mode="after")
-    def sector_macro_refs_valid(self) -> "WatchlistFile":
-        for market in ("us", "cn"):
-            sectors_set = set(getattr(self.rules.sector_keywords, market))
-            macros_set = set(getattr(self.rules.macro_keywords, market))
-            for entry in getattr(self.rules, market):
-                bad_sectors = set(entry.sectors) - sectors_set
-                bad_macros = set(entry.macro_links) - macros_set
-                if "sector_keywords" in self.rules.model_fields_set and bad_sectors:
-                    raise ValueError(
-                        f"{market} ticker {entry.ticker}: "
-                        f"sectors {sorted(bad_sectors)} not in "
-                        f"sector_keywords.{market}"
-                    )
-                if "macro_keywords" in self.rules.model_fields_set and bad_macros:
-                    raise ValueError(
-                        f"{market} ticker {entry.ticker}: "
-                        f"macro_links {sorted(bad_macros)} not in "
-                        f"macro_keywords.{market}"
-                    )
-        return self
+        """CN ticker scope is defined by the rules watchlist."""
+        return [entry.ticker for entry in self.rules.cn]
 
 
 # --- scoring.yml / first_party.yml ---

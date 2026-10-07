@@ -33,6 +33,7 @@ async def test_insert_and_find_by_url_hash(dao):
     found = await dao.find_by_url_hash("hashA")
     assert found is not None
     assert found.title == "t"
+    assert found.title_simhash == 0
 
 
 @pytest.mark.asyncio
@@ -51,28 +52,3 @@ async def test_pending_query(dao):
     )
     items = await dao.list_pending(limit=10)
     assert len(items) == 1
-
-
-@pytest.mark.asyncio
-async def test_simhash_neighbor_lookup(dao):
-    # Use recent timestamp so the 24h window query always finds it
-    # (avoids hardcoded-date test rot once the calendar moves on).
-    from datetime import timedelta
-
-    from news_pipeline.common.timeutil import utc_now
-
-    recent_iso = (utc_now() - timedelta(hours=1)).replace(tzinfo=None).isoformat()
-    await dao.insert(
-        source="x",
-        market="us",
-        url="https://x/1",
-        url_hash="h1",
-        title="t1",
-        title_simhash=0xFFFF0000,
-        body=None,
-        raw_meta={},
-        fetched_at_iso=recent_iso,
-        published_at_iso=recent_iso,
-    )
-    candidates = await dao.list_recent_simhashes(window_hours=24)
-    assert any(s == 0xFFFF0000 for _id, s in candidates)

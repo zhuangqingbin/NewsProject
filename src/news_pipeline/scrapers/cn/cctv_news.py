@@ -14,7 +14,7 @@ import pandas as pd
 
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
-from news_pipeline.common.hashing import title_simhash, url_hash
+from news_pipeline.common.hashing import url_hash
 from news_pipeline.common.timeutil import ensure_utc, utc_now
 from news_pipeline.scrapers.common.contract import require_columns
 
@@ -63,7 +63,6 @@ class CctvNewsScraper:
                     url=link,
                     url_hash=url_hash(link),
                     title=title,
-                    title_simhash=title_simhash(title),
                     body=body or None,
                     raw_meta={"provider": "akshare_cctv", "date": date_str},
                 )

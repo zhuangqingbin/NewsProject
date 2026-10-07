@@ -83,13 +83,10 @@ nav:
     - Scrapers: components/scrapers.md
     - Deduplication: components/dedup.md
     - LLM Pipeline: components/llm-pipeline.md
-    - Classifier: components/classifier.md
     - Dispatch Router: components/dispatch-router.md
     - Pushers: components/pushers.md
-    - Charts: components/charts.md
     - Storage: components/storage.md
     - Scheduler: components/scheduler.md
-    - Bot Commands: components/commands.md
     - Observability: components/observability.md
     - Rules Engine: components/rules.md
   - Operations:
@@ -99,6 +96,7 @@ nav:
     - B0 模型验收: operations/b0-acceptance.md
     - Monitoring: operations/monitoring.md
     - Upgrading: operations/upgrading.md
+    - C1/C2 清理与发布门槛: operations/staged-cleanup.md
     - Backup: operations/backup.md
     - Troubleshooting: operations/troubleshooting.md
   - Reference:

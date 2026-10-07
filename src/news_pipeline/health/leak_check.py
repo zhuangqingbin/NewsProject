@@ -1,4 +1,4 @@
-"""Read-only comparison of upstream wires against stored URL and title hashes."""
+"""Read-only comparison of upstream wires against stored URLs."""
 
 import asyncio
 import json
@@ -25,26 +25,16 @@ async def check_articles(
         if ensure_utc(article.published_at) < ensure_utc(now) - timedelta(minutes=15)
     ]
     known = await raw_dao.existing_url_hashes([article.url_hash for article in eligible])
-    simhashes = [
-        simhash for _, simhash in await raw_dao.list_recent_simhashes(window_hours=24) if simhash
-    ]
-    mask = (1 << 64) - 1
-    present = duplicates = 0
+    present = 0
     missing: list[str] = []
     for article in eligible:
         if article.url_hash in known:
             present += 1
-        elif article.title_simhash and any(
-            ((article.title_simhash & mask) ^ (stored & mask)).bit_count() <= 4
-            for stored in simhashes
-        ):
-            duplicates += 1
         else:
             missing.append(str(article.url))
     return {
         "checked": len(eligible),
         "present": present,
-        "title_duplicates": duplicates,
         "missing": len(missing),
         "missing_urls": missing,
     }

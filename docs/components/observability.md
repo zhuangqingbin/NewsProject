@@ -11,7 +11,7 @@ docker compose logs --tail=100 app quote_watcher
 docker compose logs -f app
 ```
 
-抓取日志关注 `scrape_failed`、`scrape_done`；评估关注 `event_assess_failed`、`assess_input_truncated`；行情关注 `quote_feed_ok`、`ticker_loop_failed` 与启动探测。源码里保留的旧 Tier 日志和死信周报不代表当前 main 会运行旧链路。
+抓取日志关注 `scrape_failed`、`scrape_done`；评估关注 `event_assess_failed`、`assess_input_truncated`；行情关注 `quote_feed_ok`、`ticker_loop_failed` 与启动探测。旧 Tier 与每周死信链路已删除。
 
 ## 源健康状态机
 
@@ -34,13 +34,13 @@ docker compose exec quote_watcher python -m news_pipeline.healthcheck --subsyste
 
 healthy 不意味着所有源正常，也不代表当前新闻已经发送成功。
 
-## 系统日报与影子对比
+## 系统日报
 
 每天北京时间 08:20 向 `ops.report_channel`（默认 `feishu_cn`）发送系统卡片：逐源过去 24 小时入库/状态、候选、即时推送、去重/突发/新鲜度拦截、摘要期数/展示条数、投递失败、数据库与 WAL 大小、LLM 次数/费用/失败/规则兜底。
 
-legacy 指标读取旧处理和推送记录，旧摘要使用 `kind=legacy_digest` 的审计记录（`sent` / `legacy_failed`）。新摘要展示数使用 `event_ids`；`consumed_event_ids` 是预选消费范围，不能代替展示条数。同一期多个频道不能重复计作多个事件。
+当前日报只读取 v2 指标。历史旧处理与 legacy_digest 审计保留在库中。摘要展示数使用 `event_ids`；`consumed_event_ids` 是预选消费范围，不能代替展示条数。同一期多个频道不能重复计作多个事件。
 
-影子日报补充新旧共同、仅新路径与仅旧路径的事件列表。shadow 事件/摘要不发新闻，但系统日报和源冒烟运维卡片照常发，保留每日观察信号。日报本身也走持久投递；未收到日报时检查调度心跳与 outbox。
+新旧影子对比随旧路径删除而移除。历史 shadow 事件/摘要不会自动发送。日报本身也走持久投递；未收到日报时检查调度心跳与 outbox。
 
 ## 漏抓抽检与源冒烟
 
@@ -49,7 +49,7 @@ docker compose exec app python -m news_pipeline.health.leak_check
 docker compose exec app python -m news_pipeline.health.smoke --no-report
 ```
 
-手工 smoke 默认输出 JSON 并向 ops 频道发送卡片，数据库始终只读、不插入新闻；`--no-report` 仅输出 JSON，`--report` 是默认行为的显式别名。启动和每周日 20:00 北京时间自动冒烟经 outbox 排队卡片；包含结构错误与 checked / missing / title_duplicates。发布超过 15 分钟、不在 URL hash 中的条目，再区分旧标题去重与真丢失。失败与漏抓是不同指标，源能返回列表也可能漏新闻。
+手工 smoke 默认输出 JSON 并向 ops 频道发送卡片，数据库始终只读、不插入新闻；`--no-report` 仅输出 JSON，`--report` 是默认行为的显式别名。启动和每周日 20:00 北京时间自动冒烟经 outbox 排队卡片；包含结构错误与 checked / present / missing / missing_urls。发布超过 15 分钟仍不在 URL hash 中的条目作为漏抓候选，不再运行标题 simhash 检查。失败与漏抓是不同指标，源能返回列表也可能漏新闻。
 
 ## 相关
 

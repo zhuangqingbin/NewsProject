@@ -15,5 +15,3 @@ sources:
   # 每日一次
   cjzc_em:          {enabled: true, interval_sec: 3600,  lookback_min: 2880, max_silence_min: 7200, max_silence_off_min: 7200}
   cctv_news:        {enabled: true, interval_sec: 21600, lookback_min: 2880, max_silence_min: 1800, max_silence_off_min: 1800}
-  # 停用
-  kr36:             {enabled: false}

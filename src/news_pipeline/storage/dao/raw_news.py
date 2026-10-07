@@ -1,12 +1,11 @@
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from news_pipeline.common.contracts import RawArticle
-from news_pipeline.common.timeutil import utc_now
 from news_pipeline.storage.db import Database
 from news_pipeline.storage.models import RawNews
 from shared.common.timeutil import ensure_utc
@@ -41,7 +40,7 @@ class RawNewsDAO:
             url=str(article.url),
             url_hash=article.url_hash,
             title=article.title,
-            title_simhash=article.title_simhash,
+            title_simhash=0,
             body=article.body,
             raw_meta={**article.raw_meta, **(extra_meta or {})},
             fetched_at_iso=ensure_utc(article.fetched_at).replace(tzinfo=None).isoformat(),
@@ -80,7 +79,7 @@ class RawNewsDAO:
             url=url,
             url_hash=url_hash,
             title=title,
-            title_simhash=title_simhash,
+            title_simhash=0,
             body=body,
             raw_meta=raw_meta,
             fetched_at=datetime.fromisoformat(fetched_at_iso),
@@ -127,16 +126,3 @@ class RawNewsDAO:
             row.status = status
             row.error = error
             await s.commit()
-
-    async def list_recent_simhashes(
-        self,
-        window_hours: int = 24,
-    ) -> list[tuple[int, int]]:
-        cutoff = utc_now() - timedelta(hours=window_hours)
-        async with self._db.session() as s:
-            res = await s.execute(
-                select(RawNews.id, RawNews.title_simhash).where(
-                    RawNews.fetched_at >= cutoff.replace(tzinfo=None)
-                )
-            )
-            return [(r[0], r[1]) for r in res.all()]

@@ -1,10 +1,10 @@
 # Assessment 与模型评测
 
-保留 `llm-pipeline.md` 页面路径。新路径使用 `assess/{client,prompts,schema,assessor}.py`，每个事件一次结构化评估，摘要单独调用。旧四层 Tier-0/1/2/3、双层 rules/llm watchlist、Anthropic 路由和 YAML prompt 文件暂留兼容，当前 main 不把它们作为新默认链路。
+保留 `llm-pipeline.md` 页面路径。新路径使用 `assess/{client,prompts,schema,assessor}.py`，每个事件一次结构化评估，摘要单独调用。旧四层 Tier-0/1/2/3、双层 rules/llm watchlist、Anthropic 路由和 YAML prompt 文件已删除。
 
 ## 默认关闭与配置
 
-仓库默认 `llm.enabled: false`、`pricing: {}`。在默认 legacy 模式规则仍可抓取、即时推送和发摘要。启用新 LLM 前必须配置 API key、经过授权的模型选型，以及评估/摘要模型的实际正数 input/output 单价（人民币 / 百万 token）；缺价或零价会拒绝启动。
+仓库默认 `llm.enabled: false`、`pricing: {}`。v2 在 LLM 关闭时仍可按规则抓取、即时推送和发摘要。启用新 LLM 前必须配置 API key、经过授权的模型选型，以及评估/摘要模型的实际正数 input/output 单价（人民币 / 百万 token）；缺价或零价会拒绝启动。
 
 ```yaml
 llm:
@@ -16,7 +16,7 @@ llm:
   pricing: {}
 ```
 
-模型名是配置默认值，不是已完成 benchmark 的推荐。`llm.tier*` 和旧 `runtime.daily_cost_ceiling_cny` 不控制新调用。
+模型名是配置默认值，不是已完成 benchmark 的推荐。旧 `llm.tier*` 与 `runtime.daily_cost_ceiling_cny` 已从 schema 删除，不能带入新配置。
 
 ## 哪些事件送评估
 

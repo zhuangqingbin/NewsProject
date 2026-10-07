@@ -7,7 +7,7 @@ import httpx
 
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
-from news_pipeline.common.hashing import title_simhash, url_hash
+from news_pipeline.common.hashing import url_hash
 from news_pipeline.common.timeutil import ensure_utc, utc_now
 from news_pipeline.scrapers.common.contract import (
     SourceContractError,
@@ -166,7 +166,6 @@ class SecEdgarScraper:
                             url=link,
                             url_hash=url_hash(link),
                             title=title,
-                            title_simhash=title_simhash(title),
                             body=None,
                             raw_meta={
                                 "ticker": ticker,

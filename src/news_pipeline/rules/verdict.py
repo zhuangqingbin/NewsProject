@@ -6,7 +6,7 @@ RuleDecision = Literal["push", "digest_hi", "digest_lo", "drop"]
 
 @dataclass(frozen=True, init=False)
 class RulesVerdict:
-    """Rule decision with transitional accessors for legacy and shadow consumers."""
+    """Deterministic candidate decision and matching metadata."""
 
     decision: RuleDecision
     reason: str

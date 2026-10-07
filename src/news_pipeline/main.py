@@ -1,4 +1,4 @@
-"""Start the news pipeline with explicit rollout modes and health jobs."""
+"""Start the event pipeline and its health jobs."""
 
 from __future__ import annotations
 
@@ -49,9 +49,7 @@ def register_jobs(
     for sid in registry.list_ids():
         cfg = snap.sources.sources[sid]
         source_scraper = registry.get(sid)
-        store = ArticleStore(
-            runtime.raw, mode=runtime.mode, title_distance_max=snap.app.dedup.title_simhash_distance
-        )
+        store = ArticleStore(runtime.raw)
 
         async def scrape(
             scraper: ScraperProtocol = source_scraper,
@@ -70,14 +68,9 @@ def register_jobs(
         runner.add_interval(
             name=f"scrape_{sid}", seconds=cfg.interval_sec or 180, jitter=5, coro_factory=scrape
         )
-    if runtime.mode in {"legacy", "shadow"}:
-        runner.add_interval(name="process_pending", seconds=30, coro_factory=runtime.process_legacy)
-    if runtime.mode in {"shadow", "v2"}:
-        runner.add_interval(
-            name="cluster_events", seconds=30, coro_factory=runtime.clusterer.process
-        )
-        runner.add_interval(name="assess_events", seconds=30, coro_factory=runtime.assessor.run)
-        runner.add_interval(name="decide_events", seconds=10, coro_factory=runtime.decide_pending)
+    runner.add_interval(name="cluster_events", seconds=30, coro_factory=runtime.clusterer.process)
+    runner.add_interval(name="assess_events", seconds=30, coro_factory=runtime.assessor.run)
+    runner.add_interval(name="decide_events", seconds=10, coro_factory=runtime.decide_pending)
     runner.add_interval(name="deliver_outbox", seconds=10, coro_factory=runtime.outbox.run)
     for market in ("cn", "us"):
         for schedule in getattr(snap.app.scheduler.digest, market):
@@ -186,7 +179,7 @@ async def _amain() -> None:
         await initialize_scrapers(registry, snap, heartbeat)
         if once:
             state = SourceStateDAO(db)
-            store = ArticleStore(runtime.raw, mode=runtime.mode)
+            store = ArticleStore(runtime.raw)
             for sid in registry.list_ids():
                 await scrape_one_source(
                     scraper=registry.get(sid),
@@ -195,10 +188,7 @@ async def _amain() -> None:
                     cfg=snap.sources.sources[sid],
                     bark=bark,
                 )
-            if runtime.mode in {"legacy", "shadow"}:
-                await runtime.process_legacy()
-            if runtime.mode in {"shadow", "v2"}:
-                await runtime.process_v2()
+            await runtime.process_v2()
             await runtime.outbox.run()
             return
         runner = register_jobs(runtime, registry, snap, heartbeat, db_path, bark)

@@ -3,38 +3,32 @@ from datetime import UTC, datetime
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
 from news_pipeline.config.schema import (
-    MarketKeywords,
     RulesSection,
     TickerEntry,
 )
-from news_pipeline.rules.engine import RulesEngine, _compute_boost
+from news_pipeline.rules.engine import RulesEngine
 from news_pipeline.rules.matcher import AhoCorasickMatcher
 
 
 def _section():
     return RulesSection(
-        enable=True,
         us=[
             TickerEntry(
                 ticker="NVDA",
                 name="NVIDIA",
                 aliases=["英伟达"],
                 sectors=["semiconductor"],
-                macro_links=["FOMC"],
             )
         ],
+        short_alias_allow=["茅台"],
         cn=[
             TickerEntry(
                 ticker="600519",
                 name="贵州茅台",
                 aliases=["茅台"],
                 sectors=["白酒"],
-                macro_links=["央行"],
             )
         ],
-        keyword_list=MarketKeywords(us=["powell"], cn=[]),
-        macro_keywords=MarketKeywords(us=["FOMC"], cn=["央行"]),
-        sector_keywords=MarketKeywords(us=["semiconductor"], cn=["白酒"]),
     )
 
 
@@ -86,7 +80,7 @@ def test_sector_does_not_associate_ticker():
     e = RulesEngine(_section(), AhoCorasickMatcher())
     v = e.match(_article("Semiconductor industry rebounds"))
     assert v.matched is True
-    assert v.sectors == ["semiconductor"]
+    assert "semiconductor" in v.generic_hits
     assert v.related_tickers == []
     assert v.tickers == []
 
@@ -111,15 +105,3 @@ def test_multi_market_match():
     e = RulesEngine(_section(), AhoCorasickMatcher())
     v = e.match(_article("FOMC加息影响A股茅台"))
     assert v.markets == ["cn"]
-
-
-def test_score_boost_ticker():
-    assert _compute_boost({"NVDA"}, set(), set()) == 50.0
-
-
-def test_score_boost_combo():
-    assert _compute_boost({"NVDA"}, {"semiconductor"}, {"fomc"}) == 85.0
-
-
-def test_score_boost_capped_at_100():
-    assert _compute_boost({"A"}, {"B"}, {"C"}) <= 100.0

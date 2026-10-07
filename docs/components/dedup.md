@@ -1,6 +1,6 @@
 # Events 与去重
 
-保留 `dedup.md` 页面路径供旧链接使用。新版核心在 `ingest/store.py`、`events/similarity.py`、`events/clusterer.py` 和 `events/sent_cache.py`；旧 `dedup/` 模块暂留兼容，删除等待 v2 稳定一周。
+保留 `dedup.md` 页面路径供旧链接使用。新版核心在 `ingest/store.py`、`events/similarity.py`、`events/clusterer.py` ；旧 `dedup/` 与 legacy 发送特征缓存已删除。
 
 ## 第一层：URL Hash 精确匹配
 
@@ -18,15 +18,9 @@ URL hash 是原始新闻的唯一键。相同 URL 不重复写入；不同媒体
 
 模型 `novelty=repeat` 只有引用同标的最近 24 小时、最多 8 个有效事件 id 才成立；未知引用被清理。有效 repeat 可把文章重归到已有事件，不再独立推送。
 
-## legacy / shadow / v2
+## 历史兼容
 
-| 模式 | 原始状态与去重 |
-|---|---|
-| legacy | URL 唯一；标题 simhash 重复仍入库标记；近期已推送事件特征防重复推送 |
-| shadow | legacy 使用 `status`；新事件使用 `v2_state`，也处理不同 URL 的重复证据 |
-| v2 | 标题 simhash 写 0；保留全部不同 URL 证据，由事件层合并 |
-
-旧推送特征缓存从 `push_log`、`news_processed`、`raw_news` 重建，重启后继续去重。迁移前历史原始行标 `v2_state='legacy'`，防止启动时回放历史消息。
+新原文入库统一写 title_simhash=0，不重写旧值。旧处理表和 status 保留；迁移前原文标 v2_state=legacy，避免补推。历史 shadow 记录不被转换成待发送项。
 
 ## 相关
 

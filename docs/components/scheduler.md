@@ -6,13 +6,12 @@
 
 | 任务 | 频率 | 模式 |
 |---|---|---|
-| `scrape_<source>` | 每源 `interval_sec`，带 jitter | 所有模式 |
-| `process_pending` | 30 秒 | legacy / shadow |
-| `cluster_events`、`assess_events` | 各 30 秒 | shadow / v2 |
-| `decide_events` | 10 秒 | shadow / v2 |
-| `deliver_outbox` | 10 秒，单 worker | 所有模式；shadow 新闻不实际发送 |
-| `source_health` | 300 秒 | 所有模式 |
-| `heartbeat` | 60 秒 | 所有模式 |
+| `scrape_<source>` | 每源 `interval_sec`，带 jitter | v2 |
+| `cluster_events`、`assess_events` | 各 30 秒 | v2 |
+| `decide_events` | 10 秒 | v2 |
+| `deliver_outbox` | 10 秒，单 worker | v2；历史 shadow 项不发 |
+| `source_health` | 300 秒 | v2 |
+| `heartbeat` | 60 秒 | v2 |
 
 同一 job 不重入不等于不同 job 不并发。聚类、评估、决策和投递要依靠版本检查与事务保持一致，不能依赖调度顺序。
 
@@ -40,13 +39,13 @@ scheduler:
 
 ## Digest Key 选择逻辑
 
-legacy 入队只存市场 `cn/us`，读取时兼容旧 `morning_cn` 等键。v2 的 `digest_slot` 包含市场、计划时刻和该市场本地日期，作为频道幂等键的一部分；所有频道同事务入队，成功消费独立于触发时刻。
+当前 `digest_slot` 包含市场、计划时刻和该市场本地日期，作为频道幂等键的一部分；所有频道同事务入队，成功消费独立于触发时刻。
 
-`NEWS_PIPELINE_ONCE=1` 是一次性抓取/处理入口，会按模式处理并运行一次 outbox。它可能发送消息，不是 smoke --no-report 或 rules replay 的替代。
+`NEWS_PIPELINE_ONCE=1` 是一次性抓取/处理入口，会处理 v2 并运行一次 outbox。它可能发送消息，不是 smoke --no-report 或 rules replay 的替代。
 
 ## 配置修改与旧任务
 
-每源抓取间隔来自 `sources.yml`。旧 `scheduler.scrape.*`、`scheduler.llm` 与新闻 hot_reload 字段保留兼容，不控制新入口；改配置后重启 `app`。旧命令服务器、图表、死信周报和多层 LLM 任务不由当前主进程启动。
+每源抓取间隔来自 `sources.yml`。旧 `scheduler.scrape.*`、`scheduler.llm` 与新闻 hot_reload 字段已删除；改配置后重启 `app`。旧命令服务器、图表、死信周报与多层 LLM 任务已删除。
 
 ## 相关
 

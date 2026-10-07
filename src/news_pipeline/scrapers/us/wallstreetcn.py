@@ -6,7 +6,7 @@ from typing import Any
 
 from news_pipeline.common.contracts import RawArticle
 from news_pipeline.common.enums import Market
-from news_pipeline.common.hashing import title_simhash, url_hash
+from news_pipeline.common.hashing import url_hash
 from news_pipeline.common.timeutil import utc_now
 from news_pipeline.scrapers.common.contract import (
     require_json_list,
@@ -69,7 +69,6 @@ class WallStreetCnScraper:
                     url=link,
                     url_hash=url_hash(link),
                     title=title,
-                    title_simhash=title_simhash(title),
                     body=body or None,
                     raw_meta={"wscn_id": wscn_id, "score": score, "channels": channels},
                 )

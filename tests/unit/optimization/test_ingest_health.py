@@ -31,18 +31,18 @@ async def test_store_keeps_duplicate_evidence_and_batches_urls(db):
     raw = RawNewsDAO(db)
     store = ArticleStore(raw)
     assert await store.save([article(1), article(1)], status="pending") == 1
-    assert await store.save([article(1), article(2)], status="pending") == 0
+    assert await store.save([article(1), article(2)], status="pending") == 1
     async with db.session() as session:
         rows = (await session.execute(select(RawNews).order_by(RawNews.id))).scalars().all()
     assert len(rows) == 2
-    assert rows[1].status == "duplicate"
-    assert rows[1].raw_meta["dup_of"] == rows[0].id
+    assert rows[1].status == "pending"
+    assert rows[1].raw_meta == {}
     assert await raw.existing_url_hashes([str(n) for n in range(1200)]) == {"1", "2"}
 
 
 async def test_seeded_and_v2_articles_have_independent_state(db):
     raw = RawNewsDAO(db)
-    store = ArticleStore(raw, mode="v2")
+    store = ArticleStore(raw)
     await store.save([article(1)], status="seeded")
     await store.save([article(2), article(3)], status="pending")
     assert [r.url_hash for r in await raw.list_v2_pending()] == ["2", "3"]
@@ -92,11 +92,3 @@ async def test_empty_source_stays_down_without_false_recovery(db):
     await dao.record_success("empty", new_items=0, now=now + timedelta(minutes=95))
     assert await check_source_health(dao, {"empty": cfg}, now=now + timedelta(minutes=96)) == 0
     assert (await dao.get("empty")).health == "down"
-
-
-async def test_signed_simhash_distance_is_64_bits(db):
-    raw = RawNewsDAO(db)
-    store = ArticleStore(raw)
-    await store.save([article(1, simhash=-2)])
-    assert await store.save([article(2, simhash=1)]) == 1
-    assert (await raw.get(2)).status == "pending"

@@ -1,6 +1,6 @@
 # config/quote_watcher — 盯盘配置
 
-盯盘为独立 A 股子系统，使用 `data/quotes.db` 和 `_alert` 新闻之外的飞书频道。新闻的 legacy/shadow/v2 开关不改变盯盘告警。
+盯盘为独立 A 股子系统，使用 `data/quotes.db` 和 `_alert` 新闻之外的飞书频道。新闻清理分支仅支持 v2；它不改变盯盘告警。
 
 ## quote_watchlist.yml
 

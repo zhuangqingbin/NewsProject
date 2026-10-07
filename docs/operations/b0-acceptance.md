@@ -1,6 +1,6 @@
 # B0 样本审核与模型验收
 
-B0 必须使用真实三周新闻、150 条人工审核事件及独立的 30 条留出集。仓库里的八条 `seed_unreviewed` 只用于回归，不是已审核样本。当前默认仍是 `legacy`、LLM 关闭；完成以下准备不会切换生产模式。
+B0 必须使用真实三周新闻、150 条人工审核事件及独立的 30 条留出集。仓库里的八条 `seed_unreviewed` 只用于回归，不是已审核样本。生产灰度使用保留的 v0.7.0 legacy/shadow；本 v0.7.1 清理分支仅支持 v2，LLM 默认关闭。完成以下准备不会切换生产模式。
 
 2026-10-07 已只读提取 9/14–10/6 的 60,832 条真实原始新闻，并准备好包含八类案例、50/50/30/20 分层的 150 条待审核 CSV。本地文件位于工作区 `data/b0/2026-09-14_2026-10-06/review-150.csv`，不提交原始新闻到 Git。150 条目前全部是 `unreviewed`；具体来源、哈希、选择方法与验证见[本轮记录](../superpowers/reviews/2026-10-07-rollout-hardening-verification.md)。
 
@@ -60,4 +60,4 @@ uv run python -m news_pipeline.tools.replay \
 
 只有完整已审核数据集上的 30 条 holdout 的 LLM 报告可取得验收结果。五项门槛必须同时满足：push precision ≥ 0.70、must-push recall ≥ 0.90、错 ticker 比例 ≤ 0.02、JSON 合法率 ≥ 0.99、P95 延迟 ≤ 8000 ms。结果为 `pass`、`fail` 或 `not_eligible`，每项显示实际值与门槛；规则基线和训练集不会被标为模型验收通过。
 
-通过 B0 后，仍需部署 IP 的上游检查、交易时段行情单位核对及 2–3 个交易日 shadow。C1/C2 删除等一周 v2 稳定后执行，D 扩源等两周稳定及明确选择后执行，见[部署指南](../getting-started/deployment-current.md)与[清理清单](staged-cleanup.md)。
+通过 B0 后，仍需部署 IP 的上游检查、交易时段行情单位核对及 2–3 个交易日 shadow。已开发的 C1/C2 清理候选等一周 v2 稳定后发布，D 扩源等两周稳定及明确选择后执行，见[部署指南](../getting-started/deployment-current.md)与[清理清单](staged-cleanup.md)。

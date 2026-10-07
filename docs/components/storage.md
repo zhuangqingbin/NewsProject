@@ -18,13 +18,13 @@
 
 ## legacy 表与图谱预留
 
-legacy/shadow 旧路径仍写 `news_processed`、`digest_buffer`、`push_log`；v2 停止写入这些表，历史数据只读保留。`entities`、`news_entities`、`relations`、`audit_log`、`dead_letter` 保留表结构，不作为新管线的知识图谱或死信方案。删除旧 DAO 要等 [C1/C2 稳定门槛](../operations/staged-cleanup.md)，不是本次数据库删表。
+`news_processed`、`digest_buffer`、`push_log` 已停止写入，历史数据只读保留。`entities`、`news_entities`、`relations`、`audit_log`、`dead_letter` 保留表结构，不作为新管线的知识图谱或死信方案。旧写入 DAO 已删除；本分支没有删表或破坏性迁移。生产发布仍须通过 [C1/C2 稳定门槛](../operations/staged-cleanup.md)。
 
 ## 索引与 FTS5 全文搜索
 
 原始 URL 唯一键支持抓取幂等。0005 为 `v2_state IS NULL` 建待处理索引，并为事件决策、投递状态/重试时间和 LLM 费用时间建索引。迁移删除旧 `news_fts` 及其触发器，建立 `events_fts`，通过事件插入、更新、删除触发器维护标题和摘要搜索。
 
-迁移前原始行初始化为 `v2_state='legacy'`；新 shadow/v2 处理只消费其自己的状态列。旧 `title_simhash` 列保留，v2 入库写 0。
+迁移前原始行初始化为 `v2_state='legacy'`；v2 处理只消费自己的状态列。旧 `title_simhash` 列保留，v2 入库写 0。
 
 ## 数据保留策略
 
@@ -38,7 +38,7 @@ legacy/shadow 旧路径仍写 `news_processed`、`digest_buffer`、`push_log`；
 | `deliveries` | 365 天；`shadow` 30 天 |
 | `llm_calls` | 180 天 |
 
-每月 1 日 04:30 在事务之外执行 VACUUM。执行前核对空闲磁盘足以容纳临时数据库。旧 `retention.*_hot_days` 不控制这张新任务表，不能用修改旧字段推断实际保留时间。
+每月 1 日 04:30 在事务之外执行 VACUUM。执行前核对空闲磁盘足以容纳临时数据库。旧 `retention.*_hot_days` 配置已删除；上述保留策略由当前任务实现。
 
 ## 备份与 Datasette
 

@@ -9,34 +9,21 @@ from sqlmodel import col
 
 from news_pipeline.assess.assessor import EventAssessor
 from news_pipeline.assess.client import ChatClient
-from news_pipeline.classifier.importance import ImportanceClassifier
-from news_pipeline.classifier.llm_judge import LLMJudge
-from news_pipeline.classifier.rules import RuleEngine
 from news_pipeline.config.loader import ConfigSnapshot
-from news_pipeline.config.schema import ClassifierRulesCfg
 from news_pipeline.deliver.cards import build_event_card
 from news_pipeline.deliver.digest import DigestBuilder
 from news_pipeline.deliver.outbox import Outbox
 from news_pipeline.deliver.policy import decide, markets_for_event
 from news_pipeline.events.clusterer import EventClusterer
-from news_pipeline.events.sent_cache import SentEventCache
 from news_pipeline.health.ops_report import build_ops_report
-from news_pipeline.llm.clients.dashscope import DashScopeClient
-from news_pipeline.router.routes import DispatchRouter
 from news_pipeline.rules.engine import RulesEngine
-from news_pipeline.scheduler.jobs import process_pending, run_legacy_digest
 from news_pipeline.storage.dao.deliveries import DeliveryDAO
-from news_pipeline.storage.dao.digest_buffer import DigestBufferDAO
 from news_pipeline.storage.dao.events import EventsDAO
-from news_pipeline.storage.dao.news_processed import NewsProcessedDAO
-from news_pipeline.storage.dao.push_log import PushLogDAO
 from news_pipeline.storage.dao.raw_news import RawNewsDAO
 from news_pipeline.storage.db import Database
 from news_pipeline.storage.models import Delivery, Event
 from shared.common.timeutil import utc_now
 from shared.observability.alert import BarkAlerter
-from shared.push.common.burst import BurstSuppressor
-from shared.push.common.message_builder import MessageBuilder
 from shared.push.dispatcher import PusherDispatcher
 
 
@@ -51,7 +38,6 @@ class PipelineRuntime:
         self.db = db
         self.snap = snap
         self.dispatcher = dispatcher
-        self.mode = snap.app.pipeline.mode
         self.raw = RawNewsDAO(db)
         self.events = EventsDAO(db)
         self.deliveries = DeliveryDAO(db)
@@ -71,11 +57,7 @@ class PipelineRuntime:
         self.assessor = EventAssessor(
             self.events, self.client, snap.app.llm, snap.watchlist, bark=bark
         )
-        self.outbox = Outbox(
-            self.deliveries,
-            dispatcher,
-            allowed_kinds=("ops",) if self.mode in {"legacy", "shadow"} else None,
-        )
+        self.outbox = Outbox(self.deliveries, dispatcher)
         self.digest_builder = DigestBuilder(self.events, snap.app.digest, self.assessor)
         self.ticker_market = {
             entry.ticker: market
@@ -90,63 +72,6 @@ class PipelineRuntime:
             ]
             for market in ("cn", "us")
         }
-        self.proc = NewsProcessedDAO(db)
-        self.push_log = PushLogDAO(db)
-        self.digest_buffer = DigestBufferDAO(db)
-        self.router = DispatchRouter(channels_by_market=self.channels)
-        self.message_builder = MessageBuilder(
-            source_labels={
-                "cls_telegraph": "财联社",
-                "em_stock_news": "东财个股",
-                "juchao": "巨潮公告",
-                "sec_edgar": "SEC",
-                "sina_global": "新浪",
-                "futu_global": "富途",
-                "eastmoney_global": "东财",
-                "ths_global": "同花顺",
-                "wallstreetcn": "华尔街见闻",
-            }
-        )
-        self.burst = BurstSuppressor(
-            window_seconds=snap.app.push.same_ticker_burst_window_min * 60,
-            threshold=snap.app.push.same_ticker_burst_threshold,
-        )
-        self.sent = SentEventCache(
-            db, rules=self.rules, window_hours=snap.app.push.dedup_window_hours
-        )
-        self._sent_initialized = False
-        self.importance = ImportanceClassifier(
-            rules=RuleEngine(snap.app.classifier.rules or ClassifierRulesCfg()),
-            judge=LLMJudge(client=DashScopeClient(api_key=""), model=snap.app.llm.tier1_model),
-            gray_zone=tuple(snap.app.classifier.llm_fallback_when_score),  # type: ignore[arg-type]
-            watchlist_tickers=list(self.ticker_market),
-            llm_enabled=False,
-        )
-
-    async def process_legacy(self) -> int:
-        if not self._sent_initialized:
-            await self.sent.rebuild()
-            self._sent_initialized = True
-        return await process_pending(
-            raw_dao=self.raw,
-            llm=None,
-            importance=self.importance,
-            proc_dao=self.proc,
-            msg_builder=self.message_builder,
-            router=self.router,
-            dispatcher=self.dispatcher,
-            push_log=self.push_log,
-            digest_dao=self.digest_buffer,
-            burst=self.burst,
-            rules_enabled=True,
-            llm_enabled=False,
-            rules_engine=self.rules,
-            push_cfg=self.snap.app.push,
-            sent_cache=self.sent,
-            batch_size=200,
-            announcement_window_min=self.snap.first_party.juchao.merge_window_min,
-            announcement_max_items=self.snap.first_party.juchao.merge_max_items,
-        )
 
     async def process_v2(self) -> int:
         count = await self.clusterer.process()
@@ -193,7 +118,7 @@ class PipelineRuntime:
                         .where(
                             col(Delivery.kind) == "immediate",
                             col(Delivery.created_at) >= cutoff,
-                            col(Delivery.status).in_(["sent", "pending", "shadow"]),
+                            col(Delivery.status).in_(["sent", "pending"]),
                         )
                         .distinct()
                     )
@@ -222,7 +147,6 @@ class PipelineRuntime:
                                 channel=channel,
                                 market=self.snap.channels.channels[channel].market,
                                 payload=msg.model_dump(mode="json"),
-                                status="shadow" if self.mode == "shadow" else "pending",
                             ),
                         )
                 await session.commit()
@@ -230,22 +154,6 @@ class PipelineRuntime:
         return count
 
     async def digest(self, market: str, slot: str) -> None:
-        if self.mode in {"legacy", "shadow"}:
-            await run_legacy_digest(
-                market=market,
-                channels=self.channels[market],
-                digest_dao=self.digest_buffer,
-                proc_dao=self.proc,
-                raw_dao=self.raw,
-                msg_builder=self.message_builder,
-                dispatcher=self.dispatcher,
-                cfg=self.snap.app.digest,
-                rules_engine=self.rules,
-                deliveries=self.deliveries,
-                slot=slot,
-            )
-        if self.mode == "legacy":
-            return
         # Terminal failures release their reservation for a later digest slot.
         async with self.db.session() as session:
             failed = (
@@ -280,13 +188,12 @@ class PipelineRuntime:
                         digest_slot=slot,
                         event_ids=displayed,
                         consumed_event_ids=consumed,
-                        status="shadow" if self.mode == "shadow" else "pending",
                     ),
                 )
             await session.commit()
 
     async def ops_report(self, db_path: Path) -> None:
-        msg = await build_ops_report(self.db, db_path=db_path, mode=self.mode)
+        msg = await build_ops_report(self.db, db_path=db_path, mode=self.snap.app.pipeline.mode)
         channel = self.snap.app.ops.report_channel
         if (
             channel not in self.snap.channels.channels
@@ -294,7 +201,6 @@ class PipelineRuntime:
         ):
             return
         date = utc_now().astimezone(ZoneInfo("Asia/Shanghai")).date().isoformat()
-        # Infrastructure reports remain live during shadow observation.
         await self.deliveries.enqueue(
             Delivery(
                 kind="ops",

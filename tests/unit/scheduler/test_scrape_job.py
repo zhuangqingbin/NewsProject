@@ -22,36 +22,32 @@ def _art() -> RawArticle:
 
 
 @pytest.mark.asyncio
-async def test_scrape_dedup_writes_pending():
+async def test_scrape_seeds_first_fetch_and_records_success():
     scraper = MagicMock()
     scraper.source_id = "finnhub"
     scraper.market = Market.US
     scraper.fetch = AsyncMock(return_value=[_art()])
 
-    dedup = MagicMock()
-    dedup.check_and_register = AsyncMock(
-        return_value=MagicMock(
-            is_new=True,
-            raw_id=42,
-            reason=None,
-        )
-    )
+    store = MagicMock(saved_count=1)
+    store.save = AsyncMock(return_value=1)
     state_dao = MagicMock()
     state_dao.get = AsyncMock(return_value=None)
     state_dao.is_paused = AsyncMock(return_value=False)
     state_dao.update_watermark = AsyncMock()
-    state_dao.record_error = AsyncMock()
+    state_dao.record_failure = AsyncMock()
+    state_dao.record_success = AsyncMock()
     metrics = MagicMock()
     metrics.increment = AsyncMock()
 
     n_new = await scrape_one_source(
         scraper=scraper,
-        dedup=dedup,
+        store=store,
         state_dao=state_dao,
         metrics=metrics,
     )
     assert n_new == 1
-    state_dao.update_watermark.assert_awaited_once()
+    state_dao.record_success.assert_awaited_once_with("finnhub", new_items=1)
+    store.save.assert_awaited_once_with([_art()], status="seeded")
 
 
 @pytest.mark.asyncio
@@ -60,12 +56,12 @@ async def test_scrape_skips_when_paused():
     scraper.source_id = "x"
     scraper.market = Market.US
     scraper.fetch = AsyncMock()
-    dedup = MagicMock()
+    store = MagicMock()
     state_dao = MagicMock()
     state_dao.is_paused = AsyncMock(return_value=True)
     metrics = MagicMock()
     metrics.increment = AsyncMock()
-    n = await scrape_one_source(scraper=scraper, dedup=dedup, state_dao=state_dao, metrics=metrics)
+    n = await scrape_one_source(scraper=scraper, store=store, state_dao=state_dao, metrics=metrics)
     assert n == 0
     scraper.fetch.assert_not_awaited()
 
@@ -79,7 +75,8 @@ def _make_state_dao() -> MagicMock:
     dao = MagicMock()
     dao.get = AsyncMock(return_value=None)
     dao.is_paused = AsyncMock(return_value=False)
-    dao.record_error = AsyncMock()
+    dao.record_failure = AsyncMock()
+    dao.record_success = AsyncMock()
     dao.set_paused = AsyncMock()
     dao.update_watermark = AsyncMock()
     return dao
@@ -106,13 +103,13 @@ async def test_transient_timeout_no_bark():
 
     n = await scrape_one_source(
         scraper=scraper,
-        dedup=MagicMock(),
+        store=MagicMock(),
         state_dao=state_dao,
         metrics=metrics,
         bark=bark,
     )
     assert n == 0
-    state_dao.record_error.assert_awaited_once()
+    state_dao.record_failure.assert_awaited_once()
     bark.send.assert_not_awaited()  # transient — no alert
 
 
@@ -120,7 +117,7 @@ async def test_transient_timeout_no_bark():
 async def test_transient_http5xx_no_bark():
     """httpx.HTTPStatusError with status 500 → transient, no Bark."""
     scraper = MagicMock()
-    scraper.source_id = "xueqiu"
+    scraper.source_id = "cls_telegraph"
 
     # Build a minimal HTTPStatusError with status 503
     req = httpx.Request("GET", "https://example.com")
@@ -137,21 +134,21 @@ async def test_transient_http5xx_no_bark():
 
     n = await scrape_one_source(
         scraper=scraper,
-        dedup=MagicMock(),
+        store=MagicMock(),
         state_dao=state_dao,
         metrics=metrics,
         bark=bark,
     )
     assert n == 0
-    state_dao.record_error.assert_awaited_once()
+    state_dao.record_failure.assert_awaited_once()
     bark.send.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_structural_keyerror_triggers_bark_urgent():
+async def test_structural_keyerror_records_health_failure():
     """KeyError → categorized as structural, Bark urgent called."""
     scraper = MagicMock()
-    scraper.source_id = "akshare_news"
+    scraper.source_id = "em_stock_news"
     scraper.fetch = AsyncMock(side_effect=KeyError("missing field"))
 
     bark = MagicMock()
@@ -162,28 +159,22 @@ async def test_structural_keyerror_triggers_bark_urgent():
 
     n = await scrape_one_source(
         scraper=scraper,
-        dedup=MagicMock(),
+        store=MagicMock(),
         state_dao=state_dao,
         metrics=metrics,
         bark=bark,
     )
     assert n == 0
-    state_dao.record_error.assert_awaited_once()
-    bark.send.assert_awaited_once()
-    # Verify the alert level is URGENT
-    call_kwargs = bark.send.call_args
-    from shared.observability.alert import AlertLevel
-
-    assert call_kwargs.kwargs.get("level") == AlertLevel.URGENT or (
-        len(call_kwargs.args) >= 3 and call_kwargs.args[2] == AlertLevel.URGENT
-    )
+    state_dao.record_failure.assert_awaited_once()
+    assert state_dao.record_failure.call_args.kwargs["structural"] is True
+    bark.send.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_structural_no_bark_when_bark_none():
     """Structural error with bark=None → no crash, record_error still called."""
     scraper = MagicMock()
-    scraper.source_id = "ths"
+    scraper.source_id = "ths_global"
     scraper.fetch = AsyncMock(side_effect=ValueError("unexpected format"))
 
     state_dao = _make_state_dao()
@@ -191,10 +182,10 @@ async def test_structural_no_bark_when_bark_none():
 
     n = await scrape_one_source(
         scraper=scraper,
-        dedup=MagicMock(),
+        store=MagicMock(),
         state_dao=state_dao,
         metrics=metrics,
         bark=None,
     )
     assert n == 0
-    state_dao.record_error.assert_awaited_once()
+    state_dao.record_failure.assert_awaited_once()

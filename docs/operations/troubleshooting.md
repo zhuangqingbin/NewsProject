@@ -10,11 +10,11 @@
 
 ## 没收到新闻或摘要
 
-核对 pipeline.mode、规则候选、静默/新鲜度/突发降级、市场频道及密钥。shadow 新事件/摘要设计上不发送，旧路径仍发；运维卡片仍发。v2 检查 delivery pending/failed/expired、attempts 与 next_attempt_at，摘要只有全部频道成功才消费。
+核对 pipeline.mode、规则候选、静默/新鲜度/突发降级、市场频道及密钥。本分支仅支持 v2，历史 shadow 项不会自动发送。检查 delivery pending/failed/expired、attempts 与 next_attempt_at，摘要只有全部频道成功才消费。
 
 ## LLM 不调用
 
-默认 enabled=false。核对当前模式、候选资格、实际模型正数定价、供应商 key、日预算与熔断。旧 llm.tier* 或 watchlist.llm.enable 不控制新评估器。评估失败使用规则兜底，不代表消息必定被丢弃。
+默认 enabled=false。核对当前模式、候选资格、实际模型正数定价、供应商 key、日预算与熔断。旧 llm.tier* 与 watchlist.llm.enable 已删除。评估失败使用规则兜底，不代表消息必定被丢弃。
 
 ## SEC / 飞书配置失败
 

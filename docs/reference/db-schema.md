@@ -4,7 +4,7 @@
 
 ## raw_news
 
-原始新闻保留 source、market、url/url_hash、title/body/raw_meta、published_at/fetched_at。URL hash 唯一。旧 status 供 legacy 使用，新 v2_state 供 shadow/v2 使用；迁移前历史行置 legacy，避免补推。v2 停止标题 simhash 判重并写 0，旧列保留。
+原始新闻保留 source、market、url/url_hash、title/body/raw_meta、published_at/fetched_at。URL hash 唯一。旧 status 保留历史，新 v2_state 驱动事件处理；迁移前历史行置 legacy，避免补推。v2 停止标题 simhash 判重并写 0，旧列保留。
 
 ## source_state
 
@@ -20,7 +20,7 @@ event_articles 使用 event_id/raw_id 关联，raw_id 唯一。追加证据的 a
 
 kind、event_id、market、channel、payload、status、attempts、attempt_timestamps、next_attempt_at、last_error、created_at/sent_at、digest_slot、event_ids、consumed_event_ids。事件投递 `(kind,event_id,channel)` 唯一，期次投递 `(kind,digest_slot,channel)` 唯一。
 
-pending/sent/failed/expired/shadow 区分真实发送状态。legacy_digest 审计另有 legacy_failed，不由新 worker 重试。展示 ids 与候选消费 ids 分开；摘要全部频道成功后消费与成功记录同事务提交。
+pending/sent/failed/expired/shadow/superseded 区分发送状态。shadow 与 legacy_digest/legacy_failed 是保留历史，不由当前 worker 发送。superseded 表示同事件已被旧路径成功发到该频道，不计作 v2 成功。展示 ids 与候选消费 ids 分开；摘要全部频道成功后消费与成功记录同事务提交。
 
 ## llm_calls 与 daily_metrics
 
@@ -28,7 +28,7 @@ llm_calls 逐尝试记录 purpose、event_id、模型、prompt 版本、token、
 
 ## 历史表与 FTS
 
-news_processed、digest_buffer、push_log 在 legacy/shadow 保留写入，v2 冻结为历史。entities/news_entities/relations/audit_log/dead_letter 保留表结构，旧 DAO 删除等待一周稳定门槛。0005 删除 news_fts 与旧触发器，events_fts 用触发器维护 headline/summary。
+news_processed、digest_buffer、push_log 冻结为历史。entities/news_entities/relations/audit_log/dead_letter 保留表结构，旧写入 DAO 已删除，模型和迁移保留。0005 删除 news_fts 与旧触发器，events_fts 用触发器维护 headline/summary。
 
 ## 保留与查询
 

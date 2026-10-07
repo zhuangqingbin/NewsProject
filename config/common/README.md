@@ -1,6 +1,6 @@
 # config/common — 共用配置
 
-两个子系统读取此目录。默认 `pipeline.mode: legacy`、`llm.enabled: false`；配置加载不等于线上验收完成。新闻改配置后重启 `app`，不使用旧新闻 watchdog 热加载。
+两个子系统读取此目录。本清理版本仅支持 `pipeline.mode: v2`，默认 `llm.enabled: false`；配置加载不等于线上验收完成。新闻改配置后重启 `app`，不使用旧新闻 watchdog 热加载。
 
 ## secrets.yml
 
@@ -21,18 +21,18 @@ chmod 600 config/common/secrets.yml
 | `sources.finnhub_token` | 启用 Finnhub 时需要 |
 | `alert.bark_url` | 源失效/恢复、模型控制和行情告警 |
 
-只启用已经填好密钥的源与频道。旧 flat push、Anthropic key 和 cookie 字段暂留兼容，不是新默认依赖。真实密钥不得提交或写入日志。
+只启用已经填好密钥的源与频道。flat push 密钥查找仍兼容旧布局；Anthropic 与 cookie 已无当前调用方，可从自己的密钥文件移除。真实密钥不得提交或写入日志。
 
 ## app.yml
 
 | 字段 | 默认 / 含义 |
 |---|---|
-| `pipeline.mode` | legacy / shadow / v2，默认 legacy |
+| `pipeline.mode` | 仅 v2（默认）；拒绝 legacy/shadow |
 | `llm.enabled` | false；新评估与归纳摘要的总开关 |
 | `llm.assess` / `llm.digest` | 模型、max_tokens、prompt_version；默认 qwen-plus 不是选型结论 |
 | `llm.pricing.<model>.input / output` | 人民币 / 百万 token；开启时两个实际模型都必须有正数单价 |
 | `llm.daily_cost_ceiling_cny` | 5.0；评估和摘要共享的持久日预算 |
-| `push.max_age_min` / `dedup_window_hours` | 90 分钟新鲜度、6 小时近期推送去重 |
+| `push.max_age_min` | 90 分钟新鲜度 |
 | `push.same_ticker_burst_window_min / threshold` | 5 分钟 / 3 次；主体键突发降级 |
 | `push.push_min_materiality / push_min_materiality_macro` | 公司 4、宏观/行业 5 |
 | `push.digest_min_materiality / min_confidence` | 3 / 0.5 |
@@ -44,7 +44,7 @@ chmod 600 config/common/secrets.yml
 
 先保留 `enabled: false, pricing: {}`。获授权完成模型评测、从真实控制台核对并填入两个模型的正数单价后，才开启 LLM；缺价、零价和负价会拒绝启动。不提供伪装成实际报价的示例单价。
 
-旧 `runtime.hot_reload`、`runtime.daily_cost_ceiling_cny`、`scheduler.scrape.*`、`scheduler.llm`、`llm.tier*`/旧 prompt/cache/batch、classifier/charts、旧 push rate 和 retention 字段为迁移兼容，不能据此推断新入口行为。新保留任务使用 60/365/30/180 天规则，见存储文档。删除这些字段等待 v2 稳定一周。
+旧 `runtime.hot_reload`、`runtime.daily_cost_ceiling_cny`、`scheduler.scrape.*`、`scheduler.llm`、`llm.tier*`/旧 prompt/cache/batch、classifier/charts、旧 push rate 和 retention 字段已从 schema 删除，不能带入新配置。新保留任务使用 60/365/30/180 天规则，见存储文档。生产发布本清理版本仍等待 v2 稳定一周。
 
 ## channels.yml
 

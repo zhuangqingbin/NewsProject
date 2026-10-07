@@ -6,26 +6,19 @@ from news_pipeline.config.schema import (
     SourcesFile,
     WatchlistFile,
 )
-from news_pipeline.scrapers.cn.akshare_news import AkshareNewsScraper
-from news_pipeline.scrapers.cn.caixin_telegram import CaixinTelegramScraper
 from news_pipeline.scrapers.cn.cctv_news import CctvNewsScraper
 from news_pipeline.scrapers.cn.cjzc_em import CjzcEmScraper
 from news_pipeline.scrapers.cn.cls_telegraph import ClsTelegraphScraper
 from news_pipeline.scrapers.cn.eastmoney_global import EastmoneyGlobalScraper
 from news_pipeline.scrapers.cn.em_stock_news import EmStockNewsScraper
 from news_pipeline.scrapers.cn.juchao import JuchaoScraper
-from news_pipeline.scrapers.cn.kr36 import Kr36Scraper
 from news_pipeline.scrapers.cn.sina_global import SinaGlobalScraper
-from news_pipeline.scrapers.cn.ths import ThsScraper
 from news_pipeline.scrapers.cn.ths_global import ThsGlobalScraper
-from news_pipeline.scrapers.cn.tushare_news import TushareNewsScraper
-from news_pipeline.scrapers.cn.xueqiu import XueqiuScraper
 from news_pipeline.scrapers.registry import ScraperRegistry
 from news_pipeline.scrapers.us.finnhub import FinnhubScraper
 from news_pipeline.scrapers.us.futu_global import FutuGlobalScraper
 from news_pipeline.scrapers.us.sec_edgar import SecEdgarScraper
 from news_pipeline.scrapers.us.wallstreetcn import WallStreetCnScraper
-from news_pipeline.scrapers.us.yfinance_news import YFinanceNewsScraper
 
 
 def build_registry(
@@ -39,6 +32,23 @@ def build_registry(
     us_tickers = [w.ticker for w in watchlist.rules.us]
     cn_tickers = [w.ticker for w in watchlist.rules.cn]
     enabled = {k for k, v in sources.sources.items() if v.enabled}
+    supported = {
+        "finnhub",
+        "sec_edgar",
+        "cls_telegraph",
+        "eastmoney_global",
+        "ths_global",
+        "sina_global",
+        "cjzc_em",
+        "cctv_news",
+        "futu_global",
+        "wallstreetcn",
+        "em_stock_news",
+        "juchao",
+    }
+    unsupported = enabled - supported
+    if unsupported:
+        raise ValueError(f"Unsupported enabled sources: {', '.join(sorted(unsupported))}")
     s = secrets.sources
 
     if "finnhub" in enabled:
@@ -54,12 +64,8 @@ def build_registry(
                 company_names={entry.ticker: entry.name for entry in watchlist.rules.us},
             )
         )
-    if "yfinance_news" in enabled:
-        reg.register(YFinanceNewsScraper(tickers=us_tickers))
     if "cls_telegraph" in enabled:
         reg.register(ClsTelegraphScraper())
-    if "caixin_telegram" in enabled:
-        reg.register(CaixinTelegramScraper())
     if "eastmoney_global" in enabled:
         reg.register(EastmoneyGlobalScraper())
     if "ths_global" in enabled:
@@ -74,18 +80,8 @@ def build_registry(
         reg.register(FutuGlobalScraper())
     if "wallstreetcn" in enabled:
         reg.register(WallStreetCnScraper())
-    if "kr36" in enabled:
-        reg.register(Kr36Scraper())
     if "em_stock_news" in enabled and cn_tickers:
         reg.register(EmStockNewsScraper(tickers=cn_tickers))
-    if "akshare_news" in enabled and cn_tickers:
-        reg.register(AkshareNewsScraper(tickers=cn_tickers))
     if "juchao" in enabled and cn_tickers:
         reg.register(JuchaoScraper(tickers=cn_tickers))
-    if "xueqiu" in enabled and cn_tickers:
-        reg.register(XueqiuScraper(tickers=cn_tickers, cookie=s["xueqiu_cookie"]))
-    if "ths" in enabled and cn_tickers:
-        reg.register(ThsScraper(tickers=cn_tickers, cookie=s["ths_cookie"]))
-    if "tushare_news" in enabled:
-        reg.register(TushareNewsScraper(src="sina"))
     return reg

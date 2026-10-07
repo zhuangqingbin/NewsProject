@@ -15,13 +15,12 @@
 | `juchao` | 巨潮公告，300 秒 | 初始化 orgId；不按公告时间过滤；一手源分级 |
 | `sec_edgar` | SEC submissions，120 秒 | 初始化 CIK、真实联系 User-Agent、一手表单分级 |
 | `cjzc_em` / `cctv_news` | 财经早餐 / 新闻联播，3600 / 21600 秒 | 低频内容不要求每次抓取都非空 |
-| `kr36` | 默认关闭 | 扩源与替换等阶段 D 再评估 |
 
-旧 `caixin_telegram`、`akshare_news`、雪球/个股同花顺等文件暂留兼容，不是新 factory 的默认路径。删除条件见 [C1/C2 清单](../operations/staged-cleanup.md)。
+旧 `caixin_telegram`、`akshare_news`、雪球/个股同花顺、kr36、tushare/yfinance 新闻抓取器已删除。启用旧 source_id 会明确报配置错误。
 
 ## 抓取与保存
 
-每次取 `now - lookback_min`，不用上轮发布时间当排他水位线。晚出现的旧条目仍能进入回看窗口。`ArticleStore` 先查 URL hash：同 URL 不重复插入；不同 URL 的同标题证据在 legacy/shadow 标为 `duplicate` 入库并记录 `dup_of`，不是丢弃。v2 停止标题 simhash 判重，由事件层合并文章。
+每次取 `now - lookback_min`，不用上轮发布时间当排他水位线。晚出现的旧条目仍能进入回看窗口。`ArticleStore` 先查 URL hash：同 URL 不重复插入；不同 URL 的同标题文章均作为独立证据保存，由事件层合并。标题 simhash 不再计算，新入库旧列写 0。
 
 源第一次成功抓取的内容作为 `seeded` 基线，避免初始化历史列表全部推送。抓取外层有 `fetch_timeout_sec`，成功/失败、最新条目时间和退避写入 `source_state`。失败退避为 interval 的指数倍，封顶 30 分钟。
 
