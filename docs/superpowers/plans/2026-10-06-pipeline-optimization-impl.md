@@ -10,6 +10,8 @@
 
 **Scope gates:** D is explicitly conditional on two weeks of production observation and is excluded from this release. C1/C2 removal of legacy paths and dependencies follows the one-week stability gate; do not remove the rollback path now. Model benchmarking requires a human-reviewed sample and authorization for paid calls; build the tools and leave LLM disabled until pricing/model selection is complete. No production deploy or credential reset is part of this implementation.
 
+**2026-10-07 development update:** C1/C2 development is complete on the separately staged `codex/pipeline-cleanup` v0.7.1 branch (805 tests passed and both independent reviews approved). This v0.7.0 rollout branch retains its rollback path; release/observation gates remain unexecuted. See the [development delivery record](../reviews/2026-10-07-development-delivery.md).
+
 ## Task 1: Repair quote feeds (A7)
 
 Files: `src/quote_watcher/feeds/{base,tencent,em_scan,market_scan,sector}.py`, `alerts/context.py`, quote feed tests.
