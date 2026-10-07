@@ -57,10 +57,19 @@ class ClsTelegraphScraper:
             body = require_json_string(item, "content", source=self.source_id).strip()
             level = require_json_string(item, "level", source=self.source_id)
             stocks = require_json_list(item, "stock_list", source=self.source_id)
-            subjects = require_json_list(item, "subjects", source=self.source_id)
+            subjects = (
+                []
+                if require_json_path(item, "subjects", source=self.source_id) is None
+                else require_json_list(item, "subjects", source=self.source_id)
+            )
             title = title or brief[:80]
             if ts < since or not title:
                 continue
+            stock_codes = []
+            for stock in stocks:
+                stock = require_json_mapping(stock, "", source=self.source_id)
+                field = "stock_code" if "stock_code" in stock else "StockID"
+                stock_codes.append(require_json_string(stock, field, source=self.source_id))
             link = f"https://www.cls.cn/detail/{cls_id}"
             articles.append(
                 RawArticle(
@@ -75,10 +84,7 @@ class ClsTelegraphScraper:
                     raw_meta={
                         "cls_id": cls_id,
                         "level": level,
-                        "stocks": [
-                            require_json_string(s, "stock_code", source=self.source_id)
-                            for s in stocks
-                        ],
+                        "stocks": stock_codes,
                         "subjects": [
                             require_json_string(s, "subject_name", source=self.source_id)
                             for s in subjects

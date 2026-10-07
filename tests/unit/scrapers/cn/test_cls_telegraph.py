@@ -1,4 +1,5 @@
 import hashlib
+from copy import deepcopy
 from datetime import UTC, datetime
 from importlib import import_module
 from urllib.parse import urlencode
@@ -87,3 +88,48 @@ async def test_since_filter_and_empty_upstream():
         assert await scraper().fetch(datetime(2030, 1, 1, tzinfo=UTC)) == []
         route.respond(200, json={"data": {"roll_data": []}})
         assert await scraper().fetch(datetime(2020, 1, 1, tzinfo=UTC)) == []
+
+
+@pytest.mark.parametrize(
+    ("stocks", "subjects", "expected_stocks", "expected_subjects"),
+    [
+        (
+            [{"StockID": "sz002541"}],
+            SAMPLE["data"]["roll_data"][0]["subjects"],
+            ["sz002541"],
+            ["期货市场情报"],
+        ),
+        ([{"stock_code": "NVDA"}], None, ["NVDA"], []),
+        ([{"StockID": "sh688137"}], None, ["sh688137"], []),
+    ],
+)
+async def test_live_stock_identifiers_and_nullable_subjects(
+    stocks, subjects, expected_stocks, expected_subjects
+):
+    payload = deepcopy(SAMPLE)
+    item = payload["data"]["roll_data"][0]
+    item.update(stock_list=stocks, subjects=subjects)
+    with respx.mock() as mock:
+        mock.get(URL).respond(200, json=payload)
+        articles = await scraper().fetch(datetime(2020, 1, 1, tzinfo=UTC))
+    assert len(articles) == 1
+    assert articles[0].raw_meta["stocks"] == expected_stocks
+    assert articles[0].raw_meta["subjects"] == expected_subjects
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("subjects", {}),
+        ("subjects", "invalid"),
+        ("stock_list", [{}]),
+        ("stock_list", [{"StockID": 2541}]),
+    ],
+)
+async def test_malformed_metadata_still_raises(field, value):
+    payload = deepcopy(SAMPLE)
+    payload["data"]["roll_data"][0][field] = value
+    with respx.mock() as mock:
+        mock.get(URL).respond(200, json=payload)
+        with pytest.raises(SourceContractError):
+            await scraper().fetch(datetime(2020, 1, 1, tzinfo=UTC))
