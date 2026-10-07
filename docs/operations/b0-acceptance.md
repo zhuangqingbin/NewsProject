@@ -2,9 +2,11 @@
 
 B0 必须使用真实三周新闻、150 条人工审核事件及独立的 30 条留出集。仓库里的八条 `seed_unreviewed` 只用于回归，不是已审核样本。当前默认仍是 `legacy`、LLM 关闭；完成以下准备不会切换生产模式。
 
+2026-10-07 已只读提取 9/14–10/6 的 60,832 条真实原始新闻，并准备好包含八类案例、50/50/30/20 分层的 150 条待审核 CSV。本地文件位于工作区 `data/b0/2026-09-14_2026-10-06/review-150.csv`，不提交原始新闻到 Git。150 条目前全部是 `unreviewed`；具体来源、哈希、选择方法与验证见[本轮记录](../superpowers/reviews/2026-10-07-rollout-hardening-verification.md)。
+
 ## 导出与人工审核
 
-先用 SQLite backup API 取得一致的数据库副本，按实际样本窗口修改日期。回放以只读方式打开数据库，不执行迁移、不写入事件、不发送消息。
+先用 SQLite backup API 取得一致的数据库副本，或在单个只读事务中提取所需 `raw_news` 窗口并在本地重建样本库；后者不包含完整备份所需的其他表。按实际样本窗口修改日期。回放以只读方式打开数据库，不执行迁移、不写入事件、不发送消息。
 
 ```bash
 uv run python -m news_pipeline.tools.replay \
@@ -40,7 +42,7 @@ uv run python -m news_pipeline.tools.replay \
   --eval data/gold-reviewed-v1.jsonl --mode rules --split train
 ```
 
-真实模型评测前，必须先确定候选模型、核实对应供应商的每百万 token 输入/输出人民币价格、估算本轮费用，并取得付费调用确认。将价格填入 `llm.pricing`，配置真实 API key。下面的 `MODEL_ID` 只是命令占位符；准备流程没有自动执行这些请求。
+真实模型评测前，必须先确定候选模型、核实对应供应商的每百万 token 输入/输出人民币价格、估算本轮费用，并取得付费调用确认。公开价格与一轮估算见 [B0 模型准备](b0-model-proposal.md)。将价格填入 `llm.pricing`，配置真实 API key。下面的 `MODEL_ID` 只是命令占位符；准备流程没有自动执行这些请求。
 
 ```bash
 uv run python -m news_pipeline.tools.replay \

@@ -1,6 +1,6 @@
 # B0 preparation and local upstream verification
 
-2026-10-07. This extends the approved design §3.10 tooling. No real 150-event dataset, human review, model quality acceptance, production deployment or outbound message was performed. The workspace still has no news database or local secrets configuration.
+2026-10-07, initial B0 tooling checkpoint. This extends the approved design §3.10 tooling. At this checkpoint no real 150-event dataset, human review, model quality acceptance, production deployment or outbound message was performed, and the workspace had no news database or local secrets configuration. The [later follow-up](2026-10-07-rollout-hardening-verification.md) records the real snapshot and review CSV subsequently obtained.
 
 ## Development changes
 

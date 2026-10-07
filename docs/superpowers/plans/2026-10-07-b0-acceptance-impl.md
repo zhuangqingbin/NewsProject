@@ -15,4 +15,4 @@ Implementation and verification details are in the [verification report](../revi
 
 ## External prerequisites
 
-The current workspace has no `data/news.db` or `config/common/secrets.yml`. The user has been asked for the real database location. A three-week source dataset, human review and explicit confirmation of concrete model/cost choices are necessary before actual model benchmarking. No paid call, outbound message or production configuration switch is authorized by this preparation step. C1/C2 and D retain their one-/two-week observation gates.
+The initial checkpoint had no local news database. The follow-up located the documented production database and extracted a three-week read-only raw-news slice; the real 150-event review CSV is now available locally. See the [follow-up verification record](../reviews/2026-10-07-rollout-hardening-verification.md). Human review and explicit confirmation of concrete model/cost choices remain necessary before actual model benchmarking. No paid call, outbound message or production configuration switch is authorized by this preparation step. C1/C2 and D retain their one-/two-week observation gates.
