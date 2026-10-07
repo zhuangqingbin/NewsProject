@@ -339,6 +339,7 @@ class CachedChatClient:
             "system": system,
             "user": user,
             "max_tokens": max_tokens,
+            "enable_thinking": False,
             "prompt_version": self.prompt_version,
             "provider": self.provider,
         }

@@ -43,6 +43,7 @@ class ChatClient:
         body = {
             "model": model,
             "max_tokens": max_tokens,
+            "enable_thinking": False,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "response_format": {"type": "json_object"},
         }

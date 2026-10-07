@@ -1,6 +1,8 @@
 import csv
+import hashlib
 import json
 import sqlite3
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -104,6 +106,33 @@ async def test_response_cache_hash_covers_complete_request(tmp_path):
     assert client.chat_json.await_count == 4
     assert all(len(path.stem) == 64 for path in tmp_path.iterdir())
     assert cached.cache_hits == 1
+
+
+async def test_response_cache_rejects_legacy_thinking_mode_and_reuses_current_request(tmp_path):
+    kwargs = dict(model="deepseek-v4.1-flash", system="system", user="user", max_tokens=400)
+    complete_input = kwargs | {"prompt_version": "assess_v1", "provider": "dashscope"}
+    legacy_key = hashlib.sha256(
+        json.dumps(
+            complete_input, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+    legacy_result = ChatResult('{"mode":"provider-default"}', 100, 70, 90)
+    legacy_path = tmp_path / f"{legacy_key}.json"
+    legacy_path.write_text(json.dumps(asdict(legacy_result)), encoding="utf-8")
+    legacy_bytes = legacy_path.read_bytes()
+    client = AsyncMock()
+    current_result = ChatResult('{"mode":"non-thinking"}', 100, 10, 12)
+    client.chat_json.return_value = current_result
+    cached = CachedChatClient(client, tmp_path, "assess_v1", "dashscope")
+
+    assert cached.would_hit(**kwargs) is False
+    assert await cached.chat_json(**kwargs) == current_result
+    assert (cached.cache_misses, cached.cache_hits) == (1, 0)
+    assert cached.would_hit(**kwargs) is True
+    assert await cached.chat_json(**kwargs) == current_result
+    assert (cached.cache_misses, cached.cache_hits) == (1, 1)
+    client.chat_json.assert_awaited_once_with(**kwargs)
+    assert legacy_path.read_bytes() == legacy_bytes
 
 
 def test_metrics_count_wrong_tickers_legal_json_and_latency():
