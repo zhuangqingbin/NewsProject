@@ -105,7 +105,7 @@ async def assessment_messages(
     tickers = set(event.tagged_tickers)
     recent = [
         row
-        for row in await events.list_recent(hours=24)
+        for row in await events.list_recent(hours=24, now=utc_aware(now))
         if row.id is not None
         and row.id != event.id
         and row.decision != "drop"

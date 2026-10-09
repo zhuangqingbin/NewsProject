@@ -469,3 +469,11 @@ async def test_recent_prompt_excludes_future_and_expired_evidence(assessment_db)
     )
     _, _, recent = await assessment_messages(EventsDAO(assessment_db), current, watchlist(), AT)
     assert recent == set()
+
+
+async def test_prompt_history_uses_replay_clock_not_wall_clock(assessment_db, monkeypatch):
+    current = await event(assessment_db)
+    await event(assessment_db, 2)
+    monkeypatch.setattr("news_pipeline.storage.dao.events.utc_now", lambda: AT + timedelta(days=30))
+    _, _, recent = await assessment_messages(EventsDAO(assessment_db), current, watchlist(), AT)
+    assert recent == {2}

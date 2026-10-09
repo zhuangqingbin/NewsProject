@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select, text, update
@@ -16,8 +16,11 @@ class EventsDAO:
         async with self.db.session() as session:
             return await session.get(Event, event_id)
 
-    async def list_recent(self, hours: int = 12) -> list[Event]:
-        cutoff = (utc_now() - timedelta(hours=hours)).replace(tzinfo=None)
+    async def list_recent(self, hours: int = 12, *, now: datetime | None = None) -> list[Event]:
+        reference = now or utc_now()
+        if reference.tzinfo is None:
+            raise ValueError("now must be timezone-aware")
+        cutoff = (reference.astimezone(UTC) - timedelta(hours=hours)).replace(tzinfo=None)
         async with self.db.session() as session:
             result = await session.execute(
                 select(Event).where(Event.last_seen_at >= cutoff).order_by(Event.id)
