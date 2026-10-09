@@ -24,23 +24,13 @@ from quote_watcher.feeds.base import QuoteSnapshot
 from quote_watcher.storage.dao.quote_bars import QuoteBarsDailyDAO
 from quote_watcher.storage.db import QuoteDatabase
 from quote_watcher.storage.models import QuoteBarDaily
-from quote_watcher.store.kline import DailyBar
+from quote_watcher.store.kline import DailyBar, DailyKlineCache
 
 BJ = ZoneInfo("Asia/Shanghai")
 
 
 def _row_to_bar(ticker: str, row: QuoteBarDaily) -> DailyBar:
-    return DailyBar(
-        ticker=ticker,
-        trade_date=row.trade_date,
-        open=row.open,
-        high=row.high,
-        low=row.low,
-        close=row.close,
-        prev_close=row.prev_close,
-        volume=row.volume,
-        amount=row.amount,
-    )
+    return DailyKlineCache.row_to_bar(ticker, row)
 
 
 def _make_snap(ticker: str, bar: DailyBar) -> QuoteSnapshot:

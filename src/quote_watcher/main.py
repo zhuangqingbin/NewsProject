@@ -275,14 +275,29 @@ async def _amain() -> None:
     )
 
     heartbeat_task = asyncio.create_task(_heartbeat_loop(stop, heartbeat))
+    kline_task = asyncio.create_task(_kline_refresh_loop(stop, kline_cache, cn_tickers_codes))
     await stop.wait()
+    kline_task.cancel()
     await asyncio.gather(
-        ticker_task, scan_task, sector_task, heartbeat_task, return_exceptions=True
+        ticker_task, scan_task, sector_task, heartbeat_task, kline_task, return_exceptions=True
     )
     reloader.stop()
 
     await db.close()
     log.info("quote_watcher_stopped")
+
+
+async def _kline_refresh_loop(
+    stop: asyncio.Event, cache: DailyKlineCache, tickers: list[str]
+) -> None:
+    """Keep completed daily history fresh across trading days without blocking quote polls."""
+    while not stop.is_set():
+        try:
+            await cache.load_for(tickers, days=250)
+        except Exception as exc:
+            log.warning("kline_refresh_failed", error=repr(exc))
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), timeout=3600)
 
 
 async def _heartbeat_loop(stop: asyncio.Event, heartbeat: Heartbeat) -> None:

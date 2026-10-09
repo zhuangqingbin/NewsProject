@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -41,3 +41,15 @@ def test_naive_datetime_rejected():
     cal = MarketCalendar()
     with pytest.raises(ValueError, match="timezone"):
         cal.is_open(datetime(2026, 5, 8, 10, 0))
+
+
+@pytest.mark.parametrize(
+    "day, previous",
+    [
+        (date(2026, 10, 8), date(2026, 9, 30)),
+        (date(2026, 10, 9), date(2026, 10, 8)),
+        (date(2026, 10, 12), date(2026, 10, 9)),
+    ],
+)
+def test_previous_completed_trading_day(day, previous):
+    assert MarketCalendar().previous_trading_day(day) == previous

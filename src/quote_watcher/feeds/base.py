@@ -19,7 +19,7 @@ class QuoteSnapshot:
     high: float
     low: float
     prev_close: float
-    volume: int
+    volume: int  # shares
     amount: float
     bid1: float
     ask1: float

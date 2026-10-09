@@ -98,3 +98,9 @@ def test_alert_message_includes_deeplinks():
     msg = build_alert_message(v)
     assert any("eastmoney" in str(d.url) for d in msg.deeplinks)
     assert any("xueqiu" in str(d.url) for d in msg.deeplinks)
+
+
+def test_alert_volume_is_labelled_in_shares():
+    msg = build_alert_message(_v("r1", "x", {}))
+    assert "今日量: 282.3万股" in msg.summary
+    assert "万手" not in msg.summary

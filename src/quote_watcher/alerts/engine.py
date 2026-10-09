@@ -19,10 +19,12 @@ from quote_watcher.alerts.verdict import AlertVerdict
 from quote_watcher.feeds.base import QuoteSnapshot
 from quote_watcher.feeds.sector import SectorSnapshot
 from quote_watcher.state.tracker import StateTracker
+from quote_watcher.store.kline import volume_averages
+from shared.common.calendar import BJ, MarketCalendar
 from shared.observability.log import get_logger
 
 if TYPE_CHECKING:
-    from quote_watcher.store.kline import DailyKlineCache
+    from quote_watcher.store.kline import DailyBar, DailyKlineCache
 
 log = get_logger(__name__)
 
@@ -48,12 +50,36 @@ class AlertEngine:
         self,
         snap: QuoteSnapshot,
         *,
-        volume_avg5d: float = 0.0,
-        volume_avg20d: float = 0.0,
+        volume_avg5d: float | None = None,
+        volume_avg20d: float | None = None,
         price_high_today_yday: float = 0.0,
         price_low_today_yday: float = 0.0,
     ) -> list[AlertVerdict]:
         out: list[AlertVerdict] = []
+        bars: list[DailyBar] = []
+        matching_rules = [
+            r for r in self._rules if r.ticker == snap.ticker or r.holding == snap.ticker
+        ]
+        if (
+            self._kline_cache is not None
+            and matching_rules
+            and (
+                volume_avg5d is None
+                or volume_avg20d is None
+                or any(r.kind == AlertKind.INDICATOR for r in matching_rules)
+            )
+        ):
+            cached = await self._kline_cache.get_cached(snap.ticker, days=250)
+            today = snap.ts.astimezone(BJ).date()
+            bars = [bar for bar in cached if bar.trade_date < today]
+        previous_day = MarketCalendar().previous_trading_day(snap.ts.astimezone(BJ).date())
+        cached_avg5, cached_avg20 = (
+            volume_averages(bars) if bars and bars[-1].trade_date == previous_day else (0.0, 0.0)
+        )
+        if volume_avg5d is None:
+            volume_avg5d = cached_avg5
+        if volume_avg20d is None:
+            volume_avg20d = cached_avg20
 
         # 1) threshold rules for this ticker
         threshold_rules = [
@@ -98,7 +124,6 @@ class AlertEngine:
                     rules=[r.id for r in indicator_rules],
                 )
             else:
-                bars = await self._kline_cache.get_cached(snap.ticker, days=250)
                 ctx = build_indicator_context(
                     snap,
                     bars=bars,

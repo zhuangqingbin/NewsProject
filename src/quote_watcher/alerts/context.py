@@ -121,8 +121,8 @@ def build_indicator_context(
     snap: QuoteSnapshot,
     *,
     bars: list[Any],
-    volume_avg5d: float = 0.0,
-    volume_avg20d: float = 0.0,
+    volume_avg5d: float | None = None,
+    volume_avg20d: float | None = None,
 ) -> dict[str, Any]:
     """Indicator context = threshold context + MA/RSI/MACD/cross helpers.
 
@@ -130,12 +130,14 @@ def build_indicator_context(
     snap.price is treated as today's close for "today" computations.
     """
     from quote_watcher.alerts import indicator as ind
-    from quote_watcher.store.kline import DailyBar  # noqa: F401 — type reference
+    from quote_watcher.store.kline import volume_averages
+
+    cached_avg5, cached_avg20 = volume_averages(bars)
 
     base = build_threshold_context(
         snap,
-        volume_avg5d=volume_avg5d,
-        volume_avg20d=volume_avg20d,
+        volume_avg5d=cached_avg5 if volume_avg5d is None else volume_avg5d,
+        volume_avg20d=cached_avg20 if volume_avg20d is None else volume_avg20d,
     )
     prior_closes: list[float] = [b.close for b in bars]
     closes_today: list[float] = [*prior_closes, snap.price]

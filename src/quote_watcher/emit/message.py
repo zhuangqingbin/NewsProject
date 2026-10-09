@@ -34,7 +34,7 @@ def build_alert_message(v: AlertVerdict) -> CommonMessage:
     summary_lines = [
         f"⚡ 触发: {v.rule.id}({v.rule.expr})",
         f"当前价: {snap.price:.2f}  ({pct:+.2f}%)",
-        f"今日量: {snap.volume / 10000:.1f}万手",
+        f"今日量: {snap.volume / 10000:.1f}万股",
     ]
     if vol_ratio:
         summary_lines.append(f"量比: {vol_ratio:.2f}")

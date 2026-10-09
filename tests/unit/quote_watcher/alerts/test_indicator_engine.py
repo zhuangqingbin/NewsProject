@@ -1,6 +1,7 @@
 """Tests for AlertEngine INDICATOR kind branch with DailyKlineCache injection."""
 
-from datetime import date, datetime
+from dataclasses import replace
+from datetime import date, datetime, timedelta
 from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
 
@@ -11,8 +12,9 @@ from quote_watcher.alerts.rule import AlertKind, AlertRule
 from quote_watcher.feeds.base import QuoteSnapshot
 from quote_watcher.state.tracker import StateTracker
 from quote_watcher.storage.dao.alert_state import AlertStateDAO
+from quote_watcher.storage.dao.quote_bars import QuoteBarsDailyDAO
 from quote_watcher.storage.db import QuoteDatabase
-from quote_watcher.store.kline import DailyBar
+from quote_watcher.store.kline import DailyBar, DailyKlineCache
 
 BJ = ZoneInfo("Asia/Shanghai")
 
@@ -157,3 +159,60 @@ async def test_threshold_still_works_with_kline_cache(tracker: StateTracker):
     )
     verdicts = await engine.evaluate_for_snapshot(snap)
     assert len(verdicts) == 1
+
+
+@pytest.mark.parametrize("kind", [AlertKind.THRESHOLD, AlertKind.INDICATOR])
+async def test_rule_averages_use_cached_shares_and_exclude_today(quote_db, tracker, kind):
+    dao = QuoteBarsDailyDAO(quote_db)
+    rows = [
+        (date(2026, 5, 7) - timedelta(days=19 - i), 100, 101, 99, 100, 100, (i + 1) * 100, 1e6)
+        for i in range(20)
+    ]
+    rows += [(date(2026, 5, 8), 500, 501, 499, 500, 100, 999_999, 1e8)]
+    await dao.upsert_many("600519", rows)
+    rule = AlertRule(
+        id="volumes",
+        kind=kind,
+        ticker="600519",
+        expr="volume_avg5d == 180000 and volume_avg20d == 105000 and volume_ratio == 1.25",
+    )
+    snap = replace(_snap(100), volume=100_000, volume_ratio=1.25)
+    engine = AlertEngine(rules=[rule], tracker=tracker, kline_cache=DailyKlineCache(quote_db))
+    verdicts = await engine.evaluate_for_snapshot(snap)
+    assert len(verdicts) == 1
+    assert verdicts[0].ctx_dump["volume_today"] == 100_000
+    if kind == AlertKind.INDICATOR:
+        assert verdicts[0].ctx_dump["ma5"] == 100  # today's cached close is not a prior close
+
+
+async def test_explicit_average_override_is_preserved(tracker):
+    cache = AsyncMock()
+    cache.get_cached.return_value = [_bar(date(2026, 5, i), 100) for i in range(1, 8)]
+    rule = AlertRule(
+        id="override",
+        kind=AlertKind.THRESHOLD,
+        ticker="600519",
+        expr="volume_avg5d == 50 and volume_avg20d == 0 and volume_ratio == 2",
+    )
+    engine = AlertEngine(rules=[rule], tracker=tracker, kline_cache=cache)
+    assert (
+        len(await engine.evaluate_for_snapshot(_snap(100), volume_avg5d=50, volume_avg20d=0)) == 1
+    )
+
+
+@pytest.mark.parametrize("trusted", ["none", "source", "override"])
+async def test_stale_history_does_not_create_volume_ratio_alerts(tracker, trusted):
+    cache = AsyncMock()
+    cache.get_cached.return_value = [
+        replace(_bar(date(2026, 1, 1) + timedelta(days=i), 100), volume=100_000) for i in range(20)
+    ]
+    rule = AlertRule(
+        id="stale_volume", kind=AlertKind.THRESHOLD, ticker="600519", expr="volume_ratio >= 2"
+    )
+    engine = AlertEngine(rules=[rule], tracker=tracker, kline_cache=cache)
+    snap = replace(_snap(100), volume=300_000, volume_ratio=3 if trusted == "source" else None)
+    kwargs = {"volume_avg5d": 100_000} if trusted == "override" else {}
+    verdicts = await engine.evaluate_for_snapshot(snap, **kwargs)
+    assert len(verdicts) == (0 if trusted == "none" else 1)
+    if verdicts and trusted == "source":
+        assert verdicts[0].ctx_dump["volume_avg5d"] == 0

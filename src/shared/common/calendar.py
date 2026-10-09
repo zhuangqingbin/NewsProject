@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo
 
@@ -22,6 +22,14 @@ class MarketCalendar:
 
     def is_open(self, dt: datetime) -> bool:
         return self.session(dt) in ("morning", "afternoon")
+
+    def previous_trading_day(self, day: date) -> date:
+        """Most recent completed session before a Beijing calendar date."""
+        for offset in range(1, 32):
+            previous = day - timedelta(days=offset)
+            if self.is_open(datetime.combine(previous, time(10), tzinfo=BJ)):
+                return previous
+        raise ValueError("No preceding trading day in calendar")
 
     def session(self, dt: datetime) -> Session:
         if dt.tzinfo is None:

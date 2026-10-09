@@ -14,15 +14,15 @@ class QuoteBarsDailyDAO:
     def __init__(self, db: QuoteDatabase) -> None:
         self._db = db
 
-    async def list_recent(self, ticker: str, days: int) -> list[QuoteBarDaily]:
+    async def list_recent(
+        self, ticker: str, days: int, *, through: date | None = None
+    ) -> list[QuoteBarDaily]:
         """Latest `days` bars for ticker, sorted by trade_date ASC."""
         async with self._db.session() as sess:
-            result = await sess.execute(
-                select(QuoteBarDaily)
-                .where(QuoteBarDaily.ticker == ticker)
-                .order_by(QuoteBarDaily.trade_date.desc())
-                .limit(days)
-            )
+            query = select(QuoteBarDaily).where(QuoteBarDaily.ticker == ticker)
+            if through is not None:
+                query = query.where(QuoteBarDaily.trade_date <= through)
+            result = await sess.execute(query.order_by(QuoteBarDaily.trade_date.desc()).limit(days))
             rows = list(result.scalars().all())
             rows.reverse()
             return rows
