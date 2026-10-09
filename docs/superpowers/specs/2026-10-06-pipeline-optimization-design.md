@@ -184,7 +184,7 @@ src/shared/observability/
 
 阶段 A 的预估比上一轮评审里说的"1–2 天"多不少。原因有两个：核实接口时又发现了水位线漏抓（P1），抓取框架要动；过渡期的打分规则值得做扎实，它在阶段 B 之后仍然作为 LLM 的兜底留用。逐项估时见 §9。
 
-阶段 A 内部再分两批。A-急（10/9 开盘前）：A7 quote_watcher、A1 抓取框架、A2 修源。A-缓：A3–A6、A8。
+阶段 A 内部再分两批。A-急（10/8 开盘前）：A7 quote_watcher、A1 抓取框架、A2 修源。A-缓：A3–A6、A8。
 
 ---
 
@@ -775,7 +775,9 @@ class QuoteSnapshot:
 
 #### 2.7.4 时间要求
 
-A 股 10/9 开盘。这部分最迟 10/8 晚上线，10/9 开盘后看 `quote_feed_ok` 日志和第一条告警确认。
+A 股 2026 年 10/8 开盘。这部分最迟 10/7 晚上线，10/8 开盘后看 `quote_feed_ok` 日志和第一条告警确认。
+
+2026-10-08 更正：初稿误用了 10/9 开市日期；以上交所 [2026 年中秋节、国庆节休市公告](https://www.sse.com.cn/disclosure/announcement/general/c/c_20260915_10832273.shtml)为准。项目现有交易日历已正确识别 10/8 为交易日。
 
 ### 2.8 A8 其他小修
 
@@ -1499,7 +1501,7 @@ v2 模式稳定运行一周后做。
 | A7-1 | `TencentFeed` + `QuoteSnapshot` 加字段 | `quote_watcher/feeds/tencent.py`、`base.py`、`alerts/context.py` | 0.3 | — | 三条实测样本的单测通过 |
 | A7-2 | 东财排序接口做全市场扫描和板块 | `quote_watcher/feeds/em_scan.py`、`market_scan.py`、`sector.py` | 0.3 | — | 每分钟 3 + 5 个请求，`rank_market` 结果不变 |
 | A7-3 | Bark、启动自检、零产出告警、心跳 | `quote_watcher/main.py`、`shared/observability/heartbeat.py` | 0.2 | — | 人为配错地址能收到告警 |
-| A7-4 | 实盘核对成交量单位与量比 | `store/kline.py`、`alerts/context.py` | 0.2 | 10/9 开盘后 | 量比与行情软件一致 |
+| A7-4 | 实盘核对成交量单位与量比 | `store/kline.py`、`alerts/context.py` | 0.2 | 10/8 开盘后 | 量比与行情软件一致 |
 | A1 | 回看窗口、批量 URL 去重、seeded、超时 | `scheduler/jobs.py`、`ingest/store.py`、DAO、`schema.py` | 0.5 | — | P1 回归用例；漏抓抽检 < 1% |
 | A2-1 | `em_stock_news` | `scrapers/cn/em_stock_news.py` | 0.2 | A1 | fixture 单测；线上有入库 |
 | A2-2 | `juchao` | `scrapers/cn/juchao.py` | 0.2 | A1 | 同上 |
@@ -1518,7 +1520,7 @@ v2 模式稳定运行一周后做。
 | A8 | `.gitignore`、entrypoint、SEC UA | 各处 | 0.1 | — | — |
 | | **合计** | | **约 5.3** | | |
 
-A7-1 至 A7-3、A1、A2 是 10/9 开盘前要完成的部分，合计约 2.5 人日。
+A7-1 至 A7-3、A1、A2 是 10/8 开盘前要完成的部分，合计约 2.5 人日。
 
 ### 阶段 B
 
