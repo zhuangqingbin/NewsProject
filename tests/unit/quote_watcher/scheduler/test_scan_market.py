@@ -28,7 +28,11 @@ def _row(ticker: str, pct: float, vr: float | None = 1.0) -> MarketRow:
 
 @pytest.mark.asyncio
 async def test_scan_market_skips_when_market_closed():
-    feed = AsyncMock()
+    feed = AsyncMock(
+        source_label="腾讯沪深京榜单",
+        source_url="https://stockapp.finance.qq.com/mstats/",
+        total=5573,
+    )
     feed.fetch.return_value = [_row("A", 9.0)]
     cal = MarketCalendar()
     dispatcher = AsyncMock()
@@ -51,7 +55,11 @@ async def test_scan_market_skips_when_market_closed():
 
 @pytest.mark.asyncio
 async def test_scan_market_dispatches_when_anomalies():
-    feed = AsyncMock()
+    feed = AsyncMock(
+        source_label="腾讯沪深京榜单",
+        source_url="https://stockapp.finance.qq.com/mstats/",
+        total=5573,
+    )
     feed.fetch.return_value = [_row("A", 9.0, 5.0), _row("B", -8.0, 0.5)]
     cal = MarketCalendar()
     dispatcher = AsyncMock()
@@ -71,6 +79,8 @@ async def test_scan_market_dispatches_when_anomalies():
     feed.fetch.assert_awaited_once()
     msg = dispatcher.dispatch.call_args.args[0]
     assert msg.kind == "market_scan"
+    assert msg.source_label == "腾讯沪深京榜单"
+    assert "提供方股票总数 5573" in msg.summary
 
 
 @pytest.mark.asyncio

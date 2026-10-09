@@ -91,6 +91,20 @@ async def test_collect_normalizes_completed_history_without_changing_db(daily_db
     assert hashlib.sha256(daily_db.read_bytes()).hexdigest() == before
 
 
+async def test_readonly_evidence_preserves_exact_shares_in_new_schema(daily_db, feeds, monkeypatch):
+    monkeypatch.setenv("MARKET_SCAN_FEED", "tencent")
+    monkeypatch.setenv("SECTOR_FEED", "tencent")
+    with sqlite3.connect(daily_db) as conn:
+        conn.execute("ALTER TABLE quote_bars_daily ADD COLUMN volume_shares BIGINT")
+        conn.execute("UPDATE quote_bars_daily SET volume_shares=16488424 WHERE ticker='688525'")
+    before = hashlib.sha256(daily_db.read_bytes()).hexdigest()
+    report = await collect(daily_db, now=OPEN)
+    assert report["quotes"][-1]["volume_avg20d_shares"] == 16_488_424
+    assert report["feeds"]["market"]["source"] == "tencent_spot"
+    assert report["feeds"]["sector"]["source"] == "tencent_sector_sw2"
+    assert hashlib.sha256(daily_db.read_bytes()).hexdigest() == before
+
+
 @pytest.mark.parametrize("age", [91, -6])
 async def test_stale_or_future_quote_blocks_live_evidence(daily_db, feeds, age):
     feeds[0].return_value = [
@@ -130,7 +144,13 @@ async def test_missing_quotes_and_failed_sources_are_visible(daily_db, feeds):
     report = await collect(daily_db, now=OPEN)
     assert not report["eligible_for_manual_comparison"]
     assert "missing_quote:688525" in report["issues"]
-    assert report["feeds"]["market"] == {"status": "error", "error": "RuntimeError"}
+    assert report["feeds"]["market"] == {
+        "status": "error",
+        "error": "RuntimeError",
+        "source": "eastmoney_spot",
+        "source_label": "东财沪深京榜单",
+        "upstream_total": None,
+    }
     assert report["feeds"]["sector"]["status"] == "empty"
     assert "private details" not in json.dumps(report)
 

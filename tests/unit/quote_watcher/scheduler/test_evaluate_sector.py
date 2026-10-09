@@ -28,7 +28,9 @@ async def test_sector_alerts_dispatches_when_triggered(quote_db: QuoteDatabase):
         expr="sector_pct_change >= 3.0",
     )
     engine = AlertEngine(rules=[rule], tracker=tracker)
-    feed = AsyncMock()
+    feed = AsyncMock(
+        source_label="腾讯申万二级行业", source_url="https://stockapp.finance.qq.com/mstats/"
+    )
     feed.fetch_pct_changes.return_value = {
         "半导体": SectorSnapshot(name="半导体", pct_change=3.5),
     }
@@ -46,6 +48,10 @@ async def test_sector_alerts_dispatches_when_triggered(quote_db: QuoteDatabase):
         now=open_dt,
     )
     assert n == 1
+    msg = dispatcher.dispatch.call_args.args[0]
+    assert msg.source_label == "腾讯申万二级行业"
+    assert "行业涨跌: +3.50%" in msg.summary
+    assert "当前价" not in msg.summary
     feed.fetch_pct_changes.assert_awaited_once()
     msg = dispatcher.dispatch.call_args.args[0]
     assert msg.kind == "alert"

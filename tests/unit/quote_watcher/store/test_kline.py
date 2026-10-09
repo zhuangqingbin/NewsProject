@@ -1,5 +1,5 @@
 from datetime import date
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pandas as pd
 import pytest
@@ -12,7 +12,13 @@ from quote_watcher.store.kline import DailyKlineCache
 
 @pytest.fixture(autouse=True)
 def fixed_trading_date():
-    with freeze_time("2026-05-09 02:00:00"):
+    with (
+        freeze_time("2026-05-09 02:00:00"),
+        patch(
+            "quote_watcher.store.kline.fetch_tencent_daily",
+            new=AsyncMock(side_effect=RuntimeError("fallback offline")),
+        ),
+    ):
         yield
 
 

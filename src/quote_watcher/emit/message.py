@@ -26,10 +26,15 @@ def _arrow(pct: float) -> str:
     return "⚡"
 
 
-def build_alert_message(v: AlertVerdict) -> CommonMessage:
+def build_alert_message(
+    v: AlertVerdict, *, source_label: str = "quote_watcher", source_url: str | None = None
+) -> CommonMessage:
     snap = v.snapshot
     pct = v.ctx_dump.get("pct_change_intraday", snap.pct_change)
     vol_ratio = v.ctx_dump.get("volume_ratio")
+    is_sector = v.rule.target_kind == "sector"
+    if is_sector:
+        pct = v.ctx_dump.get("sector_pct_change", 0)
 
     summary_lines = [
         f"⚡ 触发: {v.rule.id}({v.rule.expr})",
@@ -39,6 +44,13 @@ def build_alert_message(v: AlertVerdict) -> CommonMessage:
     if vol_ratio:
         summary_lines.append(f"量比: {vol_ratio:.2f}")
     summary_lines.append(f"⏱ {snap.ts.strftime('%H:%M:%S')}")
+    if is_sector:
+        summary_lines = [
+            f"⚡ 触发: {v.rule.id}({v.rule.expr})",
+            f"行业涨跌: {v.ctx_dump.get('sector_pct_change', 0):+.2f}%",
+            f"数据: {source_label}",
+            f"⏱ {snap.ts.strftime('%H:%M:%S')}",
+        ]
 
     badges = [
         Badge(text=f"#{snap.ticker}", color="blue"),
@@ -50,10 +62,15 @@ def build_alert_message(v: AlertVerdict) -> CommonMessage:
     return CommonMessage(
         title=f"{arrow} {snap.name} ({snap.ticker}) {v.rule.id}",
         summary="\n".join(summary_lines),
-        source_label="quote_watcher",
-        source_url=f"https://quote.eastmoney.com/{market_lc}{snap.ticker}.html",
+        source_label=source_label,
+        source_url=source_url
+        or (
+            "https://quote.eastmoney.com/center/gridlist.html#industry_board"
+            if is_sector
+            else f"https://quote.eastmoney.com/{market_lc}{snap.ticker}.html"
+        ),
         badges=badges,
-        deeplinks=_deeplinks_for_ticker(snap.ticker, snap.market),
+        deeplinks=[] if is_sector else _deeplinks_for_ticker(snap.ticker, snap.market),
         chart_url=None,
         market=Market.CN,
         kind="alert",

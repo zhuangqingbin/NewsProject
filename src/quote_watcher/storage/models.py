@@ -51,6 +51,7 @@ class QuoteBarDaily(Base):
     close: Mapped[float] = mapped_column(Float, nullable=False)
     prev_close: Mapped[float] = mapped_column(Float, nullable=False)
     volume: Mapped[int] = mapped_column(BigInteger, nullable=False)  # AKShare lots (100 shares)
+    volume_shares: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     __table_args__ = (UniqueConstraint("ticker", "trade_date", name="uq_bardaily_ticker_date"),)
 

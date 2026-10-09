@@ -173,8 +173,12 @@ async def _amain() -> None:
     cn_tickers_codes = [e.ticker for e in snap.quote_watchlist.cn]
     if cn_tickers_codes:
         try:
-            await kline_cache.load_for(cn_tickers_codes, days=250)
-            log.info("kline_warmup_ok", tickers=len(cn_tickers_codes))
+            history = await kline_cache.load_for(cn_tickers_codes, days=250)
+            missing = [code for code in cn_tickers_codes if not history.get(code)]
+            if missing:
+                log.warning("kline_warmup_incomplete", missing=missing)
+            else:
+                log.info("kline_warmup_ok", tickers=len(cn_tickers_codes))
         except Exception as e:
             log.warning("kline_warmup_failed", error=str(e))
 
@@ -212,6 +216,7 @@ async def _amain() -> None:
     scan_interval_sec = float(os.environ.get("QUOTE_SCAN_INTERVAL_SEC", "60"))
 
     sector_feed = SectorFeed()
+    log.info("quote_scan_providers", market=scan_feed.source_id, sector=sector_feed.source_id)
     sector_interval_sec = float(os.environ.get("QUOTE_SECTOR_INTERVAL_SEC", "60"))
 
     await _probe_quote_feeds(feed, tickers, scan_feed, sector_feed, bark)

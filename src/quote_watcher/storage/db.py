@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -20,6 +21,13 @@ class QuoteDatabase:
     async def initialize(self) -> None:
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            columns = await conn.run_sync(
+                lambda sync: {c["name"] for c in inspect(sync).get_columns("quote_bars_daily")}
+            )
+            if "volume_shares" not in columns:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE quote_bars_daily ADD COLUMN volume_shares BIGINT"
+                )
 
     def session(self) -> AsyncSession:
         return self._sessionmaker()

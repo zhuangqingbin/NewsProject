@@ -94,7 +94,13 @@ async def scan_market(
     result = rank_market(rows, cfg)
     if not (result.top_gainers or result.top_losers or result.top_volume_ratio):
         return 0
-    msg = build_market_scan_message(result, now=now_ts)
+    msg = build_market_scan_message(
+        result,
+        now=now_ts,
+        source_label=feed.source_label,
+        source_url=feed.source_url,
+        upstream_total=feed.total,
+    )
     await dispatcher.dispatch(msg, channels=channels)
     return 1
 
@@ -119,6 +125,6 @@ async def evaluate_sector_alerts(
         return 0
     verdicts = await engine.evaluate_sector(sector_snaps)
     for v in verdicts:
-        msg = build_alert_message(v)
+        msg = build_alert_message(v, source_label=feed.source_label, source_url=feed.source_url)
         await dispatcher.dispatch(msg, channels=channels)
     return len(verdicts)

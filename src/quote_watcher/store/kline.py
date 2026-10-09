@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 import akshare as ak
 import pandas as pd
 
+from quote_watcher.feeds.tencent_daily import fetch_tencent_daily
 from quote_watcher.storage.dao.quote_bars import QuoteBarsDailyDAO
 from quote_watcher.storage.db import QuoteDatabase
 from quote_watcher.storage.models import QuoteBarDaily
@@ -106,8 +107,9 @@ class DailyKlineCache:
                 continue
             # Cold or partial cache → call akshare
             self._unavailable.add(ticker)
+            start = previous_day - timedelta(days=days * 2)  # buffer for non-trading days
+            shares: dict[date, int] | None = None
             try:
-                start = previous_day - timedelta(days=days * 2)  # buffer for non-trading days
                 df = await asyncio.to_thread(
                     ak.stock_zh_a_hist,
                     symbol=ticker,
@@ -117,16 +119,33 @@ class DailyKlineCache:
                     adjust="qfq",
                     timeout=8,
                 )
+                tuples = [row for row in _ak_df_to_bars(ticker, df) if row[0] <= previous_day]
+                if not any(row[0] == previous_day for row in tuples):
+                    raise ValueError("Eastmoney history is missing the required completed session")
             except Exception as e:
-                log.warning("kline_fetch_failed", ticker=ticker, error=str(e))
-                out[ticker] = []
-                continue
-            tuples = [row for row in _ak_df_to_bars(ticker, df) if row[0] <= previous_day]
-            if not any(row[0] == previous_day for row in tuples):
-                log.warning("kline_completed_session_missing", ticker=ticker)
-                out[ticker] = []
-                continue
-            await self._dao.upsert_many(ticker, tuples)
+                log.warning("kline_primary_failed", ticker=ticker, error=type(e).__name__)
+                try:
+                    fallback = await fetch_tencent_daily(
+                        ticker, start=start, end=previous_day, days=days
+                    )
+                    tuples, shares = fallback.bars, fallback.volume_shares
+                    log.info(
+                        "kline_fallback_ok",
+                        ticker=ticker,
+                        source="tencent_daily",
+                        completed_through=str(previous_day),
+                        count=len(tuples),
+                    )
+                except Exception as fallback_error:
+                    log.warning(
+                        "kline_fetch_failed",
+                        ticker=ticker,
+                        source="tencent_daily",
+                        error=type(fallback_error).__name__,
+                    )
+                    out[ticker] = []
+                    continue
+            await self._dao.upsert_many(ticker, tuples, volume_shares=shares)
             self._verified_through[ticker] = previous_day
             self._unavailable.discard(ticker)
             cached = await self._dao.list_recent(ticker, days, through=previous_day)
@@ -142,7 +161,7 @@ class DailyKlineCache:
 
     @staticmethod
     def row_to_bar(ticker: str, row: QuoteBarDaily) -> DailyBar:
-        """Normalize persisted AKShare lots to shares exactly once at the read boundary."""
+        """Use exact shares where supplied; interpret legacy AKShare rows as lots."""
         return DailyBar(
             ticker=ticker,
             trade_date=row.trade_date,
@@ -151,6 +170,6 @@ class DailyKlineCache:
             low=row.low,
             close=row.close,
             prev_close=row.prev_close,
-            volume=row.volume * 100,
+            volume=row.volume_shares if row.volume_shares is not None else row.volume * 100,
             amount=row.amount,
         )

@@ -196,6 +196,7 @@ class AlertEngine:
             assert rule.sector is not None  # safe: filtered above
             sector_snap = sector_snaps.get(rule.sector)
             if sector_snap is None:
+                log.warning("sector_rule_unmatched", rule_id=rule.id, sector=rule.sector)
                 continue
             ctx = build_sector_context(rule.sector, sector_snap)
             if not self._eval_expr(rule, ctx):

@@ -54,6 +54,8 @@ services:
     environment:
       QUOTE_WATCHER_DB: /app/data/quotes.db
       QUOTE_FEED: ${QUOTE_FEED:-tencent}
+      MARKET_SCAN_FEED: ${MARKET_SCAN_FEED:-tencent}
+      SECTOR_FEED: ${SECTOR_FEED:-tencent}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       TZ: ${TZ:-Asia/Shanghai}
     deploy:

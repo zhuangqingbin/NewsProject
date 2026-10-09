@@ -31,6 +31,8 @@ class QuoteBarsDailyDAO:
         self,
         ticker: str,
         bars: list[tuple[date, float, float, float, float, float, int, float]],
+        *,
+        volume_shares: dict[date, int] | None = None,
     ) -> None:
         """bars: (trade_date, open, high, low, close, prev_close, volume, amount)."""
         if not bars:
@@ -56,6 +58,9 @@ class QuoteBarsDailyDAO:
                             close=c,
                             prev_close=pc,
                             volume=vol,
+                            volume_shares=volume_shares.get(d)
+                            if volume_shares is not None
+                            else None,
                             amount=amt,
                         )
                     )
@@ -66,5 +71,8 @@ class QuoteBarsDailyDAO:
                     existing.close = c
                     existing.prev_close = pc
                     existing.volume = vol
+                    existing.volume_shares = (
+                        volume_shares.get(d) if volume_shares is not None else None
+                    )
                     existing.amount = amt
             await sess.commit()

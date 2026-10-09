@@ -33,6 +33,9 @@ def build_market_scan_message(
     result: ScanResult,
     *,
     now: datetime,
+    source_label: str = "quote_watcher",
+    source_url: str = "https://quote.eastmoney.com/center.html",
+    upstream_total: int | None = None,
 ) -> CommonMessage:
     sections: list[str] = []
     g = _format_mover_lines("🚀", "涨幅", result.top_gainers)
@@ -46,13 +49,15 @@ def build_market_scan_message(
         sections.append("\n".join(v))
 
     summary = "无异动" if not sections else "\n\n".join(sections)
+    if upstream_total is not None:
+        summary += f"\n\n数据: {source_label} · 提供方股票总数 {upstream_total}"
 
     title = f"📊 A股 {now.strftime('%H:%M')} 异动榜"
     return CommonMessage(
         title=title,
         summary=summary,
-        source_label="quote_watcher",
-        source_url="https://quote.eastmoney.com/center.html",
+        source_label=source_label,
+        source_url=source_url,
         badges=[Badge(text="market_scan", color="blue")],
         chart_url=None,
         deeplinks=[],
